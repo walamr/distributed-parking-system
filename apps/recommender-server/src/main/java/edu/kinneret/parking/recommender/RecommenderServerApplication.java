@@ -1,7 +1,6 @@
 package edu.kinneret.parking.recommender;
 
 import edu.kinneret.parking.common.AppConfig;
-import edu.kinneret.parking.common.ParkingRepository;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -175,42 +174,43 @@ public class RecommenderServerApplication extends Application {
     }
 
     private static void runConsoleMenu() {
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("==========================================");
-        System.out.println("   RECOMMENDER NODE '" + nodeId + "' CLI");
-        System.out.println("==========================================");
-        System.out.println("Listen Port: " + port);
-        System.out.println("Leader status: " + isLeader);
+        try (Scanner scanner = new Scanner(System.in)) {
+            System.out.println("==========================================");
+            System.out.println("   RECOMMENDER NODE '" + nodeId + "' CLI");
+            System.out.println("==========================================");
+            System.out.println("Listen Port: " + port);
+            System.out.println("Leader status: " + isLeader);
 
-        while (true) {
-            System.out.println("\nNode Mode: " + (server.isMalicious() ? "MALICIOUS" : "NORMAL"));
-            System.out.println("Options: [m] Toggle Malicious Mode, [q] Quit Node");
-            System.out.print("Select: ");
-            
-            if (!scanner.hasNextLine()) {
-                // Keep the process alive in non-interactive environment (e.g. Docker)
-                while (true) {
-                    try {
-                        Thread.sleep(3600000);
-                    } catch (InterruptedException e) {
-                        break;
+            while (true) {
+                System.out.println("\nNode Mode: " + (server.isMalicious() ? "MALICIOUS" : "NORMAL"));
+                System.out.println("Options: [m] Toggle Malicious Mode, [q] Quit Node");
+                System.out.print("Select: ");
+                
+                if (!scanner.hasNextLine()) {
+                    // Keep the process alive in non-interactive environment (e.g. Docker)
+                    while (true) {
+                        try {
+                            Thread.sleep(3600000);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
                     }
+                    break;
                 }
-                break;
-            }
-            
-            String input = scanner.nextLine().trim().toLowerCase();
+                
+                String input = scanner.nextLine().trim().toLowerCase();
 
-            if ("q".equals(input)) {
-                System.out.println("Stopping Recommender Node...");
-                server.close();
-                break;
-            } else if ("m".equals(input)) {
-                boolean nextState = !server.isMalicious();
-                server.setMalicious(nextState);
-                System.out.println("SUCCESS: Toggled malicious mode to: " + nextState);
-            } else {
-                System.out.println("Invalid option.");
+                if ("q".equals(input)) {
+                    System.out.println("Stopping Recommender Node...");
+                    server.close();
+                    break;
+                } else if ("m".equals(input)) {
+                    boolean nextState = !server.isMalicious();
+                    server.setMalicious(nextState);
+                    System.out.println("SUCCESS: Toggled malicious mode to: " + nextState);
+                } else {
+                    System.out.println("Invalid option.");
+                }
             }
         }
         System.out.println("CLI terminated.");
