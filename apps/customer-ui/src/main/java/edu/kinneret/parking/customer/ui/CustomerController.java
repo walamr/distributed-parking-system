@@ -281,9 +281,13 @@ public class CustomerController {
      * @param timeItem       layout item
      * @param costItem       layout item
      * @param cardDivider    layout item
+     * @param requestItem    layout item
+     * @param resultItem     layout item
+     * @param recDivider     layout item
+     * @param requestLabel   the label showing the request
      */
     public void attachTimer(VBox infoCard, Label timerLabel, Label timerCostLabel, HBox rateItem, HBox timeItem,
-            HBox costItem, Separator cardDivider) {
+            HBox costItem, Separator cardDivider, HBox requestItem, HBox resultItem, Separator recDivider, Label requestLabel) {
         this.timerCostLabel = timerCostLabel;
         this.infoCard = infoCard;
 
@@ -324,7 +328,9 @@ public class CustomerController {
             boolean isMatchingJustStopped = isJustStopped && inputSpace.equalsIgnoreCase(lastActiveSpaceBeforeStop);
             
             boolean showSessionData = isMatchingActiveSpace || isMatchingJustStopped;
-            boolean shouldShowCard = hasRate || hasStatus || showSessionData;
+            boolean hasRecommendation = requestLabel != null && requestLabel.getText() != null && !"-".equals(requestLabel.getText()) && !"...".equals(requestLabel.getText());
+            boolean showRec = !showSessionData && hasRecommendation;
+            boolean shouldShowCard = hasRate || hasStatus || showSessionData || showRec;
 
             Platform.runLater(() -> {
                 if (this.infoCard != null) {
@@ -348,6 +354,18 @@ public class CustomerController {
                     cardDivider.setVisible(showDivider);
                     cardDivider.setManaged(showDivider);
                 }
+                if (requestItem != null) {
+                    requestItem.setVisible(showRec);
+                    requestItem.setManaged(showRec);
+                }
+                if (resultItem != null) {
+                    resultItem.setVisible(showRec);
+                    resultItem.setManaged(showRec);
+                }
+                if (recDivider != null) {
+                    recDivider.setVisible(showRec);
+                    recDivider.setManaged(showRec);
+                }
             });
         };
 
@@ -359,6 +377,9 @@ public class CustomerController {
         }
         if (spaceNumberField != null) {
             spaceNumberField.textProperty().addListener(visibilityListener);
+        }
+        if (requestLabel != null) {
+            requestLabel.textProperty().addListener(visibilityListener);
         }
     }
 
@@ -1362,30 +1383,23 @@ public class CustomerController {
         }
     }
 
-    private Button recommendButton;
-    private ComboBox<String> recommenderNodeCombo;
     private Label requestLabel;
     private Label resultLabel;
 
     /**
      * Attaches the recommendation panel controls.
      *
-     * @param recommendButton the recommendation request trigger button
-     * @param recommenderNodeCombo the cluster node selector ComboBox
-     * @param recommendationResultLabel the recommendation result output label
+     * @param requestLabel the recommendation request output label
+     * @param resultLabel the recommendation result output label
      */
-    public void attachRecommender(Button recommendButton, ComboBox<String> recommenderNodeCombo, Label requestLabel, Label resultLabel) {
-        this.recommendButton = recommendButton;
-        this.recommenderNodeCombo = recommenderNodeCombo;
+    public void attachRecommender(Label requestLabel, Label resultLabel) {
         this.requestLabel = requestLabel;
         this.resultLabel = resultLabel;
-
-        this.recommendButton.setOnAction(e -> handleRecommend());
 
         if (this.spaceNumberField != null) {
             this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null && !newVal.trim().isEmpty()) {
-                    fetchPreviewOnly(newVal.trim());
+                    fetchRecommendation(newVal.trim());
                 } else {
                     requestLabel.setText("-");
                     resultLabel.setText("-");
@@ -1394,82 +1408,15 @@ public class CustomerController {
         }
     }
 
-    private void fetchPreviewOnly(String spaceId) {
+    private void fetchRecommendation(String spaceId) {
         try {
             ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
             return;
         }
 
-        String selectedNode = recommenderNodeCombo.getValue();
-        int port = 8091; // default
-        if (selectedNode != null) {
-            if (selectedNode.contains("Node 2")) port = 8092;
-            else if (selectedNode.contains("Node 3")) port = 8093;
-        }
-        final int finalPort = port;
-
-        Task<String> task = new Task<>() {
-            @Override
-            protected String call() throws Exception {
-                JsonObject request = new JsonObject();
-                request.addProperty("type", "CLIENT_QUERY");
-                request.addProperty("spaceId", spaceId.trim());
-                request.addProperty("correlationId", UUID.randomUUID().toString());
-
-                try (Socket socket = new Socket()) {
-                    socket.connect(new java.net.InetSocketAddress("localhost", finalPort), 3000);
-                    try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-                         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-                        writer.println(request.toString());
-                        String responseLine = reader.readLine();
-                        if (responseLine == null) throw new IOException("Empty response");
-                        return responseLine;
-                    }
-                }
-            }
-        };
-
-        task.setOnSucceeded(e -> {
-            try {
-                JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
-                if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
-                    String resultText = response.get("result").getAsString();
-                    String[] parts = resultText.split("\n");
-                    if (parts.length >= 2) {
-                        requestLabel.setText(parts[0].replace("Request:", "").trim());
-                        resultLabel.setText(parts[1].replace("Result:", "").trim());
-                    }
-                }
-            } catch (Exception ex) {
-            }
-        });
-        new Thread(task).start();
-    }
-
-    private void handleRecommend() {
-        String spaceId = spaceNumberField.getText();
-        if (spaceId == null || spaceId.trim().isEmpty()) {
-            setStatus("Error: Parking Space ID is required for recommendation.", true);
-            return;
-        }
-        try {
-            ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            setStatus("Error: Invalid parking space format.", true);
-            return;
-        }
-
-        String selectedNode = recommenderNodeCombo.getValue();
-        int port = 8091; // default
-        if (selectedNode != null) {
-            if (selectedNode.contains("Node 2")) {
-                port = 8092;
-            } else if (selectedNode.contains("Node 3")) {
-                port = 8093;
-            }
-        }
-        final int finalPort = port;
+        int[] ports = {8091, 8092, 8093};
+        final int finalPort = ports[(int) (Math.random() * 3)];
 
         requestLabel.setText("...");
         resultLabel.setText("...");
@@ -1521,7 +1468,6 @@ public class CustomerController {
         });
 
         task.setOnFailed(e -> {
-            Throwable ex = task.getException();
             requestLabel.setText("Failed");
             resultLabel.setText("Node unreachable");
         });
