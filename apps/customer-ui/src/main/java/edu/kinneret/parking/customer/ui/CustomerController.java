@@ -1364,7 +1364,8 @@ public class CustomerController {
 
     private Button recommendButton;
     private ComboBox<String> recommenderNodeCombo;
-    private Label recommendationResultLabel;
+    private Label requestLabel;
+    private Label resultLabel;
 
     /**
      * Attaches the recommendation panel controls.
@@ -1373,10 +1374,11 @@ public class CustomerController {
      * @param recommenderNodeCombo the cluster node selector ComboBox
      * @param recommendationResultLabel the recommendation result output label
      */
-    public void attachRecommender(Button recommendButton, ComboBox<String> recommenderNodeCombo, Label recommendationResultLabel) {
+    public void attachRecommender(Button recommendButton, ComboBox<String> recommenderNodeCombo, Label requestLabel, Label resultLabel) {
         this.recommendButton = recommendButton;
         this.recommenderNodeCombo = recommenderNodeCombo;
-        this.recommendationResultLabel = recommendationResultLabel;
+        this.requestLabel = requestLabel;
+        this.resultLabel = resultLabel;
 
         this.recommendButton.setOnAction(e -> handleRecommend());
 
@@ -1385,8 +1387,8 @@ public class CustomerController {
                 if (newVal != null && !newVal.trim().isEmpty()) {
                     fetchPreviewOnly(newVal.trim());
                 } else {
-                    recommendationResultLabel.setText("");
-                    recommendationResultLabel.setStyle("-fx-background-color: transparent; -fx-border-width: 0; -fx-effect: none;");
+                    requestLabel.setText("-");
+                    resultLabel.setText("-");
                 }
             });
         }
@@ -1433,18 +1435,11 @@ public class CustomerController {
                 JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
                 if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
                     String resultText = response.get("result").getAsString();
-                    recommendationResultLabel.setText(resultText);
-                    recommendationResultLabel.setStyle(
-                        "-fx-background-color: white;" +
-                        "-fx-text-fill: black;" +
-                        "-fx-font-family: monospace;" +
-                        "-fx-font-size: 14px;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-padding: 10 15 10 15;" +
-                        "-fx-border-color: transparent transparent transparent #00a0e9;" +
-                        "-fx-border-width: 0 0 0 5;" +
-                        "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
-                    );
+                    String[] parts = resultText.split("\n");
+                    if (parts.length >= 2) {
+                        requestLabel.setText(parts[0].replace("Request:", "").trim());
+                        resultLabel.setText(parts[1].replace("Result:", "").trim());
+                    }
                 }
             } catch (Exception ex) {
             }
@@ -1476,8 +1471,8 @@ public class CustomerController {
         }
         final int finalPort = port;
 
-        recommendationResultLabel.setText("Calculating recommendation...");
-        recommendationResultLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-background-color: transparent; -fx-border-width: 0; -fx-effect: none;");
+        requestLabel.setText("...");
+        resultLabel.setText("...");
 
         Task<String> task = new Task<>() {
             @Override
@@ -1509,33 +1504,26 @@ public class CustomerController {
                 String status = response.get("status").getAsString();
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     String result = response.get("result").getAsString();
-                    recommendationResultLabel.setText(result);
-                    recommendationResultLabel.setStyle(
-                        "-fx-background-color: white;" +
-                        "-fx-text-fill: black;" +
-                        "-fx-font-family: monospace;" +
-                        "-fx-font-size: 12px;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-padding: 10 15 10 15;" +
-                        "-fx-border-color: transparent transparent transparent #00a0e9;" +
-                        "-fx-border-width: 0 0 0 5;" +
-                        "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
-                    );
+                    String[] parts = result.split("\n");
+                    if (parts.length >= 2) {
+                        requestLabel.setText(parts[0].replace("Request:", "").trim());
+                        resultLabel.setText(parts[1].replace("Result:", "").trim());
+                    }
                 } else {
                     String reason = response.has("reason") ? response.get("reason").getAsString() : "Consensus failed.";
-                    recommendationResultLabel.setText("Failed: " + reason);
-                    recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+                    requestLabel.setText("Failed");
+                    resultLabel.setText(reason);
                 }
             } catch (Exception ex) {
-                recommendationResultLabel.setText("Failed: Invalid response structure.");
-                recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+                requestLabel.setText("Failed");
+                resultLabel.setText("Invalid response");
             }
         });
 
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
-            recommendationResultLabel.setText("Failed to reach node: " + ex.getMessage());
-            recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+            requestLabel.setText("Failed");
+            resultLabel.setText("Node unreachable");
         });
 
         new Thread(task).start();

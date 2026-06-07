@@ -240,7 +240,7 @@ public class CustomerApp extends Application {
         costItem.getChildren().addAll(costHeader, timerCostLabel);
         
         dataRows.getChildren().addAll(timeItem, costItem);
-        infoCard.getChildren().addAll(areaItem, rateItem, cardDivider, dataRows);
+        // We will add recResultLabel here later after it is initialized
 
         VBox errorCard = new VBox();
         errorCard.setStyle("-fx-background-color: white; -fx-background-radius: 15; -fx-padding: 20;");
@@ -295,12 +295,28 @@ public class CustomerApp extends Application {
         recommendBtn.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b; -fx-font-weight: bold; -fx-cursor: hand;");
         recommendBtn.setMaxWidth(Double.MAX_VALUE);
 
-        Label recResultLabel = new Label("Enter space ID above and click get");
-        recResultLabel.setStyle("-fx-text-fill: #a6adc8; -fx-font-size: 13px; -fx-alignment: center;");
-        recResultLabel.setMaxWidth(Double.MAX_VALUE);
-        recResultLabel.setAlignment(Pos.CENTER);
+        HBox requestItem = new HBox(15);
+        requestItem.setAlignment(Pos.CENTER_LEFT);
+        Label requestHeader = new Label("REQUEST:");
+        requestHeader.getStyleClass().add("dashboard-label");
+        requestHeader.setMinWidth(64);
+        Label requestLabel = new Label("-");
+        requestLabel.getStyleClass().add("dashboard-value-secondary");
+        requestItem.getChildren().addAll(requestHeader, requestLabel);
 
-        recSection.getChildren().addAll(recTitle, recNodeCombo, recommendBtn, recResultLabel);
+        HBox resultItem = new HBox(15);
+        resultItem.setAlignment(Pos.CENTER_LEFT);
+        Label resultHeader = new Label("RESULT:");
+        resultHeader.getStyleClass().add("dashboard-label");
+        resultHeader.setMinWidth(64);
+        Label resultLabel = new Label("-");
+        resultLabel.getStyleClass().add("dashboard-value-primary");
+        resultItem.getChildren().addAll(resultHeader, resultLabel);
+
+        recSection.getChildren().addAll(recTitle, recNodeCombo, recommendBtn);
+
+        // Add the new beautifully formatted request and result rows to the info card
+        infoCard.getChildren().addAll(areaItem, rateItem, requestItem, resultItem, cardDivider, dataRows);
 
         Region dashboardSpacer = new Region();
         dashboardSpacer.setPrefHeight(40);
@@ -522,7 +538,7 @@ public class CustomerApp extends Application {
         controller.attachButtons(startButton, stopButton, fetchHistoryBtn);
         controller.attachTimer(infoCard, timerLabel, timerCostLabel, rateItem, timeItem, costItem, cardDivider);
         controller.attachHistoryStatus(historyStatusLabel);
-        controller.attachRecommender(recommendBtn, recNodeCombo, recResultLabel);
+        controller.attachRecommender(recommendBtn, recNodeCombo, requestLabel, resultLabel);
 
         // Restore persisted local transactions from disk (fix: stop operations survive app restarts)
         controller.loadPersistedTransactions(associatedVin);
