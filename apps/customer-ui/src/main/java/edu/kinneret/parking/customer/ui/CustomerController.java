@@ -1406,7 +1406,7 @@ public class CustomerController {
         final int finalPort = port;
 
         recommendationResultLabel.setText("Calculating recommendation...");
-        recommendationResultLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-weight: bold;");
+        recommendationResultLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-weight: bold; -fx-background-color: transparent; -fx-border-width: 0; -fx-effect: none;");
 
         Task<String> task = new Task<>() {
             @Override
@@ -1438,8 +1438,18 @@ public class CustomerController {
                 String status = response.get("status").getAsString();
                 if ("SUCCESS".equalsIgnoreCase(status)) {
                     String result = response.get("result").getAsString();
-                    recommendationResultLabel.setText("Recommended: " + result);
-                    recommendationResultLabel.setStyle("-fx-text-fill: #a6e3a1; -fx-font-weight: bold; -fx-font-size: 13px;");
+                    recommendationResultLabel.setText(result);
+                    recommendationResultLabel.setStyle(
+                        "-fx-background-color: white;" +
+                        "-fx-text-fill: black;" +
+                        "-fx-font-family: monospace;" +
+                        "-fx-font-size: 12px;" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-padding: 10 15 10 15;" +
+                        "-fx-border-color: transparent transparent transparent #00a0e9;" +
+                        "-fx-border-width: 0 0 0 5;" +
+                        "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
+                    );
                 } else {
                     String reason = response.has("reason") ? response.get("reason").getAsString() : "Consensus failed.";
                     recommendationResultLabel.setText("Failed: " + reason);

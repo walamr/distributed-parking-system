@@ -38,17 +38,15 @@ public class RecommenderServerTest {
                 new RecommendationResult("3", 1)
         );
         String serialized = RecommenderServer.serializeResults(results);
-        // Verify it is sorted by space number
-        assertEquals("3;1, 4;2", serialized);
+        // Verify it returns only the first item (since 3 < 4, it is sorted)
+        assertEquals("3;1", serialized);
     }
 
     @Test
     public void testMaliciousMode() {
         server.setMalicious(true);
-        List<RecommendationResult> results = server.calculateLocalRecommendation("3");
-        assertEquals(1, results.size());
-        assertEquals("999", results.get(0).spaceId());
-        assertEquals(999, results.get(0).citationCount());
+        String result = server.calculateLocalRecommendation("3");
+        assertTrue(result.startsWith("Request: Space 3\nResult: Space 999;999"));
     }
 
     @Test
@@ -57,10 +55,8 @@ public class RecommenderServerTest {
         // Therefore, the desired space itself is available and has minimum citations (0).
         // Branch B should apply and return the desired space itself.
         try (ParkingRepository repository = new ParkingRepository(appConfig)) {
-            List<RecommendationResult> results = server.calculateLocalRecommendation("3", repository);
-            assertEquals(1, results.size());
-            assertEquals("3", results.get(0).spaceId());
-            assertEquals(0, results.get(0).citationCount());
+            String result = server.calculateLocalRecommendation("3", repository);
+            assertTrue(result.startsWith("Request: Space 3\nResult: Space 3;0"));
         }
     }
 

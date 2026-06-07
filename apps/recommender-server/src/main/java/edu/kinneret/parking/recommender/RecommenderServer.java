@@ -153,7 +153,7 @@ public class RecommenderServer implements AutoCloseable {
                 clientWriter.println(response.toString());
             } else {
                 // Follower: calculate local result, then forward to leader
-                String localResult = serializeResults(calculateLocalRecommendation(spaceId));
+                String localResult = calculateLocalRecommendation(spaceId);
                 JsonObject forwardRequest = new JsonObject();
                 forwardRequest.addProperty("type", "FORWARD_QUERY");
                 forwardRequest.addProperty("spaceId", spaceId);
@@ -218,11 +218,11 @@ public class RecommenderServer implements AutoCloseable {
 
     private void handleCollectRequest(String spaceId, PrintWriter writer) {
         try {
-            List<RecommendationResult> localResults = calculateLocalRecommendation(spaceId);
+            String localResult = calculateLocalRecommendation(spaceId);
             JsonObject response = new JsonObject();
             response.addProperty("type", "COLLECT_RESPONSE");
             response.addProperty("nodeId", nodeId);
-            response.addProperty("localResult", serializeResults(localResults));
+            response.addProperty("localResult", localResult);
             writer.println(response.toString());
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleCollectRequest on follower " + nodeId, e);
@@ -242,7 +242,7 @@ public class RecommenderServer implements AutoCloseable {
         Map<String, String> votes = new ConcurrentHashMap<>();
         
         // 1. Calculate leader's own local result
-        String leaderResult = serializeResults(calculateLocalRecommendation(spaceId));
+        String leaderResult = calculateLocalRecommendation(spaceId);
         votes.put(nodeId, leaderResult);
 
         // 2. Put any explicit votes already received (e.g. from forwarding follower)
@@ -341,9 +341,9 @@ public class RecommenderServer implements AutoCloseable {
      * Calculates the local recommendation.
      *
      * @param desiredSpaceId the requested space number/ID
-     * @return the list of recommendation results
+     * @return the formatted recommendation string
      */
-    public List<RecommendationResult> calculateLocalRecommendation(String desiredSpaceId) {
+    public String calculateLocalRecommendation(String desiredSpaceId) {
         try (ParkingRepository repository = new ParkingRepository(appConfig)) {
             return calculateLocalRecommendation(desiredSpaceId, repository);
         }
@@ -354,14 +354,12 @@ public class RecommenderServer implements AutoCloseable {
      *
      * @param desiredSpaceId the requested space number/ID
      * @param repository     the repository instance to use
-     * @return the list of recommendation results
+     * @return the formatted recommendation string
      */
-    public List<RecommendationResult> calculateLocalRecommendation(String desiredSpaceId, ParkingRepository repository) {
+    public String calculateLocalRecommendation(String desiredSpaceId, ParkingRepository repository) {
         if (isMalicious) {
             // Malicious mode: return faked space and high citation count
-            List<RecommendationResult> list = new ArrayList<>();
-            list.add(new RecommendationResult("999", 999));
-            return list;
+            return "Request: Space " + desiredSpaceId + "\nResult: Space 999;999";
         }
 
         // Validate space ID format
@@ -383,22 +381,27 @@ public class RecommenderServer implements AutoCloseable {
                 throw new IllegalArgumentException("Zone could not be identified for space " + desiredSpaceId);
             }
 
-            // Fetch all spaces in the zone from DB
+            // Calculate citations for the desired space regardless of whether it is occupied
+            long desiredSpaceCitations = 0;
+            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                desiredSpaceCitations = repository.getDatabase().getCollection("citations")
+                        .countDocuments(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.eq("payload.spaceId", desiredSpaceId),
+                                com.mongodb.client.model.Filters.eq("spaceId", desiredSpaceId)
+                        ));
+            }
+            String requestedPart = "Request: Space " + desiredSpaceId;
+
+            // Fetch ALL spaces from DB (Do not restrict to the same zone to allow finding numerically closest spaces)
             List<Document> allSpacesInZone = new ArrayList<>();
             if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
                 repository.getDatabase().getCollection("spaces")
-                        .find(new Document("zoneName", zoneName))
+                        .find()
                         .into(allSpacesInZone);
             } else {
-                // Testing fallback: if database client is not initialized, generate zone space list in-memory
-                int desiredNum = parseSpaceNumber(desiredSpaceId);
-                if (desiredNum >= 1 && desiredNum <= 100) {
-                    int zoneIdx = (desiredNum - 1) % 10;
-                    for (int i = 1; i <= 100; i++) {
-                        if ((i - 1) % 10 == zoneIdx) {
-                            allSpacesInZone.add(new Document("spaceId", String.valueOf(i)).append("zoneName", zoneName));
-                        }
-                    }
+                // Testing fallback: if database client is not initialized, generate all 100 spaces in-memory
+                for (int i = 1; i <= 100; i++) {
+                    allSpacesInZone.add(new Document("spaceId", String.valueOf(i)));
                 }
             }
 
@@ -436,10 +439,10 @@ public class RecommenderServer implements AutoCloseable {
 
             // Branch C: No spaces available
             if (candidates.isEmpty()) {
-                return new ArrayList<>();
+                return requestedPart + "\nResult: NONE";
             }
 
-            // Find the minimum citation count among available spaces in the zone
+            // Find the minimum citation count among all available spaces
             long minCitations = Long.MAX_VALUE;
             for (SpaceCandidate c : candidates) {
                 if (c.citationCount < minCitations) {
@@ -447,28 +450,17 @@ public class RecommenderServer implements AutoCloseable {
                 }
             }
 
-            // Filter spaces matching minimum citation count
+            // Filter down to only spaces that have the minimum citations
             List<SpaceCandidate> minCitationCandidates = new ArrayList<>();
-            boolean enteredSpaceIsAvailableAndMin = false;
             for (SpaceCandidate c : candidates) {
                 if (c.citationCount == minCitations) {
                     minCitationCandidates.add(c);
-                    if (c.spaceId.equals(desiredSpaceId)) {
-                        enteredSpaceIsAvailableAndMin = true;
-                    }
                 }
             }
 
+            int desiredNum = parseSpaceNumber(desiredSpaceId);
             List<RecommendationResult> results = new ArrayList<>();
 
-            // Branch B: Entered space is available and has minimum citations
-            if (enteredSpaceIsAvailableAndMin) {
-                results.add(new RecommendationResult(desiredSpaceId, minCitations));
-                return results;
-            }
-
-            // Branch A: Find space(s) with minimum citations and smallest absolute value distance
-            int desiredNum = parseSpaceNumber(desiredSpaceId);
             if (desiredNum != -1) {
                 int minDistance = Integer.MAX_VALUE;
                 List<SpaceCandidate> closestCandidates = new ArrayList<>();
@@ -495,8 +487,50 @@ public class RecommenderServer implements AutoCloseable {
                     results.add(new RecommendationResult(c.spaceId, c.citationCount));
                 }
             }
+            String recommendedPart = "Space " + serializeResults(results);
 
-            return results;
+            // Build the formatted ASCII table
+            StringBuilder tableBuilder = new StringBuilder();
+            tableBuilder.append("\n\n");
+            int dNum = parseSpaceNumber(desiredSpaceId);
+            if (dNum == -1) dNum = 3;
+            int startSpace = Math.max(1, dNum - 2);
+            int endSpace = startSpace + 5;
+
+            tableBuilder.append(String.format("%-10s|", "Space #"));
+            for (int i = startSpace; i <= endSpace; i++) {
+                tableBuilder.append(String.format("%2d|", i));
+            }
+            tableBuilder.append("\n");
+
+            tableBuilder.append(String.format("%-10s|", "Tickets"));
+            for (int i = startSpace; i <= endSpace; i++) {
+                long cCount = 0;
+                if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                    cCount = repository.getDatabase().getCollection("citations")
+                            .countDocuments(com.mongodb.client.model.Filters.or(
+                                    com.mongodb.client.model.Filters.eq("payload.spaceId", String.valueOf(i)),
+                                    com.mongodb.client.model.Filters.eq("spaceId", String.valueOf(i))
+                            ));
+                }
+                tableBuilder.append(String.format("%2d|", cCount));
+            }
+            tableBuilder.append("\n");
+
+            tableBuilder.append(String.format("%-10s|", "Busy?"));
+            for (int i = startSpace; i <= endSpace; i++) {
+                boolean busy = false;
+                Document lastTx = repository.getLatestTransactionForSpace(String.valueOf(i));
+                if (lastTx != null) {
+                    String action = ParkingRepository.readTransactionAction(lastTx);
+                    if ("start".equalsIgnoreCase(action)) {
+                        busy = true;
+                    }
+                }
+                tableBuilder.append(String.format("%2s|", busy ? " Y" : " N"));
+            }
+
+            return requestedPart + "\nResult: " + recommendedPart + tableBuilder.toString();
         } catch (Exception e) {
             logger.log(Level.WARNING, "Database lookup failed for recommendation", e);
             throw new RuntimeException("Recommender DB error: " + e.getMessage(), e);
@@ -540,7 +574,7 @@ public class RecommenderServer implements AutoCloseable {
             RecommendationResult r = sorted.get(i);
             sb.append(r.spaceId()).append(";").append(r.citationCount());
             if (i < sorted.size() - 1) {
-                sb.append(", ");
+                sb.append(", Space ");
             }
         }
         return sb.toString();
