@@ -489,48 +489,7 @@ public class RecommenderServer implements AutoCloseable {
             }
             String recommendedPart = "Space " + serializeResults(results);
 
-            // Build the formatted ASCII table
-            StringBuilder tableBuilder = new StringBuilder();
-            tableBuilder.append("\n\n");
-            int dNum = parseSpaceNumber(desiredSpaceId);
-            if (dNum == -1) dNum = 3;
-            int startSpace = Math.max(1, dNum - 2);
-            int endSpace = startSpace + 5;
-
-            tableBuilder.append(String.format("%-10s|", "Space #"));
-            for (int i = startSpace; i <= endSpace; i++) {
-                tableBuilder.append(String.format("%2d|", i));
-            }
-            tableBuilder.append("\n");
-
-            tableBuilder.append(String.format("%-10s|", "Tickets"));
-            for (int i = startSpace; i <= endSpace; i++) {
-                long cCount = 0;
-                if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                    cCount = repository.getDatabase().getCollection("citations")
-                            .countDocuments(com.mongodb.client.model.Filters.or(
-                                    com.mongodb.client.model.Filters.eq("payload.spaceId", String.valueOf(i)),
-                                    com.mongodb.client.model.Filters.eq("spaceId", String.valueOf(i))
-                            ));
-                }
-                tableBuilder.append(String.format("%2d|", cCount));
-            }
-            tableBuilder.append("\n");
-
-            tableBuilder.append(String.format("%-10s|", "Busy?"));
-            for (int i = startSpace; i <= endSpace; i++) {
-                boolean busy = false;
-                Document lastTx = repository.getLatestTransactionForSpace(String.valueOf(i));
-                if (lastTx != null) {
-                    String action = ParkingRepository.readTransactionAction(lastTx);
-                    if ("start".equalsIgnoreCase(action)) {
-                        busy = true;
-                    }
-                }
-                tableBuilder.append(String.format("%2s|", busy ? " Y" : " N"));
-            }
-
-            return requestedPart + "\nResult: " + recommendedPart + tableBuilder.toString();
+            return requestedPart + "\nResult: " + recommendedPart;
         } catch (Exception e) {
             logger.log(Level.WARNING, "Database lookup failed for recommendation", e);
             throw new RuntimeException("Recommender DB error: " + e.getMessage(), e);

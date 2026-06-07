@@ -305,7 +305,7 @@ public class CustomerApp extends Application {
         Region dashboardSpacer = new Region();
         dashboardSpacer.setPrefHeight(40);
 
-        dashboardView.getChildren().addAll(dashboardSpacer, createTopBar(() -> toggleSidebarRef[0].run(), true), dashboardInputs, dashboardActions, recSection, errorCard, statusLabel, infoCard, historyLink);
+        dashboardView.getChildren().addAll(dashboardSpacer, createTopBar(() -> toggleSidebarRef[0].run(), true), dashboardInputs, dashboardActions, errorCard, statusLabel, infoCard, recSection, historyLink);
         dashboardView.setAlignment(Pos.TOP_CENTER);
         dashboardView.getStyleClass().add("glass-pane");
         dashboardView.setMaxWidth(380);

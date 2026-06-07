@@ -1383,7 +1383,7 @@ public class CustomerController {
         if (this.spaceNumberField != null) {
             this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null && !newVal.trim().isEmpty()) {
-                    fetchTableOnly(newVal.trim());
+                    fetchPreviewOnly(newVal.trim());
                 } else {
                     recommendationResultLabel.setText("");
                     recommendationResultLabel.setStyle("-fx-background-color: transparent; -fx-border-width: 0; -fx-effect: none;");
@@ -1392,7 +1392,7 @@ public class CustomerController {
         }
     }
 
-    private void fetchTableOnly(String spaceId) {
+    private void fetchPreviewOnly(String spaceId) {
         try {
             ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
@@ -1432,23 +1432,19 @@ public class CustomerController {
             try {
                 JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
                 if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
-                    String fullResult = response.get("result").getAsString();
-                    int tableStart = fullResult.indexOf("Space #");
-                    if (tableStart != -1) {
-                        String tableOnly = "\n" + fullResult.substring(tableStart);
-                        recommendationResultLabel.setText(tableOnly);
-                        recommendationResultLabel.setStyle(
-                            "-fx-background-color: white;" +
-                            "-fx-text-fill: black;" +
-                            "-fx-font-family: monospace;" +
-                            "-fx-font-size: 12px;" +
-                            "-fx-font-weight: bold;" +
-                            "-fx-padding: 10 15 10 15;" +
-                            "-fx-border-color: transparent transparent transparent #00a0e9;" +
-                            "-fx-border-width: 0 0 0 5;" +
-                            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
-                        );
-                    }
+                    String resultText = response.get("result").getAsString();
+                    recommendationResultLabel.setText(resultText);
+                    recommendationResultLabel.setStyle(
+                        "-fx-background-color: white;" +
+                        "-fx-text-fill: black;" +
+                        "-fx-font-family: monospace;" +
+                        "-fx-font-size: 14px;" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-padding: 10 15 10 15;" +
+                        "-fx-border-color: transparent transparent transparent #00a0e9;" +
+                        "-fx-border-width: 0 0 0 5;" +
+                        "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
+                    );
                 }
             } catch (Exception ex) {
             }
