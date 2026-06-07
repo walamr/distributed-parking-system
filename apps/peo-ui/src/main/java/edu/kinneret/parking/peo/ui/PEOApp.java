@@ -48,10 +48,19 @@ public class PEOApp extends Application {
         primaryStage.setTitle("Mulligan Parking System - Enforcement Cluster UI");
         primaryStage.setAlwaysOnTop(true);
         primaryStage.setResizable(false);
-        primaryStage.setMinWidth(390);
-        primaryStage.setMinHeight(844);
-        primaryStage.setMaxWidth(390);
-        primaryStage.setMaxHeight(844);
+        
+        javafx.geometry.Rectangle2D bounds = javafx.stage.Screen.getPrimary().getBounds();
+        double targetHeight = bounds.getHeight();
+        double scaleFactor = targetHeight / 844.0;
+        double targetWidth = 390.0 * scaleFactor;
+        
+        primaryStage.setMinWidth(targetWidth);
+        primaryStage.setMinHeight(targetHeight);
+        primaryStage.setMaxWidth(targetWidth);
+        primaryStage.setMaxHeight(targetHeight);
+        
+        primaryStage.setX((bounds.getWidth() - targetWidth) / 2.0); // Center horizontally
+        primaryStage.setY(0.0); // Align to the absolute top edge of the screen
         primaryStage.maximizedProperty().addListener((obs, oldVal, newValue) -> {
             if (newValue) {
                 primaryStage.setMaximized(false);
@@ -59,7 +68,10 @@ public class PEOApp extends Application {
         });
         
         Parent root = createContent();
-        Scene scene = new Scene(root, 390, 844);
+        javafx.scene.Group scaleGroup = new javafx.scene.Group(root);
+        scaleGroup.getTransforms().add(new javafx.scene.transform.Scale(scaleFactor, scaleFactor));
+        
+        Scene scene = new Scene(scaleGroup, targetWidth, targetHeight);
         try {
             scene.getStylesheets().add(getClass().getResource("/peo-style.css").toExternalForm());
         } catch (Exception e) {}

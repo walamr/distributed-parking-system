@@ -48,10 +48,19 @@ public class CustomerApp extends Application {
         primaryStage.setTitle("Mulligan Parking System - Customer Cluster UI");
         primaryStage.setAlwaysOnTop(true);
         primaryStage.setResizable(false);
-        primaryStage.setMinWidth(390);
-        primaryStage.setMinHeight(844);
-        primaryStage.setMaxWidth(390);
-        primaryStage.setMaxHeight(844);
+        
+        javafx.geometry.Rectangle2D bounds = javafx.stage.Screen.getPrimary().getBounds();
+        double targetHeight = bounds.getHeight();
+        double scaleFactor = targetHeight / 844.0;
+        double targetWidth = 390.0 * scaleFactor;
+        
+        primaryStage.setMinWidth(targetWidth);
+        primaryStage.setMinHeight(targetHeight);
+        primaryStage.setMaxWidth(targetWidth);
+        primaryStage.setMaxHeight(targetHeight);
+        
+        primaryStage.setX((bounds.getWidth() - targetWidth) / 2.0); // Center horizontally
+        primaryStage.setY(0.0); // Align to the absolute top edge of the screen
         primaryStage.maximizedProperty().addListener((obs, oldVal, newValue) -> {
             if (newValue) {
                 primaryStage.setMaximized(false);
@@ -59,8 +68,10 @@ public class CustomerApp extends Application {
         });
 
         Parent root = createContent(primaryStage);
+        javafx.scene.Group scaleGroup = new javafx.scene.Group(root);
+        scaleGroup.getTransforms().add(new javafx.scene.transform.Scale(scaleFactor, scaleFactor));
 
-        Scene scene = new Scene(root, 390, 844);
+        Scene scene = new Scene(scaleGroup, targetWidth, targetHeight);
         scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
         try {
             scene.getStylesheets().add(getClass().getResource("/customer-style.css").toExternalForm());
@@ -209,14 +220,14 @@ public class CustomerApp extends Application {
         rateItem.setAlignment(Pos.CENTER_LEFT);
         Label rateHeader = new Label("RATE:");
         rateHeader.getStyleClass().add("dashboard-label");
-        rateHeader.setMinWidth(64);
+        rateHeader.setMinWidth(115);
         rateItem.getChildren().addAll(rateHeader, rateLabel);
         
         HBox areaItem = new HBox(15);
         areaItem.setAlignment(Pos.CENTER_LEFT);
         Label areaHeader = new Label("AREA:");
         areaHeader.getStyleClass().add("dashboard-label");
-        areaHeader.setMinWidth(64);
+        areaHeader.setMinWidth(115);
         Label areaLabel = new Label();
         areaLabel.getStyleClass().add("dashboard-value-secondary");
         areaItem.getChildren().addAll(areaHeader, areaLabel);
@@ -229,14 +240,14 @@ public class CustomerApp extends Application {
         timeItem.setAlignment(Pos.CENTER_LEFT);
         Label timeHeader = new Label("TIME:");
         timeHeader.getStyleClass().add("dashboard-label");
-        timeHeader.setMinWidth(64);
+        timeHeader.setMinWidth(115);
         timeItem.getChildren().addAll(timeHeader, timerLabel);
 
         HBox costItem = new HBox(15);
         costItem.setAlignment(Pos.CENTER_LEFT);
         Label costHeader = new Label("COST:");
         costHeader.getStyleClass().add("dashboard-label");
-        costHeader.setMinWidth(64);
+        costHeader.setMinWidth(115);
         costItem.getChildren().addAll(costHeader, timerCostLabel);
         
         dataRows.getChildren().addAll(timeItem, costItem);
@@ -282,18 +293,18 @@ public class CustomerApp extends Application {
 
         HBox requestItem = new HBox(15);
         requestItem.setAlignment(Pos.CENTER_LEFT);
-        Label requestHeader = new Label("REQUEST:");
+        Label requestHeader = new Label("REQUESTED:");
         requestHeader.getStyleClass().add("dashboard-label");
-        requestHeader.setMinWidth(64);
+        requestHeader.setMinWidth(115);
         Label requestLabel = new Label("-");
         requestLabel.getStyleClass().add("dashboard-value-secondary");
         requestItem.getChildren().addAll(requestHeader, requestLabel);
 
         HBox resultItem = new HBox(15);
         resultItem.setAlignment(Pos.CENTER_LEFT);
-        Label resultHeader = new Label("RESULT:");
+        Label resultHeader = new Label("RECOMMENDED:");
         resultHeader.getStyleClass().add("dashboard-label");
-        resultHeader.setMinWidth(64);
+        resultHeader.setMinWidth(115);
         Label resultLabel = new Label("-");
         resultLabel.getStyleClass().add("dashboard-value-primary");
         resultItem.getChildren().addAll(resultHeader, resultLabel);

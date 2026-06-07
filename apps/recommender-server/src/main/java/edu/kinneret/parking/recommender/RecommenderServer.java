@@ -392,11 +392,11 @@ public class RecommenderServer implements AutoCloseable {
             }
             String requestedPart = "Request: Space " + desiredSpaceId;
 
-            // Fetch ALL spaces from DB (Do not restrict to the same zone to allow finding numerically closest spaces)
+            // Fetch spaces in the same zone from DB (SUC 8: limit candidates to target parking zone)
             List<Document> allSpacesInZone = new ArrayList<>();
             if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
                 repository.getDatabase().getCollection("spaces")
-                        .find()
+                        .find(com.mongodb.client.model.Filters.eq("zoneName", zoneName))
                         .into(allSpacesInZone);
             } else {
                 // Testing fallback: if database client is not initialized, generate all 100 spaces in-memory
@@ -409,6 +409,14 @@ public class RecommenderServer implements AutoCloseable {
             List<SpaceCandidate> candidates = new ArrayList<>();
             for (Document spaceDoc : allSpacesInZone) {
                 String spaceId = spaceDoc.getString("spaceId");
+
+                // In-memory zone filtering when DB is offline (fallback)
+                if (!ParkingRepository.isDbOnline || repository.getDatabase() == null) {
+                    String candidateZone = repository.getSpaceZone(spaceId);
+                    if (!zoneName.equalsIgnoreCase(candidateZone)) {
+                        continue;
+                    }
+                }
 
                 // Availability check (latest transaction action is not "start")
                 boolean isAvailable = true;

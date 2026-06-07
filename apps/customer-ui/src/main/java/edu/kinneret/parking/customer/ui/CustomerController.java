@@ -328,9 +328,9 @@ public class CustomerController {
             boolean isMatchingJustStopped = isJustStopped && inputSpace.equalsIgnoreCase(lastActiveSpaceBeforeStop);
             
             boolean showSessionData = isMatchingActiveSpace || isMatchingJustStopped;
-            boolean hasRecommendation = requestLabel != null && requestLabel.getText() != null && !"-".equals(requestLabel.getText()) && !"...".equals(requestLabel.getText());
+            boolean hasRecommendation = requestLabel != null && requestLabel.getText() != null && !"-".equals(requestLabel.getText());
             boolean showRec = !showSessionData && hasRecommendation;
-            boolean shouldShowCard = hasRate || hasStatus || showSessionData || showRec;
+            boolean shouldShowCard = hasStatus || showSessionData || showRec;
 
             Platform.runLater(() -> {
                 if (this.infoCard != null) {
@@ -1392,6 +1392,8 @@ public class CustomerController {
      * @param requestLabel the recommendation request output label
      * @param resultLabel the recommendation result output label
      */
+    private javafx.animation.PauseTransition recommendationDebounceTimer;
+
     public void attachRecommender(Label requestLabel, Label resultLabel) {
         this.requestLabel = requestLabel;
         this.resultLabel = resultLabel;
@@ -1399,13 +1401,44 @@ public class CustomerController {
         if (this.spaceNumberField != null) {
             this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null && !newVal.trim().isEmpty()) {
-                    fetchRecommendation(newVal.trim());
+                    if (recommendationDebounceTimer != null) {
+                        recommendationDebounceTimer.stop();
+                    }
+                    recommendationDebounceTimer = new javafx.animation.PauseTransition(javafx.util.Duration.millis(10));
+                    recommendationDebounceTimer.setOnFinished(event -> fetchRecommendation(newVal.trim()));
+                    recommendationDebounceTimer.play();
                 } else {
+                    if (recommendationDebounceTimer != null) {
+                        recommendationDebounceTimer.stop();
+                    }
                     requestLabel.setText("-");
                     resultLabel.setText("-");
                 }
             });
         }
+    }
+
+    private String formatRecommendationResult(String rawResult) {
+        if (rawResult == null || rawResult.isBlank() || "NONE".equalsIgnoreCase(rawResult)) {
+            return rawResult;
+        }
+        // Example rawResult: "Space 3;0" or "Space 3;0, Space 13;0"
+        String[] recommendationParts = rawResult.split(", ");
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < recommendationParts.length; i++) {
+            String part = recommendationParts[i].replace("Space ", "").trim(); // e.g. "3;0"
+            String[] spaceAndCitations = part.split(";");
+            if (spaceAndCitations.length >= 2) {
+                formatted.append("Space ").append(spaceAndCitations[0])
+                         .append(" (").append(spaceAndCitations[1]).append(" Citations)");
+            } else {
+                formatted.append(recommendationParts[i]);
+            }
+            if (i < recommendationParts.length - 1) {
+                formatted.append(", ");
+            }
+        }
+        return formatted.toString();
     }
 
     private void fetchRecommendation(String spaceId) {
@@ -1417,9 +1450,6 @@ public class CustomerController {
 
         int[] ports = {8091, 8092, 8093};
         final int finalPort = ports[(int) (Math.random() * 3)];
-
-        requestLabel.setText("...");
-        resultLabel.setText("...");
 
         Task<String> task = new Task<>() {
             @Override
@@ -1454,7 +1484,8 @@ public class CustomerController {
                     String[] parts = result.split("\n");
                     if (parts.length >= 2) {
                         requestLabel.setText(parts[0].replace("Request:", "").trim());
-                        resultLabel.setText(parts[1].replace("Result:", "").trim());
+                        String rawResult = parts[1].replace("Result:", "").trim();
+                        resultLabel.setText(formatRecommendationResult(rawResult));
                     }
                 } else {
                     String reason = response.has("reason") ? response.get("reason").getAsString() : "Consensus failed.";

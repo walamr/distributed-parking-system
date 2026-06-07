@@ -3,12 +3,17 @@ package edu.kinneret.parking.common.ui;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.transform.Scale;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 /**
@@ -118,9 +123,41 @@ public class PhoneFrameBuilder {
         powerBtn.setCursor(javafx.scene.Cursor.HAND);
 
         StackPane root = new StackPane(phoneBody);
-        root.setPadding(new Insets(30));
+        root.setPadding(new Insets(0, 30, 0, 30));
         root.setBackground(Background.EMPTY);
 
         return root;
+    }
+
+    /**
+     * Creates a scaled Scene containing the given content wrapped in the phone frame.
+     * The scene scale is calculated dynamically to occupy 100% of the screen height.
+     *
+     * @param content the layout content of the phone screen
+     * @param stage   the JavaFX Stage window context
+     * @return the scaled Scene instance
+     */
+    public static Scene createScaledScene(Node content, Stage stage) {
+        Rectangle2D bounds = Screen.getPrimary().getBounds();
+        double targetHeight = bounds.getHeight();
+        double scaleFactor = targetHeight / 864.0;
+        double targetWidth = 470.0 * scaleFactor;
+
+        if (stage != null) {
+            stage.setMinWidth(targetWidth);
+            stage.setMinHeight(targetHeight);
+            stage.setMaxWidth(targetWidth);
+            stage.setMaxHeight(targetHeight);
+            stage.setX((bounds.getWidth() - targetWidth) / 2.0);
+            stage.setY(0.0);
+        }
+
+        StackPane framed = wrapInPhoneFrame(content, stage);
+        Group scaleGroup = new Group(framed);
+        scaleGroup.getTransforms().add(new Scale(scaleFactor, scaleFactor));
+
+        Scene scene = new Scene(scaleGroup, targetWidth, targetHeight);
+        scene.setFill(Color.TRANSPARENT);
+        return scene;
     }
 }

@@ -46,9 +46,7 @@ public class WelcomeController {
             Stage stage = (Stage) Stage.getWindows().filtered(w -> w.isShowing()).get(0);
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxml));
             Parent root = loader.load();
-            javafx.scene.layout.StackPane framed = PhoneFrameBuilder.wrapInPhoneFrame(root, stage);
-            Scene scene = new Scene(framed);
-            scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            Scene scene = PhoneFrameBuilder.createScaledScene(root, stage);
             scene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
             stage.setScene(scene);
         } catch (Exception e) {

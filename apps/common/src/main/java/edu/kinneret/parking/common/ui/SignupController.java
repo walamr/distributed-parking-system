@@ -330,9 +330,7 @@ public class SignupController {
             Stage stage = (Stage) statusLabel.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/LoginView.fxml"));
             Parent loginRoot = loader.load();
-            javafx.scene.layout.StackPane framedLogin = PhoneFrameBuilder.wrapInPhoneFrame(loginRoot, stage);
-            Scene loginScene = new Scene(framedLogin);
-            loginScene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            Scene loginScene = PhoneFrameBuilder.createScaledScene(loginRoot, stage);
             loginScene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
             stage.setScene(loginScene);
         } catch (Exception e) {

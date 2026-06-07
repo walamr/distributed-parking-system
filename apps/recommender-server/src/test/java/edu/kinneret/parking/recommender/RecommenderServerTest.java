@@ -2,6 +2,7 @@ package edu.kinneret.parking.recommender;
 
 import edu.kinneret.parking.common.AppConfig;
 import edu.kinneret.parking.common.ParkingRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +58,27 @@ public class RecommenderServerTest {
         try (ParkingRepository repository = new ParkingRepository(appConfig)) {
             String result = server.calculateLocalRecommendation("3", repository);
             assertTrue(result.startsWith("Request: Space 3\nResult: Space 3;0"));
+        }
+    }
+
+    @Test
+    public void testZoneFilteringAndBranchA() {
+        try (ParkingRepository occupiedRepo = new ParkingRepository(appConfig) {
+            @Override
+            public Document getLatestTransactionForSpace(String spaceId) {
+                if ("3".equals(spaceId)) {
+                    return new Document("type", "transaction.start")
+                            .append("payload", new Document("action", "start"));
+                }
+                return null;
+            }
+        }) {
+            String result = server.calculateLocalRecommendation("3", occupiedRepo);
+            // Space 3 is in zone "Fifth Dr". Space 3 is occupied.
+            // Under SUC 8, only other spaces in "Fifth Dr" (13, 23, 33, ...) should be considered.
+            // Since all have 0 citations, the nearest available space in zone is 13.
+            // (Without zone filtering, the nearest available would be 2 or 4).
+            assertTrue(result.contains("Result: Space 13;0"), "Expected recommendation to be Space 13;0 but was: " + result);
         }
     }
 

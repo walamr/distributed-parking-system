@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * High-level repository for accessing parking data in the MongoDB cluster.
  */
-public final class ParkingRepository implements AutoCloseable {
+public class ParkingRepository implements AutoCloseable {
     private final MongoConnectionManager connectionManager;
     private final MongoDatabase database;
     /**

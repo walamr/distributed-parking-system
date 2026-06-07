@@ -304,9 +304,7 @@ public class LoginController {
             javafx.stage.Stage stage = (javafx.stage.Stage) statusLabel.getScene().getWindow();
             javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/views/SignupView.fxml"));
             javafx.scene.Parent signupRoot = loader.load();
-            javafx.scene.layout.StackPane framedSignup = edu.kinneret.parking.common.ui.PhoneFrameBuilder.wrapInPhoneFrame(signupRoot, stage);
-            javafx.scene.Scene signupScene = new javafx.scene.Scene(framedSignup);
-            signupScene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            javafx.scene.Scene signupScene = PhoneFrameBuilder.createScaledScene(signupRoot, stage);
             signupScene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
             stage.setScene(signupScene);
         } catch (Exception e) {
