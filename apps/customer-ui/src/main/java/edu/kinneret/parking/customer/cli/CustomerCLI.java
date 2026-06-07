@@ -60,7 +60,7 @@ public class CustomerCLI {
                         System.out.print("Enter Vehicle VIN: ");
                         String vin = scanner.nextLine().trim();
 
-                        // Auto-format 8-digit numeric VIN into XXX-XX-XXX format
+                        // Auto-format 8-digit numeric VIN into 000-00-000 format
                         if (vin.matches("\\d{8}")) {
                             vin = vin.substring(0, 3) + "-" + vin.substring(3, 5) + "-" + vin.substring(5);
                         }
