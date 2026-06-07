@@ -1379,6 +1379,81 @@ public class CustomerController {
         this.recommendationResultLabel = recommendationResultLabel;
 
         this.recommendButton.setOnAction(e -> handleRecommend());
+
+        if (this.spaceNumberField != null) {
+            this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal != null && !newVal.trim().isEmpty()) {
+                    fetchTableOnly(newVal.trim());
+                } else {
+                    recommendationResultLabel.setText("");
+                    recommendationResultLabel.setStyle("-fx-background-color: transparent; -fx-border-width: 0; -fx-effect: none;");
+                }
+            });
+        }
+    }
+
+    private void fetchTableOnly(String spaceId) {
+        try {
+            ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+
+        String selectedNode = recommenderNodeCombo.getValue();
+        int port = 8091; // default
+        if (selectedNode != null) {
+            if (selectedNode.contains("Node 2")) port = 8092;
+            else if (selectedNode.contains("Node 3")) port = 8093;
+        }
+        final int finalPort = port;
+
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                JsonObject request = new JsonObject();
+                request.addProperty("type", "CLIENT_QUERY");
+                request.addProperty("spaceId", spaceId.trim());
+                request.addProperty("correlationId", UUID.randomUUID().toString());
+
+                try (Socket socket = new Socket()) {
+                    socket.connect(new java.net.InetSocketAddress("localhost", finalPort), 3000);
+                    try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+                         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                        writer.println(request.toString());
+                        String responseLine = reader.readLine();
+                        if (responseLine == null) throw new IOException("Empty response");
+                        return responseLine;
+                    }
+                }
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            try {
+                JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
+                if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
+                    String fullResult = response.get("result").getAsString();
+                    int tableStart = fullResult.indexOf("Space #");
+                    if (tableStart != -1) {
+                        String tableOnly = "\n" + fullResult.substring(tableStart);
+                        recommendationResultLabel.setText(tableOnly);
+                        recommendationResultLabel.setStyle(
+                            "-fx-background-color: white;" +
+                            "-fx-text-fill: black;" +
+                            "-fx-font-family: monospace;" +
+                            "-fx-font-size: 12px;" +
+                            "-fx-font-weight: bold;" +
+                            "-fx-padding: 10 15 10 15;" +
+                            "-fx-border-color: transparent transparent transparent #00a0e9;" +
+                            "-fx-border-width: 0 0 0 5;" +
+                            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 10, 0, 0, 4);"
+                        );
+                    }
+                }
+            } catch (Exception ex) {
+            }
+        });
+        new Thread(task).start();
     }
 
     private void handleRecommend() {

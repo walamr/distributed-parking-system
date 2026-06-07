@@ -38,8 +38,8 @@ public class RecommenderServerTest {
                 new RecommendationResult("3", 1)
         );
         String serialized = RecommenderServer.serializeResults(results);
-        // Verify it returns only the first item (since 3 < 4, it is sorted)
-        assertEquals("3;1", serialized);
+        // Verify it returns a formatted comma-separated list
+        assertEquals("3;1, Space 4;2", serialized);
     }
 
     @Test
