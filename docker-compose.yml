@@ -8,11 +8,11 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq1
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
+      HOME: /tmp
     ports:
       - "127.0.0.1:5671:5671"
       - "127.0.0.1:15671:15671"
     volumes:
-      - rabbitmq1-data-v3:/var/lib/rabbitmq
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
@@ -33,11 +33,11 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq2
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
+      HOME: /tmp
     ports:
       - "127.0.0.1:5673:5671"
       - "127.0.0.1:15673:15671"
     volumes:
-      - rabbitmq2-data-v3:/var/lib/rabbitmq
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
@@ -58,11 +58,11 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq3
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
+      HOME: /tmp
     ports:
       - "127.0.0.1:5674:5671"
       - "127.0.0.1:15674:15671"
     volumes:
-      - rabbitmq3-data-v3:/var/lib/rabbitmq
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro

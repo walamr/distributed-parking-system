@@ -5,7 +5,7 @@ plugins {
 }
 
 application {
-    mainClass = 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+    mainClass = 'edu.kinneret.parking.recommender.Launcher'
 }
 
 def java21Launcher = javaToolchains.launcherFor {
@@ -30,7 +30,7 @@ dependencies {
 
 tasks.named('jar') {
     manifest {
-        attributes 'Main-Class': 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+        attributes 'Main-Class': 'edu.kinneret.parking.recommender.Launcher'
     }
 }
 
@@ -39,7 +39,7 @@ shadowJar {
     archiveVersion = '1.0'
     archiveClassifier = ''
     manifest {
-        attributes 'Main-Class': 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+        attributes 'Main-Class': 'edu.kinneret.parking.recommender.Launcher'
     }
     mergeServiceFiles()
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -57,7 +57,7 @@ tasks.register('runRecommenderServer', JavaExec) {
     group = 'application'
     description = 'Runs a recommender-server node.'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+    mainClass = 'edu.kinneret.parking.recommender.Launcher'
     javaLauncher = java21Launcher
     workingDir = rootProject.projectDir
     
