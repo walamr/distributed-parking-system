@@ -1,0 +1,93 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'edu.kinneret.parking'
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':common')
+    implementation project(':customer-ui')
+    implementation project(':peo-ui')
+    implementation project(':mo-ui')
+    
+    // JavaFX
+    implementation "org.openjfx:javafx-controls:21.0.2"
+    implementation "org.openjfx:javafx-fxml:21.0.2"
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.11'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+}
+
+application {
+    mainClass = 'edu.kinneret.parking.app.Launcher'
+}
+
+java {
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+javafx {
+    version = '21.0.2'
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
+}
+
+tasks.run.configure {
+    standardInput = System.in
+}
+
+tasks.named('startScripts') {
+    enabled = false
+}
+tasks.named('startShadowScripts') {
+    enabled = false
+    dependsOn tasks.jar
+}
+tasks.named('distZip') {
+    enabled = false
+}
+tasks.named('distTar') {
+    enabled = false
+}
+tasks.named('installDist') {
+    dependsOn ':customer-ui:shadowJar'
+    dependsOn ':peo-ui:shadowJar'
+    dependsOn ':mo-ui:shadowJar'
+}
+
+tasks.named('test') {
+    dependsOn ':customer-ui:shadowJar'
+    dependsOn ':peo-ui:shadowJar'
+    dependsOn ':mo-ui:shadowJar'
+}
+
+shadowJar {
+    dependsOn ':customer-ui:shadowJar'
+    dependsOn ':peo-ui:shadowJar'
+    dependsOn ':mo-ui:shadowJar'
+    
+    archiveBaseName = 'mulligan-app'
+    archiveVersion = '1.0'
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.app.Launcher'
+    }
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.build.configure {
+    dependsOn tasks.shadowJar
+}

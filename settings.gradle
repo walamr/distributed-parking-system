@@ -1,0 +1,22 @@
+rootProject.name = 'parking-system-stage2'
+
+include 'common'
+project(':common').projectDir = file('apps/common')
+
+include 'queue-server'
+project(':queue-server').projectDir = file('apps/queue-server')
+
+include 'storage-server'
+project(':storage-server').projectDir = file('apps/storage-server')
+
+include 'customer-ui'
+project(':customer-ui').projectDir = file('apps/customer-ui')
+
+include 'peo-ui'
+project(':peo-ui').projectDir = file('apps/peo-ui')
+
+include 'mo-ui'
+project(':mo-ui').projectDir = file('apps/mo-ui')
+
+include 'mulligan-app'
+project(':mulligan-app').projectDir = file('apps/mulligan-app')

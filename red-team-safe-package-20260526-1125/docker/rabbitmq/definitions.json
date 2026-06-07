@@ -1,0 +1,122 @@
+{
+  "vhosts": [
+    {
+      "name": "/parking"
+    }
+  ],
+  "users": [
+    {
+      "name": "customer",
+      "password": "customer_secure_pass_2026",
+      "tags": ""
+    },
+    {
+      "name": "peo_service",
+      "password": "peo_secure_pass_2026",
+      "tags": ""
+    },
+    {
+      "name": "mulligan_admin",
+      "password": "admin_ultra_secure_99",
+      "tags": "administrator"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "customer",
+      "vhost": "/parking",
+      "configure": "^$",
+      "write": "^transactions\\.queue$",
+      "read": "^$"
+    },
+    {
+      "user": "peo_service",
+      "vhost": "/parking",
+      "configure": "^$",
+      "write": "^(transactions\\.queue|citations\\.queue)$",
+      "read": "^(transactions\\.queue|citations\\.queue)$"
+    },
+    {
+      "user": "mulligan_admin",
+      "vhost": "/parking",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "queues": [
+    {
+      "name": "transactions.queue",
+      "vhost": "/parking",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-dead-letter-exchange": "parking.dlx",
+        "x-dead-letter-routing-key": "transactions.dead"
+      }
+    },
+    {
+      "name": "citations.queue",
+      "vhost": "/parking",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-dead-letter-exchange": "parking.dlx",
+        "x-dead-letter-routing-key": "citations.dead"
+      }
+    },
+    {
+      "name": "transactions.dlq",
+      "vhost": "/parking",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "citations.dlq",
+      "vhost": "/parking",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    }
+  ],
+  "policies": [],
+  "parameters": [],
+  "bindings": [
+    {
+      "source": "parking.dlx",
+      "vhost": "/parking",
+      "destination": "transactions.dlq",
+      "destination_type": "queue",
+      "routing_key": "transactions.dead",
+      "arguments": {}
+    },
+    {
+      "source": "parking.dlx",
+      "vhost": "/parking",
+      "destination": "citations.dlq",
+      "destination_type": "queue",
+      "routing_key": "citations.dead",
+      "arguments": {}
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "parking.dlx",
+      "vhost": "/parking",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ]
+}

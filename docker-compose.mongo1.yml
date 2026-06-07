@@ -1,0 +1,32 @@
+# docker-compose for mongo1 host only
+# Run with: docker compose -f docker-compose.mongo1.yml up -d
+services:
+  mongo1:
+    image: mongo:7.0
+    container_name: mongo1
+    hostname: mongo1
+    command: >
+      bash -c "
+      apt-get update && apt-get install -y iproute2 &&
+      ip addr add 10.0.201.25/32 dev lo || true &&
+      cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
+      chmod 600 /tmp/mongodb-keyfile &&
+      chown mongodb:mongodb /tmp/mongodb-keyfile &&
+      mongod --replSet rs0 --port 27017 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --tlsAllowInvalidHostnames --keyFile /tmp/mongodb-keyfile
+      "
+    ports:
+      - "0.0.0.0:27017:27017"
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - mongo1-data:/data/db
+      - ./docker/mongodb/certs:/etc/mongo/certs:ro
+    networks:
+      - parking-net
+
+networks:
+  parking-net:
+    driver: bridge
+
+volumes:
+  mongo1-data:

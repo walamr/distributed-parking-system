@@ -1,0 +1,72 @@
+.root {
+    -fx-font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -fx-base: #0f172a;
+    -fx-background: #0f172a;
+}
+
+.main-container {
+    -fx-background-color: #0f172a;
+}
+
+.glass-card {
+    -fx-background-color: rgba(15, 23, 42, 0.75);
+    -fx-background-radius: 24;
+    -fx-border-color: rgba(255, 255, 255, 0.15);
+    -fx-border-width: 1.5;
+    -fx-border-radius: 24;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 40, 0, 0, 15);
+}
+
+.action-button {
+    -fx-background-color: #2563eb; /* Exact Vibrant Blue */
+    -fx-text-fill: white;
+    -fx-font-weight: 900;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.action-button:hover {
+    -fx-background-color: #3b82f6;
+}
+
+/* ── FORCE DARK TABLE ── */
+.report-table {
+    -fx-background-color: #0f172a !important;
+    -fx-control-inner-background: #0f172a !important;
+}
+
+.report-table .column-header-background {
+    -fx-background-color: #1e293b !important;
+}
+
+.report-table .column-header {
+    -fx-background-color: transparent !important;
+}
+
+.report-table .column-header .label {
+    -fx-text-fill: white !important;
+    -fx-font-weight: 900;
+}
+
+.report-table .table-row-cell {
+    -fx-background-color: #0f172a !important;
+    -fx-text-fill: white !important;
+}
+
+.report-table .table-row-cell:odd {
+    -fx-background-color: #1e293b !important;
+}
+
+.report-table .table-cell {
+    -fx-text-fill: white !important;
+}
+
+.report-table .viewport, .report-table .virtual-flow {
+    -fx-background-color: #0f172a !important;
+}
+
+.text-field {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+}

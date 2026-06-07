@@ -1,0 +1,20 @@
+.gradle/
+build/
+*/build/
+bin/
+**/bin/
+*.class
+.project
+.classpath
+.settings/
+.vscode/
+
+# Generated / large files
+dist/
+red-team-delivery/
+gradle-bin/
+**/build/
+*.zip
+*.log
+logs/
+.gradle/

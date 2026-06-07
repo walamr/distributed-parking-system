@@ -1,0 +1,91 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'edu.kinneret.parking'
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':common')
+    
+    // JavaFX
+    implementation "org.openjfx:javafx-controls:21.0.2"
+    implementation "org.openjfx:javafx-fxml:21.0.2"
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.11'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'
+
+    // JSON
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+}
+
+application {
+    mainClass = 'edu.kinneret.parking.customer.ui.Launcher'
+}
+
+java {
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+def java21Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+javafx {
+    version = '21.0.2'
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
+}
+
+shadowJar {
+    archiveBaseName = 'customer-ui'
+    archiveVersion = '1.0'
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.customer.ui.Launcher'
+    }
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+jar {
+    enabled = true
+}
+
+tasks.build.configure {
+    dependsOn tasks.shadowJar
+}
+
+tasks.distZip.dependsOn tasks.shadowJar
+tasks.distTar.dependsOn tasks.shadowJar
+tasks.startScripts.dependsOn tasks.shadowJar
+tasks.startShadowScripts.dependsOn tasks.jar
+
+tasks.run.configure {
+    standardInput = System.in
+}
+
+task runTestQuery(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.kinneret.parking.customer.ui.TestQuery'
+}
+
+task runCLI(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.kinneret.parking.customer.cli.CustomerCLI'
+    javaLauncher = java21Launcher
+    standardInput = System.in
+    description = 'Run Customer CLI (non-JavaFX terminal application)'
+    group = 'application'
+}

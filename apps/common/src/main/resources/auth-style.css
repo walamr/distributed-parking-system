@@ -1,0 +1,265 @@
+/* High-Fidelity Transparent Phone Hardware */
+.main-container {
+    -fx-background-image: url('mulligan_premium_car_background.png');
+    -fx-background-position: center bottom;
+    -fx-background-size: cover;
+    -fx-font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.glass-pane {
+    -fx-background-color: rgba(8, 12, 20, 0.82);
+    -fx-background-radius: 20px;
+    -fx-border-color: rgba(255, 255, 255, 0.15);
+    -fx-border-width: 1px;
+    -fx-border-radius: 20px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 30, 0, 0, 10);
+    -fx-padding: 30px 25px 30px 25px;
+}
+
+.iphone-frame {
+    -fx-background-color: #020617; /* Physical Shell Dark Base */
+    -fx-background-radius: 54px;
+    -fx-border-radius: 54px;
+    -fx-border-width: 10px;
+    -fx-border-color: linear-gradient(to bottom right, #4b5563, #374151, #1f2937, #020617);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.85), 60, 0, 0, 30);
+}
+
+.iphone-notch-hd {
+    -fx-background-color: #000000;
+    -fx-min-width: 140px;
+    -fx-min-height: 28px;
+    -fx-max-width: 140px;
+    -fx-background-radius: 0 0 20px 20px;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+    -fx-border-width: 0 1px 1px 1px;
+    -fx-border-radius: 0 0 18px 18px;
+    -fx-margin: 0 0 5px 0;
+}
+
+.iphone-home-hd {
+    -fx-background-color: rgba(255, 255, 255, 0.4);
+    -fx-min-width: 120px;
+    -fx-max-width: 120px;
+    -fx-min-height: 5px;
+    -fx-max-height: 5px;
+    -fx-background-radius: 10px;
+    /* Spacing around the bar */
+    -fx-margin: 15px 0 12px 0;
+}
+
+.iphone-side-btn-hd {
+    -fx-background-color: linear-gradient(to right, #4b5563, #1f2937);
+    -fx-background-radius: 0 4px 4px 0;
+    -fx-min-width: 6px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 8, 0, 0, 0);
+}
+
+.pc-simulation {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.auth-title {
+    -fx-font-size: 24px; /* Reduced from 32px */
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-letter-spacing: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 10, 0, 0, 2); /* Text shadow for clarity */
+}
+
+.header-label {
+    -fx-font-size: 22px; /* Very small to prevent clipping */
+    -fx-font-weight: 800;
+    -fx-text-fill: white;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0, 0, 1);
+    -fx-wrap-text: true;
+    -fx-text-alignment: center;
+    -fx-alignment: center;
+}
+
+.button-primary {
+    -fx-background-color: linear-gradient(to right, #2563eb, #7c3aed);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 20px;
+    -fx-background-radius: 16px; /* Optimized 2026 standard */
+    -fx-padding: 18px 45px;
+    -fx-cursor: hand;
+}
+
+.button-primary:hover {
+    -fx-background-color: linear-gradient(to right, #3b82f6, #8b5cf6);
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+}
+
+.button-primary:pressed {
+    -fx-background-color: #1e40af;
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.button-primary:disabled {
+    -fx-opacity: 0.4;
+    -fx-cursor: default;
+}
+
+.status-label {
+    -fx-text-fill: #fbbf24;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0, 0, 1);
+    -fx-wrap-text: true;
+    -fx-text-alignment: center;
+}
+
+.combo-box {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+    -fx-background-radius: 12px;
+    -fx-padding: 10px;
+    -fx-font-size: 16px;
+    -fx-text-fill: white;
+}
+
+/* Enhanced contrast for placeholders/prompt text */
+.text-field, .password-field {
+    -fx-prompt-text-fill: rgba(255, 255, 255, 0.7);
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+    -fx-background-radius: 12px;
+    -fx-text-fill: white;
+    -fx-padding: 15px;
+    -fx-font-size: 16px;
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+    -fx-border-radius: 16px;
+}
+
+/* Items in the dropdown list should match hint colors */
+.combo-box-popup .list-cell {
+    -fx-text-fill: rgba(255, 255, 255, 0.7);
+    -fx-background-color: transparent;
+}
+
+/* The item shown inside the ComboBox field must be white */
+.combo-box > .list-cell {
+    -fx-text-fill: white;
+}
+
+/* Prompt text inside the ComboBox field should also be white/light */
+.combo-box:empty > .list-cell {
+    -fx-text-fill: rgba(255, 255, 255, 0.7);
+}
+
+/* Popup style - Dark and Glassy to match fields */
+.combo-box .list-view {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 12px;
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+}
+
+.combo-box .list-cell:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+.combo-box .list-cell:selected {
+    -fx-text-fill: #60a5fa; /* Vibrant blue for selection */
+    -fx-font-weight: bold;
+}
+
+/* Explicitly ensure the selected item INSIDE THE FIELD is white */
+.combo-box > .list-cell:selected {
+    -fx-text-fill: white;
+}
+
+.field-error {
+    -fx-border-color: #ef4444 !important;
+    -fx-effect: dropshadow(three-pass-box, rgba(239, 68, 68, 0.8), 15, 0.5, 0, 0);
+    -fx-background-color: rgba(239, 68, 68, 0.05);
+}
+
+.error-text {
+    -fx-text-fill: #fc8181;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 5 0 0 5;
+}
+
+.text-field:focused, .password-field:focused {
+    -fx-border-color: #63b3ed;
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+}
+
+.auth-label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 5, 0, 0, 2);
+}
+
+.auth-link {
+    -fx-text-fill: #3b82f6; /* Bright Blue */
+    -fx-font-weight: 800;
+    -fx-underline: false;
+    -fx-font-size: 14px;
+    -fx-padding: 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 3, 0, 0, 1);
+}
+
+.auth-link:hover {
+    -fx-text-fill: #63b3ed;
+}
+
+/* Chips / Role Selector Styles */
+.chip-button {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-text-fill: rgba(255, 255, 255, 0.8);
+    -fx-background-radius: 16px;
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+    -fx-border-radius: 16px;
+    -fx-padding: 12px 20px;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+}
+
+.chip-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+.chip-active {
+    -fx-background-color: #3182ce;
+    -fx-text-fill: white;
+    -fx-border-color: #63b3ed;
+}
+
+.back-arrow-btn {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-background-radius: 50%;
+    -fx-min-width: 50px;
+    -fx-max-width: 50px;
+    -fx-min-height: 50px;
+    -fx-max-height: 50px;
+    -fx-text-fill: white;
+    -fx-font-size: 24px;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+    -fx-padding: 0;
+}
+
+.back-arrow-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+}
+
+.eye-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: rgba(255, 255, 255, 0.6);
+    -fx-font-size: 18px;
+    -fx-cursor: hand;
+    -fx-padding: 0 10 0 0;
+}
+
+.eye-button:hover {
+    -fx-text-fill: white;
+}

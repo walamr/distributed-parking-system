@@ -1,0 +1,67 @@
+plugins {
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+application {
+    mainClass = 'edu.kinneret.parking.queue.QueueServerApplication'
+}
+
+def java21Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':common')
+    implementation 'com.rabbitmq:amqp-client:5.21.0'
+
+    testImplementation platform('org.junit:junit-bom:5.10.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.queue.QueueServerApplication'
+    }
+}
+
+shadowJar {
+    archiveBaseName = 'queue-service'
+    archiveVersion = '1.0'
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.queue.QueueServerApplication'
+    }
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.build.configure {
+    dependsOn tasks.shadowJar
+}
+
+tasks.named('startShadowScripts') {
+    dependsOn tasks.jar
+}
+
+tasks.register('runQueueServer', JavaExec) {
+    group = 'application'
+    description = 'Runs the queue-server application.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.kinneret.parking.queue.QueueServerApplication'
+    javaLauncher = java21Launcher
+    workingDir = rootProject.projectDir
+}
+
+tasks.register('runQueueSmokeTest', JavaExec) {
+    group = 'application'
+    description = 'Runs the local RabbitMQ publisher smoke test.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.kinneret.parking.queue.QueuePublisherSmokeTest'
+    javaLauncher = java21Launcher
+    workingDir = rootProject.projectDir
+}
