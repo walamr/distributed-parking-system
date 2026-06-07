@@ -277,10 +277,35 @@ public class CustomerApp extends Application {
         VBox dashboardActions = new VBox(12, startButton, stopButton);
         dashboardActions.setAlignment(Pos.CENTER);
 
+        // --- RECOMMENDATION SECTION ---
+        VBox recSection = new VBox(10);
+        recSection.setStyle("-fx-background-color: rgba(255, 255, 255, 0.05); -fx-background-radius: 12; -fx-padding: 15; -fx-border-color: rgba(255, 255, 255, 0.1); -fx-border-width: 1; -fx-border-radius: 12;");
+        
+        Label recTitle = new Label("Parking space recommender:");
+        recTitle.setStyle("-fx-text-fill: #cdd6f4; -fx-font-weight: bold; -fx-font-size: 14px;");
+
+        ComboBox<String> recNodeCombo = new ComboBox<>();
+        recNodeCombo.getItems().addAll("Recommender Node 1 (Port 8091)", "Recommender Node 2 (Port 8092)", "Recommender Node 3 (Port 8093)");
+        recNodeCombo.setValue("Recommender Node 1 (Port 8091)");
+        recNodeCombo.setMaxWidth(Double.MAX_VALUE);
+        recNodeCombo.setStyle("-fx-background-color: #313244; -fx-text-fill: white; -fx-background-radius: 8;");
+
+        Button recommendBtn = new Button("💡 Get Recommendation");
+        recommendBtn.getStyleClass().add("button-start");
+        recommendBtn.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b; -fx-font-weight: bold; -fx-cursor: hand;");
+        recommendBtn.setMaxWidth(Double.MAX_VALUE);
+
+        Label recResultLabel = new Label("Enter space ID above and click get");
+        recResultLabel.setStyle("-fx-text-fill: #a6adc8; -fx-font-size: 13px; -fx-alignment: center;");
+        recResultLabel.setMaxWidth(Double.MAX_VALUE);
+        recResultLabel.setAlignment(Pos.CENTER);
+
+        recSection.getChildren().addAll(recTitle, recNodeCombo, recommendBtn, recResultLabel);
+
         Region dashboardSpacer = new Region();
         dashboardSpacer.setPrefHeight(40);
 
-        dashboardView.getChildren().addAll(dashboardSpacer, createTopBar(() -> toggleSidebarRef[0].run(), true), dashboardInputs, dashboardActions, errorCard, statusLabel, infoCard, historyLink);
+        dashboardView.getChildren().addAll(dashboardSpacer, createTopBar(() -> toggleSidebarRef[0].run(), true), dashboardInputs, dashboardActions, recSection, errorCard, statusLabel, infoCard, historyLink);
         dashboardView.setAlignment(Pos.TOP_CENTER);
         dashboardView.getStyleClass().add("glass-pane");
         dashboardView.setMaxWidth(380);
@@ -497,6 +522,7 @@ public class CustomerApp extends Application {
         controller.attachButtons(startButton, stopButton, fetchHistoryBtn);
         controller.attachTimer(infoCard, timerLabel, timerCostLabel, rateItem, timeItem, costItem, cardDivider);
         controller.attachHistoryStatus(historyStatusLabel);
+        controller.attachRecommender(recommendBtn, recNodeCombo, recResultLabel);
 
         // Restore persisted local transactions from disk (fix: stop operations survive app restarts)
         controller.loadPersistedTransactions(associatedVin);

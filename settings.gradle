@@ -20,3 +20,7 @@ project(':mo-ui').projectDir = file('apps/mo-ui')
 
 include 'mulligan-app'
 project(':mulligan-app').projectDir = file('apps/mulligan-app')
+
+include 'recommender-server'
+project(':recommender-server').projectDir = file('apps/recommender-server')
+

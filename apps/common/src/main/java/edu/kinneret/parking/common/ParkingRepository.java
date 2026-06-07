@@ -172,17 +172,20 @@ public final class ParkingRepository implements AutoCloseable {
      * @return true if the space exists in the spaces collection
      */
     public boolean isSpaceRegistered(String spaceId) {
-        if (database == null) return false;
-        try {
-            Document space = database.getCollection("spaces")
-                    .withReadPreference(ReadPreference.secondaryPreferred())
-                    .find(Filters.eq("spaceId", spaceId))
-                    .first();
-            return space != null;
-        } catch (Exception e) {
-            System.err.println("Error checking space registration: " + e.getMessage());
-            return false;
+        if (isDbOnline && database != null) {
+            try {
+                Document space = database.getCollection("spaces")
+                        .withReadPreference(ReadPreference.secondaryPreferred())
+                        .find(Filters.eq("spaceId", spaceId))
+                        .first();
+                return space != null;
+            } catch (Exception e) {
+                isDbOnline = false;
+                System.err.println("Error checking space registration: " + e.getMessage());
+            }
         }
+        int id = parseSpaceNumber(spaceId);
+        return id >= 1 && id <= 100;
     }
 
     /**
@@ -195,8 +198,8 @@ public final class ParkingRepository implements AutoCloseable {
     public List<Document> getVehicleHistory(String vehicleId) {
         System.out.println("[DB-DEBUG] getVehicleHistory called for vehicleId: '" + vehicleId + "'");
         List<Document> history = new ArrayList<>();
-        if (database == null) {
-            System.out.println("[DB-DEBUG] database connection is null!");
+        if (!isDbOnline || database == null) {
+            System.out.println("[DB-DEBUG] database connection is offline or null!");
             return history;
         }
         try {
@@ -223,17 +226,19 @@ public final class ParkingRepository implements AutoCloseable {
      * @return true if the vehicle exists in the vehicles collection
      */
     public boolean isVehicleRegistered(String vehicleId) {
-        if (database == null) return false;
-        try {
-            Document vehicle = database.getCollection("vehicles")
-                    .withReadPreference(ReadPreference.secondaryPreferred())
-                    .find(Filters.eq("vehicleId", vehicleId))
-                    .first();
-            return vehicle != null;
-        } catch (Exception e) {
-            System.err.println("Error checking vehicle registration: " + e.getMessage());
-            return false;
+        if (isDbOnline && database != null) {
+            try {
+                Document vehicle = database.getCollection("vehicles")
+                        .withReadPreference(ReadPreference.secondaryPreferred())
+                        .find(Filters.eq("vehicleId", vehicleId))
+                        .first();
+                return vehicle != null;
+            } catch (Exception e) {
+                isDbOnline = false;
+                System.err.println("Error checking vehicle registration: " + e.getMessage());
+            }
         }
+        return vehicleId != null && vehicleId.matches("^[A-Z0-9-]{1,20}$");
     }
 
     /**
@@ -243,7 +248,7 @@ public final class ParkingRepository implements AutoCloseable {
      */
     public List<Document> getAllVehicles() {
         List<Document> results = new ArrayList<>();
-        if (database == null) return results;
+        if (!isDbOnline || database == null) return results;
         try {
             database.getCollection("vehicles")
                     .withReadPreference(ReadPreference.secondaryPreferred())
@@ -264,6 +269,7 @@ public final class ParkingRepository implements AutoCloseable {
      */
     public List<Document> getAllTransactions() {
         List<Document> results = new ArrayList<>();
+        if (!isDbOnline || database == null) return results;
         database.getCollection("transactions")
                 .withReadPreference(ReadPreference.secondaryPreferred())
                 .find()
@@ -280,6 +286,7 @@ public final class ParkingRepository implements AutoCloseable {
      */
     public List<Document> getAllCitations() {
         List<Document> results = new ArrayList<>();
+        if (!isDbOnline || database == null) return results;
         database.getCollection("citations")
                 .withReadPreference(ReadPreference.secondaryPreferred())
                 .find()
@@ -373,7 +380,7 @@ public final class ParkingRepository implements AutoCloseable {
      * @return the latest transaction document, or null if none
      */
     public Document getLatestTransactionForSpace(String spaceId) {
-        if (database == null) {
+        if (!isDbOnline || database == null) {
             return null;
         }
         try {

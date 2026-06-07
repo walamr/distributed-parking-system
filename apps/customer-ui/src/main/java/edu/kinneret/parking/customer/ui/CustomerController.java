@@ -12,6 +12,13 @@ import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
@@ -1353,5 +1360,103 @@ public class CustomerController {
         } catch (NumberFormatException ignored) {
             return 0.0;
         }
+    }
+
+    private Button recommendButton;
+    private ComboBox<String> recommenderNodeCombo;
+    private Label recommendationResultLabel;
+
+    /**
+     * Attaches the recommendation panel controls.
+     *
+     * @param recommendButton the recommendation request trigger button
+     * @param recommenderNodeCombo the cluster node selector ComboBox
+     * @param recommendationResultLabel the recommendation result output label
+     */
+    public void attachRecommender(Button recommendButton, ComboBox<String> recommenderNodeCombo, Label recommendationResultLabel) {
+        this.recommendButton = recommendButton;
+        this.recommenderNodeCombo = recommenderNodeCombo;
+        this.recommendationResultLabel = recommendationResultLabel;
+
+        this.recommendButton.setOnAction(e -> handleRecommend());
+    }
+
+    private void handleRecommend() {
+        String spaceId = spaceNumberField.getText();
+        if (spaceId == null || spaceId.trim().isEmpty()) {
+            setStatus("Error: Parking Space ID is required for recommendation.", true);
+            return;
+        }
+        try {
+            ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            setStatus("Error: Invalid parking space format.", true);
+            return;
+        }
+
+        String selectedNode = recommenderNodeCombo.getValue();
+        int port = 8091; // default
+        if (selectedNode != null) {
+            if (selectedNode.contains("Node 2")) {
+                port = 8092;
+            } else if (selectedNode.contains("Node 3")) {
+                port = 8093;
+            }
+        }
+        final int finalPort = port;
+
+        recommendationResultLabel.setText("Calculating recommendation...");
+        recommendationResultLabel.setStyle("-fx-text-fill: #94a3b8; -fx-font-weight: bold;");
+
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                JsonObject request = new JsonObject();
+                request.addProperty("type", "CLIENT_QUERY");
+                request.addProperty("spaceId", spaceId.trim());
+                request.addProperty("correlationId", UUID.randomUUID().toString());
+
+                try (Socket socket = new Socket()) {
+                    socket.connect(new java.net.InetSocketAddress("localhost", finalPort), 3000);
+                    try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+                         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                        
+                        writer.println(request.toString());
+                        String responseLine = reader.readLine();
+                        if (responseLine == null) {
+                            throw new IOException("Empty response from recommender.");
+                        }
+                        return responseLine;
+                    }
+                }
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            try {
+                JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
+                String status = response.get("status").getAsString();
+                if ("SUCCESS".equalsIgnoreCase(status)) {
+                    String result = response.get("result").getAsString();
+                    recommendationResultLabel.setText("Recommended: " + result);
+                    recommendationResultLabel.setStyle("-fx-text-fill: #a6e3a1; -fx-font-weight: bold; -fx-font-size: 13px;");
+                } else {
+                    String reason = response.has("reason") ? response.get("reason").getAsString() : "Consensus failed.";
+                    recommendationResultLabel.setText("Failed: " + reason);
+                    recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+                }
+            } catch (Exception ex) {
+                recommendationResultLabel.setText("Failed: Invalid response structure.");
+                recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+            }
+        });
+
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            recommendationResultLabel.setText("Failed to reach node: " + ex.getMessage());
+            recommendationResultLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold; -fx-font-size: 13px;");
+        });
+
+        new Thread(task).start();
     }
 }

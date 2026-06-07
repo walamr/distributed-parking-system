@@ -1,1 +1,19 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/Dt2bH9YF)
+# Distributed Systems - Semester 2, 5786
+
+## Team Members
+| Name | Student ID | Task Performed | Hours Worked |
+| :--- | :--- | :--- | :--- |
+| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 20 Hours |
+| **Hanan Taha** | 212277438 | Task 2: Queue Server | 20 Hours |
+| **Aseel Shaheen** | 214228009 | Task 4: Documentation | 20 Hours |
+| **Hala Assadi** | 324830967 | Task 3: Database and Storage | 20 Hours |
+| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening | 20 Hours |
+
+---
+
+## Parking System - Stage 3: Clustered Recommender and Consensus
+
+For full setup, deployment, and testing instructions, please refer to the following documents:
+- [DEPLOY.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/DEPLOY.md) - Infrastructure setup and application startup guide.
+- [ConsensusProtocolDesign.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/ConsensusProtocolDesign.md) - Sequence diagrams, JSON message schema, and voting details.
+- [Defense.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/Defense.md) - Security controls and Blue team fixes report.

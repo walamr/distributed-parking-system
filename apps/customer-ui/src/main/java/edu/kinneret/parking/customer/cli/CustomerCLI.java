@@ -98,11 +98,11 @@ public class CustomerCLI {
                     }
                 } else {
                     System.out.println("\nStatus: LOGGED IN as '" + loggedInUser + "' (Vehicle VIN: '" + loggedInVin + "')");
-                    System.out.println("Options: [1] Start Parking, [2] Stop Parking, [3] List Parking Events (History), [4] List All Registered Vehicles, [5] Logout, [6] Exit");
+                    System.out.println("Options: [1] Start Parking, [2] Stop Parking, [3] List Parking Events (History), [4] List All Registered Vehicles, [5] Recommend Parking, [6] Logout, [7] Exit");
                     System.out.print("Select: ");
                     String choice = scanner.nextLine();
 
-                    if ("6".equals(choice)) break;
+                    if ("7".equals(choice)) break;
 
                     switch (choice) {
                         case "1":
@@ -139,6 +139,19 @@ public class CustomerCLI {
                             }
                             break;
                         case "5":
+                            System.out.print("Enter Space ID to base recommendation on: ");
+                            String spaceIdRec = scanner.nextLine().trim();
+                            System.out.print("Select Recommender Node (1: port 8091, 2: port 8092, 3: port 8093) [Default 1]: ");
+                            String nodeChoice = scanner.nextLine().trim();
+                            int port = 8091;
+                            if ("2".equals(nodeChoice)) {
+                                port = 8092;
+                            } else if ("3".equals(nodeChoice)) {
+                                port = 8093;
+                            }
+                            queryRecommender(spaceIdRec, port);
+                            break;
+                        case "6":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
                             loggedInUser = null;
                             loggedInVin = null;
@@ -221,6 +234,49 @@ public class CustomerCLI {
         }
         ValidationUtils.validateParkingPayload(payload.toString(), config.getMaxAllowedAmount(), "transaction." + safeType);
         return payload.toString();
+    }
+
+    private static void queryRecommender(String spaceId, int port) {
+        if (spaceId == null || spaceId.isBlank()) {
+            System.out.println("ERROR: Space ID cannot be empty.");
+            return;
+        }
+        try {
+            ValidationUtils.requireValidSpaceId(spaceId.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            System.out.println("ERROR: Invalid space ID format.");
+            return;
+        }
+
+        JsonObject request = new JsonObject();
+        request.addProperty("type", "CLIENT_QUERY");
+        request.addProperty("spaceId", spaceId);
+        request.addProperty("correlationId", UUID.randomUUID().toString());
+
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress("localhost", port), 3000);
+            try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
+                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
+                
+                writer.println(request.toString());
+                String responseLine = reader.readLine();
+                if (responseLine != null) {
+                    com.google.gson.JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
+                    String status = response.get("status").getAsString();
+                    if ("SUCCESS".equalsIgnoreCase(status)) {
+                        String result = response.get("result").getAsString();
+                        System.out.println("RECOMMENDATION SUCCESS: Recommended spaces: " + result);
+                    } else {
+                        String reason = response.has("reason") ? response.get("reason").getAsString() : "Unknown error";
+                        System.out.println("RECOMMENDATION FAILURE: " + reason);
+                    }
+                } else {
+                    System.out.println("ERROR: Received empty response from recommender node.");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("ERROR: Could not connect to recommender node on port " + port + ": " + e.getMessage());
+        }
     }
 
     private static String safeForLog(String value) {

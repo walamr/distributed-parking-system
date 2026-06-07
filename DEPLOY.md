@@ -440,3 +440,41 @@ Expected evidence:
 | MO UI | `.\gradlew.bat :mo-ui:run` | Window starts; transaction and citation reports load from MongoDB; cluster status labels update. |
 
 If Docker Desktop is not running, do not claim live cluster verification. Start Docker Desktop and rerun the commands in this guide.
+
+## 18. Clustered Recommender Server
+
+The Recommender Server cluster runs inside Docker Compose or can be executed locally on the host via Gradle:
+
+### Option A: Running Clustered Recommender inside Docker Compose
+
+Build the shade jar first:
+```powershell
+.\gradlew.bat :recommender-server:build
+```
+
+Start the containers:
+```powershell
+docker compose up -d recommender1 recommender2 recommender3
+```
+
+This will launch:
+- `recommender1` (Leader) on port `8091`
+- `recommender2` (Follower) on port `8092`
+- `recommender3` (Follower) on port `8093`
+
+### Option B: Running Recommender Server locally on Host
+
+To run a node on the host, execute the Gradle task with node parameters:
+
+```powershell
+# Node 1 (Leader / Coordinator)
+.\gradlew.bat :recommender-server:runRecommenderServer -Dport=8091 -DnodeId=recommender1 -DisLeader=true
+
+# Node 2 (Follower)
+.\gradlew.bat :recommender-server:runRecommenderServer -Dport=8092 -DnodeId=recommender2 -DisLeader=false
+
+# Node 3 (Follower)
+.\gradlew.bat :recommender-server:runRecommenderServer -Dport=8093 -DnodeId=recommender3 -DisLeader=false
+```
+
+Once running, verify using the updated **Customer CLI** (option `[5] Recommend Parking`) or **Customer GUI** (select node and click `💡 Get Recommendation`).

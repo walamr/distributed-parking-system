@@ -1,0 +1,66 @@
+plugins {
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+application {
+    mainClass = 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+}
+
+def java21Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+javafx {
+    version = '21.0.2'
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':common')
+
+    testImplementation platform('org.junit:junit-bom:5.10.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+    }
+}
+
+shadowJar {
+    archiveBaseName = 'recommender-service'
+    archiveVersion = '1.0'
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+    }
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.build.configure {
+    dependsOn tasks.shadowJar
+}
+
+tasks.named('startShadowScripts') {
+    dependsOn tasks.jar
+}
+
+tasks.register('runRecommenderServer', JavaExec) {
+    group = 'application'
+    description = 'Runs a recommender-server node.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'edu.kinneret.parking.recommender.RecommenderServerApplication'
+    javaLauncher = java21Launcher
+    workingDir = rootProject.projectDir
+    
+    // Allow passing system properties/arguments
+    systemProperties = System.getProperties()
+}
