@@ -3,6 +3,7 @@ package edu.kinneret.parking.recommender;
 import edu.kinneret.parking.common.AppConfig;
 import edu.kinneret.parking.common.ParkingRepository;
 import edu.kinneret.parking.common.ValidationUtils;
+import edu.kinneret.parking.common.RabbitMqConnectionManager;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bson.Document;
@@ -72,6 +73,18 @@ public class RecommenderServer implements AutoCloseable {
             t.setDaemon(true);
             return t;
         });
+
+        // Verify access to RabbitMQ server (TCP/AMQP connection as per physical architecture)
+        try {
+            RabbitMqConnectionManager rabbitManager = new RabbitMqConnectionManager(appConfig);
+            if (rabbitManager.checkHealth()) {
+                logger.info("Recommender node '" + nodeId + "' successfully verified connection to RabbitMQ server.");
+            } else {
+                logger.warning("Recommender node '" + nodeId + "' could not reach RabbitMQ server.");
+            }
+        } catch (Exception e) {
+            logger.warning("Recommender node '" + nodeId + "' failed to verify RabbitMQ connection: " + e.getMessage());
+        }
 
         logger.info("Recommender node '" + nodeId + "' started on port " + port 
                 + " [Leader: " + isLeader + ", Malicious: " + isMalicious + "]");
