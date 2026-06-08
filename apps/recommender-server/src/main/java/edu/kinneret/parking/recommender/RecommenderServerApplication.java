@@ -1,6 +1,7 @@
 package edu.kinneret.parking.recommender;
 
 import edu.kinneret.parking.common.AppConfig;
+import edu.kinneret.parking.common.SecurityLogger;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -91,13 +92,14 @@ public class RecommenderServerApplication extends Application {
             clusterNodes = Arrays.asList(System.getProperty("nodes").split(","));
         }
 
+        SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/recommender-security.log"));
         AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.CUSTOMER_UI);
 
         try {
             server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes, appConfig);
             server.start();
         } catch (IOException e) {
-            System.err.println("Fatal: Could not start recommender server: " + e.getMessage());
+            System.err.println("Fatal: Could not start recommender server. See server logs for details.");
             System.exit(1);
         }
 

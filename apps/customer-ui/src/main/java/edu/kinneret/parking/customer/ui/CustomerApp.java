@@ -190,6 +190,9 @@ public class CustomerApp extends Application {
         Button stopButton = new Button("■ Stop Parking");
         stopButton.getStyleClass().add("button-stop");
 
+        Button recommendButton = new Button("Recommend Parking");
+        recommendButton.getStyleClass().add("button-history-toggle");
+
         Label timerLabel = new Label("00:00:00");
         timerLabel.getStyleClass().add("dashboard-value-secondary");
         
@@ -285,11 +288,8 @@ public class CustomerApp extends Application {
             controller.handleEvents(false);
         });
 
-        VBox dashboardActions = new VBox(12, startButton, stopButton);
+        VBox dashboardActions = new VBox(12, startButton, stopButton, recommendButton);
         dashboardActions.setAlignment(Pos.CENTER);
-
-        // The manual recommendation UI (dropdown and button) has been completely removed
-        // because the preview now triggers automatically as the user types.
 
         HBox requestItem = new HBox(15);
         requestItem.setAlignment(Pos.CENTER_LEFT);
@@ -532,7 +532,7 @@ public class CustomerApp extends Application {
 
         // CONTROLLER BINDING
         controller.attach(vinField, spaceNumberField, statusLabel, historyTable, rateLabel, areaLabel, totalOwedLabel, errorLabel, errorCard);
-        controller.attachButtons(startButton, stopButton, fetchHistoryBtn);
+        controller.attachButtons(startButton, stopButton, fetchHistoryBtn, recommendButton);
         controller.attachTimer(infoCard, timerLabel, timerCostLabel, rateItem, timeItem, costItem, cardDivider, requestItem, resultItem, recDivider, requestLabel);
         controller.attachHistoryStatus(historyStatusLabel);
         controller.attachRecommender(requestLabel, resultLabel);

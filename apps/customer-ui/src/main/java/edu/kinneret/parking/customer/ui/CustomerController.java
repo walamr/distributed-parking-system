@@ -18,13 +18,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
+import javax.net.ssl.SSLSocket;
 
 /**
  * Controller for the Customer UI.
@@ -263,6 +263,19 @@ public class CustomerController {
         startButton.setOnAction(e -> handleStart());
         stopButton.setOnAction(e -> handleStop());
         historyButton.setOnAction(e -> handleEvents(true));
+    }
+
+    /**
+     * Attaches action buttons to the controller.
+     *
+     * @param startButton the start parking button
+     * @param stopButton the stop parking button
+     * @param historyButton the history refresh button
+     * @param recommendButton the explicit Recommend Parking button
+     */
+    public void attachButtons(Button startButton, Button stopButton, Button historyButton, Button recommendButton) {
+        attachButtons(startButton, stopButton, historyButton);
+        recommendButton.setOnAction(e -> handleRecommendParking());
     }
 
     private java.time.Instant parkingStartTime;
@@ -1392,30 +1405,9 @@ public class CustomerController {
      * @param requestLabel the recommendation request output label
      * @param resultLabel the recommendation result output label
      */
-    private javafx.animation.PauseTransition recommendationDebounceTimer;
-
     public void attachRecommender(Label requestLabel, Label resultLabel) {
         this.requestLabel = requestLabel;
         this.resultLabel = resultLabel;
-
-        if (this.spaceNumberField != null) {
-            this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
-                if (newVal != null && !newVal.trim().isEmpty()) {
-                    if (recommendationDebounceTimer != null) {
-                        recommendationDebounceTimer.stop();
-                    }
-                    recommendationDebounceTimer = new javafx.animation.PauseTransition(javafx.util.Duration.millis(10));
-                    recommendationDebounceTimer.setOnFinished(event -> fetchRecommendation(newVal.trim()));
-                    recommendationDebounceTimer.play();
-                } else {
-                    if (recommendationDebounceTimer != null) {
-                        recommendationDebounceTimer.stop();
-                    }
-                    requestLabel.setText("-");
-                    resultLabel.setText("-");
-                }
-            });
-        }
     }
 
     private String formatRecommendationResult(String rawResult) {
@@ -1441,10 +1433,55 @@ public class CustomerController {
         return formatted.toString();
     }
 
+    /**
+     * Validates the current space input and starts an explicit recommendation query.
+     *
+     * @param none no input parameters
+     * @return no return value
+     */
+    private void handleRecommendParking() {
+        String spaceId = spaceNumberField == null || spaceNumberField.getText() == null
+                ? "" : spaceNumberField.getText().trim();
+        if (spaceId.isEmpty()) {
+            setStatus("Error: Parking space number is required.", true);
+            requestLabel.setText("-");
+            resultLabel.setText("-");
+            return;
+        }
+        if (!spaceId.matches("\\d+")) {
+            setStatus("Error: Parking space number must be numeric.", true);
+            requestLabel.setText("-");
+            resultLabel.setText("-");
+            return;
+        }
+        try {
+            int numericSpace = Integer.parseInt(spaceId);
+            if (numericSpace < 1 || numericSpace > 100) {
+                setStatus("Error: Parking space number must be between 1 and 100.", true);
+                requestLabel.setText("-");
+                resultLabel.setText("-");
+                return;
+            }
+        } catch (NumberFormatException ex) {
+            setStatus("Error: Parking space number must be numeric.", true);
+            requestLabel.setText("-");
+            resultLabel.setText("-");
+            return;
+        }
+        fetchRecommendation(spaceId);
+    }
+
+    /**
+     * Sends a signed TLS recommendation request to one recommender node.
+     *
+     * @param spaceId validated numeric parking space number
+     * @return no return value
+     */
     private void fetchRecommendation(String spaceId) {
         try {
-            ValidationUtils.requireValidSpaceId(spaceId.trim().toUpperCase());
+            ValidationUtils.requireValidSpaceId(spaceId.trim());
         } catch (IllegalArgumentException ex) {
+            setStatus("Error: Invalid parking space number.", true);
             return;
         }
 
@@ -1454,13 +1491,22 @@ public class CustomerController {
         Task<String> task = new Task<>() {
             @Override
             protected String call() throws Exception {
-                JsonObject request = new JsonObject();
-                request.addProperty("type", "CLIENT_QUERY");
-                request.addProperty("spaceId", spaceId.trim());
-                request.addProperty("correlationId", UUID.randomUUID().toString());
+                JsonObject request = edu.kinneret.parking.recommender.RecommenderServer.createSignedRequest(
+                        "CLIENT_QUERY",
+                        spaceId.trim(),
+                        UUID.randomUUID().toString(),
+                        "customer-ui",
+                        signer);
 
-                try (Socket socket = new Socket()) {
+                javax.net.ssl.SSLContext sslContext = TlsUtils.createSslContext(
+                        config.getTlsTruststorePath(),
+                        config.getTlsTruststorePassword(),
+                        config.getTlsKeystorePath(),
+                        config.getTlsKeystorePassword());
+                try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
+                    socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
                     socket.connect(new java.net.InetSocketAddress("localhost", finalPort), 3000);
+                    socket.startHandshake();
                     try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
                          BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
                         

@@ -1,27 +1,62 @@
 package edu.kinneret.parking.recommender;
 
-import edu.kinneret.parking.common.AppConfig;
-import edu.kinneret.parking.common.ParkingRepository;
-import edu.kinneret.parking.common.ValidationUtils;
-import edu.kinneret.parking.common.RabbitMqConnectionManager;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import edu.kinneret.parking.common.AppConfig;
+import edu.kinneret.parking.common.NonceStore;
+import edu.kinneret.parking.common.ParkingRepository;
+import edu.kinneret.parking.common.RabbitMqConnectionManager;
+import edu.kinneret.parking.common.SecureMessageSigner;
+import edu.kinneret.parking.common.SecurityLogger;
+import edu.kinneret.parking.common.TlsUtils;
+import edu.kinneret.parking.common.ValidationUtils;
 import org.bson.Document;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
-import java.util.concurrent.*;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Recommender server node that implements the consensus protocol and generates
- * recommended parking space lists.
+ * Recommender server node that implements secure recommendation requests,
+ * local recommendation generation, and leader majority consensus.
  */
 public class RecommenderServer implements AutoCloseable {
     private static final Logger logger = Logger.getLogger(RecommenderServer.class.getName());
     private static final int TIMEOUT_MS = 2000;
+    private static final int MAX_SPACE_NUMBER = 100;
+    private static final long MAX_MESSAGE_AGE_SECONDS = 60;
+    private static final String SAFE_CLIENT_FAILURE = "Recommendation service temporarily unavailable";
+    private static final Set<String> REQUEST_TYPES = Set.of("CLIENT_QUERY", "FORWARD_QUERY", "COLLECT_REQUEST");
+    private static final Set<String> RESPONSE_TYPES = Set.of("CLIENT_RESPONSE", "COLLECT_RESPONSE");
+    private static final Set<String> SIGNED_FIELDS = Set.of(
+            "type", "spaceId", "correlationId", "timestamp", "nonce", "nodeId", "localResult", "status", "result", "reason");
 
     private final String nodeId;
     private final int port;
@@ -29,8 +64,11 @@ public class RecommenderServer implements AutoCloseable {
     private final int leaderPort;
     private final boolean isLeader;
     private volatile boolean isMalicious;
-    private final List<String> clusterNodes; // e.g. ["localhost:8091", "localhost:8092", "localhost:8093"]
+    private final List<NodeEndpoint> clusterNodes;
     private final AppConfig appConfig;
+    private final SecureMessageSigner signer;
+    private final NonceStore nonceStore;
+    private final javax.net.ssl.SSLContext sslContext;
 
     private ServerSocket serverSocket;
     private ExecutorService executorService;
@@ -39,199 +77,254 @@ public class RecommenderServer implements AutoCloseable {
     /**
      * Creates a recommender server node.
      *
-     * @param nodeId       unique identifier for this node
-     * @param port         port to listen on
-     * @param leaderHost   host address of the cluster leader
-     * @param leaderPort   port of the cluster leader
-     * @param isLeader     flag indicating if this node is the leader
-     * @param isMalicious  flag indicating if this node should behave maliciously
-     * @param clusterNodes list of all nodes in the cluster
-     * @param appConfig    application configuration for DB access
+     * @param nodeId unique identifier for this node
+     * @param port port to listen on
+     * @param leaderHost host address of the cluster leader
+     * @param leaderPort port of the cluster leader
+     * @param isLeader flag indicating if this node is the leader
+     * @param isMalicious flag indicating if this node should behave maliciously
+     * @param clusterNodes list of all nodes in nodeId=host:port or host:port form
+     * @param appConfig application configuration for DB access and TLS/HMAC settings
      */
     public RecommenderServer(String nodeId, int port, String leaderHost, int leaderPort,
                              boolean isLeader, boolean isMalicious, List<String> clusterNodes,
                              AppConfig appConfig) {
-        this.nodeId = nodeId;
-        this.port = port;
-        this.leaderHost = leaderHost;
-        this.leaderPort = leaderPort;
+        this.nodeId = ValidationUtils.requireValidMessageType(nodeId, "nodeId");
+        this.port = ValidationUtils.requirePositive(port, "port");
+        this.leaderHost = ValidationUtils.requireNonEmpty(leaderHost, "leaderHost");
+        this.leaderPort = ValidationUtils.requirePositive(leaderPort, "leaderPort");
         this.isLeader = isLeader;
         this.isMalicious = isMalicious;
-        this.clusterNodes = new ArrayList<>(clusterNodes);
+        this.clusterNodes = parseClusterNodes(clusterNodes);
         this.appConfig = appConfig;
+        this.signer = new SecureMessageSigner(appConfig.getHmacSecret());
+        this.nonceStore = new NonceStore(appConfig);
+        try {
+            this.sslContext = TlsUtils.createSslContext(
+                    appConfig.getTlsTruststorePath(),
+                    appConfig.getTlsTruststorePassword(),
+                    appConfig.getTlsKeystorePath(),
+                    appConfig.getTlsKeystorePassword());
+        } catch (Exception e) {
+            throw new IllegalStateException("Recommender TLS/mTLS configuration is invalid.", e);
+        }
     }
 
     /**
-     * Starts the socket server and listens for incoming connections.
+     * Starts the TLS listener and background worker pool.
      *
-     * @throws IOException if the server socket cannot be opened
+     * @throws IOException if the secure server socket cannot be opened
      */
     public void start() throws IOException {
-        serverSocket = new ServerSocket(port);
+        SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+        SSLServerSocket tlsServerSocket = (SSLServerSocket) factory.createServerSocket(port);
+        tlsServerSocket.setEnabledProtocols(enabledTlsProtocols(tlsServerSocket.getSupportedProtocols()));
+        tlsServerSocket.setNeedClientAuth(true);
+        serverSocket = tlsServerSocket;
+
         executorService = Executors.newCachedThreadPool(runnable -> {
             Thread t = new Thread(runnable, "recommender-worker-" + nodeId);
             t.setDaemon(true);
             return t;
         });
 
-        // Verify access to RabbitMQ server (TCP/AMQP connection as per physical architecture)
         try {
             RabbitMqConnectionManager rabbitManager = new RabbitMqConnectionManager(appConfig);
             if (rabbitManager.checkHealth()) {
-                logger.info("Recommender node '" + nodeId + "' successfully verified connection to RabbitMQ server.");
+                logger.info("Recommender node '" + nodeId + "' verified RabbitMQ TLS connectivity.");
             } else {
                 logger.warning("Recommender node '" + nodeId + "' could not reach RabbitMQ server.");
             }
         } catch (Exception e) {
-            logger.warning("Recommender node '" + nodeId + "' failed to verify RabbitMQ connection: " + e.getMessage());
+            logger.warning("Recommender node '" + nodeId + "' failed RabbitMQ health check: "
+                    + SecurityLogger.sanitize(e.getMessage()));
         }
 
-        logger.info("Recommender node '" + nodeId + "' started on port " + port 
+        logger.info("Recommender node '" + nodeId + "' started with TLS/mTLS on port " + port
                 + " [Leader: " + isLeader + ", Malicious: " + isMalicious + "]");
-
         executorService.submit(this::listen);
     }
 
+    /**
+     * Accepts incoming TLS connections and dispatches each connection to a worker.
+     *
+     * @param none no input parameters
+     * @return no return value
+     */
     private void listen() {
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
                 executorService.submit(() -> handleConnection(clientSocket));
+            } catch (SSLHandshakeException e) {
+                logSecurity("TLS_HANDSHAKE_FAILURE", "unknown", "failed TLS/mTLS handshake: " + e.getMessage());
             } catch (IOException e) {
-                if (!running) break;
-                logger.log(Level.WARNING, "Error accepting connection on node " + nodeId, e);
+                if (!running) {
+                    break;
+                }
+                logger.log(Level.WARNING, "Error accepting TLS connection on node " + nodeId, e);
             }
         }
     }
 
+    /**
+     * Reads a single signed JSON request from a TLS socket and routes it by type.
+     *
+     * @param socket accepted TLS socket from a client or peer recommender
+     * @return no return value
+     */
     private void handleConnection(Socket socket) {
         try (Socket s = socket;
              BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
              PrintWriter writer = new PrintWriter(s.getOutputStream(), true)) {
 
-            String line = reader.readLine();
-            if (line == null || line.isBlank()) return;
+            if (!(s instanceof SSLSocket sslSocket)) {
+                logSecurity("PLAINTEXT_REJECTED", remoteAddress(s), "non-TLS socket rejected");
+                sendSignedFailure(writer, "CLIENT_RESPONSE", UUID.randomUUID().toString(), SAFE_CLIENT_FAILURE);
+                return;
+            }
+            sslSocket.setEnabledProtocols(enabledTlsProtocols(sslSocket.getSupportedProtocols()));
+            sslSocket.startHandshake();
 
-            JsonObject request = JsonParser.parseString(line).getAsJsonObject();
+            String line = reader.readLine();
+            if (line == null || line.isBlank()) {
+                logSecurity("INVALID_INPUT", remoteAddress(s), "empty request");
+                return;
+            }
+
+            JsonObject request = parseAndValidateRequest(line, remoteAddress(s));
             String type = request.get("type").getAsString();
             String spaceId = request.get("spaceId").getAsString();
-            String correlationId = request.has("correlationId") ? request.get("correlationId").getAsString() : UUID.randomUUID().toString();
-
-            logger.fine("[" + nodeId + "] Received " + type + " for space " + spaceId);
+            String correlationId = request.get("correlationId").getAsString();
 
             switch (type) {
-                case "CLIENT_QUERY":
-                    handleClientQuery(spaceId, correlationId, writer);
-                    break;
-                case "FORWARD_QUERY":
-                    handleForwardQuery(request, writer);
-                    break;
-                case "COLLECT_REQUEST":
-                    handleCollectRequest(spaceId, writer);
-                    break;
-                default:
-                    logger.warning("Unknown message type: " + type);
+                case "CLIENT_QUERY" -> handleClientQuery(spaceId, correlationId, writer);
+                case "FORWARD_QUERY" -> handleForwardQuery(request, writer);
+                case "COLLECT_REQUEST" -> handleCollectRequest(spaceId, correlationId, writer);
+                default -> throw new IllegalArgumentException("Unsupported recommender message type.");
             }
+        } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Rejected recommender request on node " + nodeId + ": "
+                    + SecurityLogger.sanitize(e.getMessage()));
+        } catch (SSLHandshakeException e) {
+            logSecurity("TLS_HANDSHAKE_FAILURE", remoteAddress(socket), "failed TLS/mTLS handshake: " + e.getMessage());
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Exception handling connection on node " + nodeId, e);
+            logger.log(Level.SEVERE, "Exception handling recommender connection on node " + nodeId, e);
         }
     }
 
+    /**
+     * Handles a customer recommendation request, forwarding to the leader when needed.
+     *
+     * @param spaceId validated numeric parking space number
+     * @param correlationId request correlation identifier
+     * @param clientWriter writer used to return the signed client response
+     * @return no return value
+     */
     private void handleClientQuery(String spaceId, String correlationId, PrintWriter clientWriter) {
         try {
             if (isLeader) {
-                // Leader consensus directly
-                String consensus = executeLeaderConsensus(spaceId);
-                JsonObject response = new JsonObject();
-                if (consensus != null) {
-                    response.addProperty("status", "SUCCESS");
-                    response.addProperty("result", consensus);
-                } else {
-                    response.addProperty("status", "FAILURE");
-                    response.addProperty("reason", "No majority consensus reached in cluster.");
-                }
-                clientWriter.println(response.toString());
-            } else {
-                // Follower: calculate local result, then forward to leader
-                String localResult = calculateLocalRecommendation(spaceId);
-                JsonObject forwardRequest = new JsonObject();
-                forwardRequest.addProperty("type", "FORWARD_QUERY");
-                forwardRequest.addProperty("spaceId", spaceId);
-                forwardRequest.addProperty("localResult", localResult);
-                forwardRequest.addProperty("nodeId", nodeId);
-                forwardRequest.addProperty("correlationId", correlationId);
+                sendConsensusResponse(spaceId, correlationId, clientWriter);
+                return;
+            }
 
-                try (Socket leaderSocket = new Socket()) {
-                    leaderSocket.connect(new InetSocketAddress(leaderHost, leaderPort), TIMEOUT_MS);
-                    try (PrintWriter leaderWriter = new PrintWriter(leaderSocket.getOutputStream(), true);
-                         BufferedReader leaderReader = new BufferedReader(new InputStreamReader(leaderSocket.getInputStream()))) {
+            String localResult = calculateLocalRecommendation(spaceId);
+            JsonObject forwardRequest = createSignedMessage("FORWARD_QUERY", spaceId, correlationId, nodeId);
+            forwardRequest.addProperty("localResult", localResult);
+            signMessage(forwardRequest, signer);
 
-                        leaderWriter.println(forwardRequest.toString());
-                        String reply = leaderReader.readLine();
-                        if (reply != null) {
-                            clientWriter.println(reply);
-                        } else {
-                            sendClientFailure(clientWriter, "No response from leader.");
-                        }
+            try (SSLSocket leaderSocket = openTlsSocket(leaderHost, leaderPort)) {
+                try (PrintWriter leaderWriter = new PrintWriter(leaderSocket.getOutputStream(), true);
+                     BufferedReader leaderReader = new BufferedReader(new InputStreamReader(leaderSocket.getInputStream()))) {
+                    leaderWriter.println(forwardRequest);
+                    String reply = leaderReader.readLine();
+                    if (reply == null) {
+                        sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
+                        return;
                     }
-                } catch (Exception e) {
-                    logger.warning("Node '" + nodeId + "' failed to reach leader at " + leaderHost + ":" + leaderPort);
-                    sendClientFailure(clientWriter, "Failed to reach cluster leader.");
+                    JsonObject signedReply = parseAndValidateResponse(reply, leaderHost + ":" + leaderPort);
+                    clientWriter.println(signedReply);
                 }
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach leader.", e);
+                logSecurity("CONSENSUS_FAILURE", leaderHost + ":" + leaderPort, "follower could not reach leader");
+                sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
             }
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleClientQuery on node " + nodeId, e);
-            sendClientFailure(clientWriter, "Internal recommender error: " + e.getMessage());
+            sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
         }
     }
 
+    /**
+     * Handles a follower-forwarded vote on the leader and returns the majority result.
+     *
+     * @param forwardRequest signed request containing the follower's local vote
+     * @param leaderWriter writer used to return the signed leader response
+     * @return no return value
+     */
     private void handleForwardQuery(JsonObject forwardRequest, PrintWriter leaderWriter) {
         if (!isLeader) {
-            sendClientFailure(leaderWriter, "Non-leader node cannot handle FORWARD_QUERY.");
+            sendSignedFailure(leaderWriter, "CLIENT_RESPONSE",
+                    forwardRequest.get("correlationId").getAsString(), SAFE_CLIENT_FAILURE);
             return;
         }
 
+        String correlationId = forwardRequest.get("correlationId").getAsString();
         try {
             String spaceId = forwardRequest.get("spaceId").getAsString();
             String followerResult = forwardRequest.get("localResult").getAsString();
             String followerId = forwardRequest.get("nodeId").getAsString();
 
-            // Run consensus, incorporating the follower's pre-calculated vote!
             Map<String, String> explicitVotes = new HashMap<>();
             explicitVotes.put(followerId, followerResult);
-
-            String consensus = executeLeaderConsensus(spaceId, explicitVotes);
-            JsonObject response = new JsonObject();
-            if (consensus != null) {
-                response.addProperty("status", "SUCCESS");
-                response.addProperty("result", consensus);
-            } else {
-                response.addProperty("status", "FAILURE");
-                response.addProperty("reason", "No majority consensus reached in cluster.");
-            }
-            leaderWriter.println(response.toString());
+            sendConsensusResponse(spaceId, correlationId, leaderWriter, explicitVotes);
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleForwardQuery on leader", e);
-            sendClientFailure(leaderWriter, "Leader internal error: " + e.getMessage());
+            sendSignedFailure(leaderWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
         }
     }
 
-    private void handleCollectRequest(String spaceId, PrintWriter writer) {
+    /**
+     * Handles a leader collection request by returning this node's local recommendation.
+     *
+     * @param spaceId validated numeric parking space number
+     * @param correlationId request correlation identifier
+     * @param writer writer used to return the signed collect response
+     * @return no return value
+     */
+    private void handleCollectRequest(String spaceId, String correlationId, PrintWriter writer) {
         try {
             String localResult = calculateLocalRecommendation(spaceId);
-            JsonObject response = new JsonObject();
-            response.addProperty("type", "COLLECT_RESPONSE");
-            response.addProperty("nodeId", nodeId);
+            JsonObject response = createSignedMessage("COLLECT_RESPONSE", spaceId, correlationId, nodeId);
             response.addProperty("localResult", localResult);
-            writer.println(response.toString());
+            signMessage(response, signer);
+            writer.println(response);
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleCollectRequest on follower " + nodeId, e);
-            JsonObject response = new JsonObject();
-            response.addProperty("type", "COLLECT_RESPONSE");
-            response.addProperty("nodeId", nodeId);
-            response.addProperty("localResult", ""); // empty indicates failure/error
-            writer.println(response.toString());
+            JsonObject response = createSignedMessage("COLLECT_RESPONSE", spaceId, correlationId, nodeId);
+            response.addProperty("localResult", "");
+            signMessage(response, signer);
+            writer.println(response);
         }
+    }
+
+    private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer) {
+        sendConsensusResponse(spaceId, correlationId, writer, Collections.emptyMap());
+    }
+
+    private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer, Map<String, String> explicitVotes) {
+        String consensus = executeLeaderConsensus(spaceId, explicitVotes);
+        JsonObject response = createSignedMessage("CLIENT_RESPONSE", spaceId, correlationId, nodeId);
+        if (consensus != null) {
+            response.addProperty("status", "SUCCESS");
+            response.addProperty("result", consensus);
+        } else {
+            response.addProperty("status", "FAILURE");
+            response.addProperty("reason", "No majority consensus reached in cluster.");
+        }
+        signMessage(response, signer);
+        writer.println(response);
     }
 
     private String executeLeaderConsensus(String spaceId) {
@@ -240,85 +333,80 @@ public class RecommenderServer implements AutoCloseable {
 
     private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
         Map<String, String> votes = new ConcurrentHashMap<>();
-        
-        // 1. Calculate leader's own local result
-        String leaderResult = calculateLocalRecommendation(spaceId);
-        votes.put(nodeId, leaderResult);
-
-        // 2. Put any explicit votes already received (e.g. from forwarding follower)
+        votes.put(nodeId, calculateLocalRecommendation(spaceId));
         votes.putAll(explicitVotes);
 
-        // 3. For all other cluster nodes that we haven't got votes from, query them via COLLECT_REQUEST
-        List<Future<Void>> futures = new ArrayList<>();
         ExecutorService collectExecutor = Executors.newCachedThreadPool();
+        List<Future<Void>> futures = new ArrayList<>();
 
-        for (String nodeAddr : clusterNodes) {
-            String[] parts = nodeAddr.split(":");
-            String host = parts[0];
-            int p = Integer.parseInt(parts[1]);
-
-            // Skip contacting ourself
-            if (host.equalsIgnoreCase("localhost") || host.equalsIgnoreCase("127.0.0.1")) {
-                if (p == this.port) continue;
-            }
-
-            // Find node ID corresponding to address (or infer from port/list)
-            String targetNodeId = "recommender-" + p;
-            if (votes.containsKey(targetNodeId)) {
-                continue; // Already have a vote (e.g., forwarded query)
+        for (NodeEndpoint endpoint : clusterNodes) {
+            if (endpoint.nodeId().equals(nodeId) || votes.containsKey(endpoint.nodeId())) {
+                continue;
             }
 
             futures.add(collectExecutor.submit(() -> {
-                try (Socket collectSocket = new Socket()) {
-                    collectSocket.connect(new InetSocketAddress(host, p), TIMEOUT_MS);
+                try (SSLSocket collectSocket = openTlsSocket(endpoint.host(), endpoint.port())) {
                     try (PrintWriter collectWriter = new PrintWriter(collectSocket.getOutputStream(), true);
                          BufferedReader collectReader = new BufferedReader(new InputStreamReader(collectSocket.getInputStream()))) {
+                        JsonObject collectRequest = createSignedMessage("COLLECT_REQUEST", spaceId, UUID.randomUUID().toString(), nodeId);
+                        signMessage(collectRequest, signer);
+                        collectWriter.println(collectRequest);
 
-                        JsonObject collectRequest = new JsonObject();
-                        collectRequest.addProperty("type", "COLLECT_REQUEST");
-                        collectRequest.addProperty("spaceId", spaceId);
-
-                        collectWriter.println(collectRequest.toString());
                         String reply = collectReader.readLine();
                         if (reply != null) {
-                            JsonObject response = JsonParser.parseString(reply).getAsJsonObject();
+                            JsonObject response = parseAndValidateResponse(reply, endpoint.host() + ":" + endpoint.port());
                             String val = response.get("localResult").getAsString();
                             String senderId = response.get("nodeId").getAsString();
+                            if (!endpoint.nodeId().equals(senderId)) {
+                                logSecurity("FAILED_AUTHENTICATION", endpoint.host() + ":" + endpoint.port(),
+                                        "collect response node identity mismatch");
+                                return null;
+                            }
                             if (!val.isBlank()) {
                                 votes.put(senderId, val);
                             }
                         }
                     }
                 } catch (Exception e) {
-                    logger.warning("Leader node '" + nodeId + "' failed to collect result from " + host + ":" + p);
+                    logger.warning("Leader node '" + nodeId + "' failed to collect result from "
+                            + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port());
                 }
                 return null;
             }));
         }
 
-        // Wait for collect tasks to complete or timeout
         for (Future<Void> fut : futures) {
             try {
                 fut.get(TIMEOUT_MS + 200, TimeUnit.MILLISECONDS);
-            } catch (Exception e) {
-                // Ignore timeouts and keep going with collected votes
+            } catch (Exception ignored) {
             }
         }
         collectExecutor.shutdown();
 
-        // 4. Perform majority voting
         int totalConfiguredNodes = clusterNodes.isEmpty() ? 3 : clusterNodes.size();
         int majorityThreshold = (totalConfiguredNodes / 2) + 1;
-
+        String consensus = determineMajority(votes, majorityThreshold);
         logger.info("Consensus votes collected: " + votes + " (Threshold: " + majorityThreshold + ")");
+        if (consensus == null) {
+            logSecurity("CONSENSUS_FAILURE", "cluster", "no exact-list majority");
+        }
+        return consensus;
+    }
 
+    /**
+     * Determines the exact-list majority value from collected node votes.
+     *
+     * @param votes map of node identity to complete serialized recommendation list
+     * @param majorityThreshold number of equal votes required to accept a result
+     * @return the majority result, or null when no exact-list majority exists
+     */
+    public static String determineMajority(Map<String, String> votes, int majorityThreshold) {
         Map<String, Integer> counts = new HashMap<>();
         for (String vote : votes.values()) {
             if (vote != null && !vote.isBlank()) {
                 counts.put(vote, counts.getOrDefault(vote, 0) + 1);
             }
         }
-
         String consensus = null;
         int maxVotes = 0;
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
@@ -327,20 +415,13 @@ public class RecommenderServer implements AutoCloseable {
                 consensus = entry.getKey();
             }
         }
-
-        if (maxVotes >= majorityThreshold) {
-            logger.info("Consensus REACHED: '" + consensus + "' with " + maxVotes + " votes.");
-            return consensus;
-        } else {
-            logger.warning("Consensus FAILED. Max agreement: " + maxVotes + " votes. Consensus required: " + majorityThreshold);
-            return null;
-        }
+        return maxVotes >= majorityThreshold ? consensus : null;
     }
 
     /**
      * Calculates the local recommendation.
      *
-     * @param desiredSpaceId the requested space number/ID
+     * @param desiredSpaceId the requested space number
      * @return the formatted recommendation string
      */
     public String calculateLocalRecommendation(String desiredSpaceId) {
@@ -352,190 +433,254 @@ public class RecommenderServer implements AutoCloseable {
     /**
      * Calculates the local recommendation using a specified repository instance.
      *
-     * @param desiredSpaceId the requested space number/ID
-     * @param repository     the repository instance to use
+     * @param desiredSpaceId the requested space number
+     * @param repository the repository instance to use
      * @return the formatted recommendation string
      */
     public String calculateLocalRecommendation(String desiredSpaceId, ParkingRepository repository) {
         if (isMalicious) {
-            // Malicious mode: return faked space and high citation count
             return "Request: Space " + desiredSpaceId + "\nResult: Space 999;999";
         }
 
-        // Validate space ID format
+        String safeSpaceId = requireValidRecommenderSpace(desiredSpaceId);
         try {
-            ValidationUtils.requireValidSpaceId(desiredSpaceId);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid parking space format.");
-        }
-
-        try {
-            // Check if space is registered
-            if (!repository.isSpaceRegistered(desiredSpaceId)) {
+            if (!repository.isSpaceRegistered(safeSpaceId)) {
                 throw new IllegalArgumentException("Parking space is not registered in the system.");
             }
 
-            // Find the zone name for the desired space
-            String zoneName = repository.getSpaceZone(desiredSpaceId);
+            String zoneName = repository.getSpaceZone(safeSpaceId);
             if ("Unknown".equalsIgnoreCase(zoneName)) {
-                throw new IllegalArgumentException("Zone could not be identified for space " + desiredSpaceId);
+                throw new IllegalArgumentException("Zone could not be identified for requested space.");
             }
 
-            // Calculate citations for the desired space regardless of whether it is occupied
-            long desiredSpaceCitations = 0;
-            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                desiredSpaceCitations = repository.getDatabase().getCollection("citations")
-                        .countDocuments(com.mongodb.client.model.Filters.or(
-                                com.mongodb.client.model.Filters.eq("payload.spaceId", desiredSpaceId),
-                                com.mongodb.client.model.Filters.eq("spaceId", desiredSpaceId)
-                        ));
-            }
-            String requestedPart = "Request: Space " + desiredSpaceId;
-
-            // Fetch spaces in the same zone from DB (SUC 8: limit candidates to target parking zone)
-            List<Document> allSpacesInZone = new ArrayList<>();
-            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                repository.getDatabase().getCollection("spaces")
-                        .find(com.mongodb.client.model.Filters.eq("zoneName", zoneName))
-                        .into(allSpacesInZone);
-            } else {
-                // Testing fallback: if database client is not initialized, generate all 100 spaces in-memory
-                for (int i = 1; i <= 100; i++) {
-                    allSpacesInZone.add(new Document("spaceId", String.valueOf(i)));
-                }
-            }
-
-            // Evaluate availability and count citations for each space candidate
-            List<SpaceCandidate> candidates = new ArrayList<>();
-            for (Document spaceDoc : allSpacesInZone) {
-                String spaceId = spaceDoc.getString("spaceId");
-
-                // In-memory zone filtering when DB is offline (fallback)
-                if (!ParkingRepository.isDbOnline || repository.getDatabase() == null) {
-                    String candidateZone = repository.getSpaceZone(spaceId);
-                    if (!zoneName.equalsIgnoreCase(candidateZone)) {
-                        continue;
-                    }
-                }
-
-                // Availability check (latest transaction action is not "start")
-                boolean isAvailable = true;
-                Document lastTx = repository.getLatestTransactionForSpace(spaceId);
-                if (lastTx != null) {
-                    String action = ParkingRepository.readTransactionAction(lastTx);
-                    if ("start".equalsIgnoreCase(action)) {
-                        isAvailable = false;
-                    }
-                }
-
-                if (!isAvailable) {
-                    continue; // Skip occupied space
-                }
-
-                // Citation count
-                long citationCount = 0;
-                if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                    citationCount = repository.getDatabase().getCollection("citations")
-                            .countDocuments(com.mongodb.client.model.Filters.or(
-                                    com.mongodb.client.model.Filters.eq("payload.spaceId", spaceId),
-                                    com.mongodb.client.model.Filters.eq("spaceId", spaceId)
-                            ));
-                }
-
-                candidates.add(new SpaceCandidate(spaceId, citationCount));
-            }
-
-            // Branch C: No spaces available
-            if (candidates.isEmpty()) {
-                return requestedPart + "\nResult: NONE";
-            }
-
-            // Find the minimum citation count among all available spaces
-            long minCitations = Long.MAX_VALUE;
-            for (SpaceCandidate c : candidates) {
-                if (c.citationCount < minCitations) {
-                    minCitations = c.citationCount;
-                }
-            }
-
-            // Filter down to only spaces that have the minimum citations
-            List<SpaceCandidate> minCitationCandidates = new ArrayList<>();
-            for (SpaceCandidate c : candidates) {
-                if (c.citationCount == minCitations) {
-                    minCitationCandidates.add(c);
-                }
-            }
-
-            int desiredNum = parseSpaceNumber(desiredSpaceId);
-            List<RecommendationResult> results = new ArrayList<>();
-
-            if (desiredNum != -1) {
-                int minDistance = Integer.MAX_VALUE;
-                List<SpaceCandidate> closestCandidates = new ArrayList<>();
-
-                for (SpaceCandidate c : minCitationCandidates) {
-                    int candidateNum = parseSpaceNumber(c.spaceId);
-                    if (candidateNum != -1) {
-                        int dist = Math.abs(candidateNum - desiredNum);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            closestCandidates.clear();
-                            closestCandidates.add(c);
-                        } else if (dist == minDistance) {
-                            closestCandidates.add(c);
-                        }
-                    }
-                }
-
-                for (SpaceCandidate c : closestCandidates) {
-                    results.add(new RecommendationResult(c.spaceId, c.citationCount));
-                }
-            } else {
-                for (SpaceCandidate c : minCitationCandidates) {
-                    results.add(new RecommendationResult(c.spaceId, c.citationCount));
-                }
-            }
-            String recommendedPart = "Space " + serializeResults(results);
-
-            return requestedPart + "\nResult: " + recommendedPart;
+            List<SpaceCandidate> candidates = loadAvailableCandidates(safeSpaceId, zoneName, repository);
+            List<RecommendationResult> results = recommendFromSpaceCandidates(safeSpaceId, candidates);
+            String resultPart = results.isEmpty() ? "NONE" : "Space " + serializeResults(results);
+            return "Request: Space " + safeSpaceId + "\nResult: " + resultPart;
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             logger.log(Level.WARNING, "Database lookup failed for recommendation", e);
-            throw new RuntimeException("Recommender DB error: " + e.getMessage(), e);
-        }
-    }
-
-    private int parseSpaceNumber(String spaceId) {
-        if (spaceId == null) return -1;
-        String digits = spaceId.replaceAll("[^\\d]", "");
-        if (digits.isEmpty()) return -1;
-        try {
-            return Integer.parseInt(digits);
-        } catch (Exception e) {
-            return -1;
+            throw new RuntimeException("Recommendation service temporarily unavailable", e);
         }
     }
 
     /**
-     * Serializes a list of recommendation results into a sorted comma-separated string.
-     * Sorts by space ID numerically to ensure deterministic comparison.
+     * Chooses the best spaces from already-filtered available candidates.
      *
-     * @param results list of results
-     * @return serialized string (e.g. "3;1, 4;2")
+     * @param desiredSpaceId validated requested space number
+     * @param candidates available candidates in the same parking zone
+     * @return nearest minimum-citation recommendation results, possibly empty
      */
-    public static String serializeResults(List<RecommendationResult> results) {
-        if (results == null || results.isEmpty()) return "";
+    public static List<RecommendationResult> recommendFromCandidates(String desiredSpaceId, List<RecommendationResult> candidates) {
+        String safeSpaceId = requireValidRecommenderSpace(desiredSpaceId);
+        List<SpaceCandidate> internal = new ArrayList<>();
+        for (RecommendationResult candidate : candidates) {
+            internal.add(new SpaceCandidate(requireValidRecommenderSpace(candidate.spaceId()), candidate.citationCount()));
+        }
+        return recommendFromSpaceCandidates(safeSpaceId, internal);
+    }
 
-        List<RecommendationResult> sorted = new ArrayList<>(results);
-        sorted.sort((r1, r2) -> {
-            try {
-                int n1 = Integer.parseInt(r1.spaceId().replaceAll("[^\\d]", ""));
-                int n2 = Integer.parseInt(r2.spaceId().replaceAll("[^\\d]", ""));
-                return Integer.compare(n1, n2);
-            } catch (Exception e) {
-                return r1.spaceId().compareTo(r2.spaceId());
+    private List<SpaceCandidate> loadAvailableCandidates(String desiredSpaceId, String zoneName, ParkingRepository repository) {
+        List<Document> allSpacesInZone = new ArrayList<>();
+        if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+            repository.getDatabase().getCollection("spaces")
+                    .find(com.mongodb.client.model.Filters.eq("zoneName", zoneName))
+                    .into(allSpacesInZone);
+        } else {
+            for (int i = 1; i <= MAX_SPACE_NUMBER; i++) {
+                allSpacesInZone.add(new Document("spaceId", String.valueOf(i)));
+            }
+        }
+
+        List<SpaceCandidate> candidates = new ArrayList<>();
+        for (Document spaceDoc : allSpacesInZone) {
+            String spaceId = spaceDoc.getString("spaceId");
+            if (spaceId == null) {
+                continue;
+            }
+            if (!ParkingRepository.isDbOnline || repository.getDatabase() == null) {
+                String candidateZone = repository.getSpaceZone(spaceId);
+                if (!zoneName.equalsIgnoreCase(candidateZone)) {
+                    continue;
+                }
+            }
+            Document lastTx = repository.getLatestTransactionForSpace(spaceId);
+            if (lastTx != null && "start".equalsIgnoreCase(ParkingRepository.readTransactionAction(lastTx))) {
+                continue;
+            }
+            long citationCount = 0;
+            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                citationCount = repository.getDatabase().getCollection("citations")
+                        .countDocuments(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.eq("payload.spaceId", spaceId),
+                                com.mongodb.client.model.Filters.eq("spaceId", spaceId)));
+            }
+            candidates.add(new SpaceCandidate(spaceId, citationCount));
+        }
+        return candidates;
+    }
+
+    private static List<RecommendationResult> recommendFromSpaceCandidates(String desiredSpaceId, List<SpaceCandidate> candidates) {
+        if (candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
+        long minCitations = candidates.stream().mapToLong(c -> c.citationCount).min().orElse(Long.MAX_VALUE);
+        int desiredNum = parseSpaceNumber(desiredSpaceId);
+        int minDistance = Integer.MAX_VALUE;
+        List<RecommendationResult> results = new ArrayList<>();
+        for (SpaceCandidate candidate : candidates) {
+            if (candidate.citationCount != minCitations) {
+                continue;
+            }
+            int distance = Math.abs(parseSpaceNumber(candidate.spaceId) - desiredNum);
+            if (distance < minDistance) {
+                minDistance = distance;
+                results.clear();
+            }
+            if (distance == minDistance) {
+                results.add(new RecommendationResult(candidate.spaceId, candidate.citationCount));
+            }
+        }
+        results.sort(Comparator.comparingInt(r -> parseSpaceNumber(r.spaceId())));
+        return results;
+    }
+
+    private JsonObject parseAndValidateRequest(String line, String source) {
+        JsonObject request = parseJsonObject(line);
+        validateSignedMessage(request, REQUEST_TYPES, true, source);
+        return request;
+    }
+
+    private JsonObject parseAndValidateResponse(String line, String source) {
+        JsonObject response = parseJsonObject(line);
+        validateSignedMessage(response, RESPONSE_TYPES, false, source);
+        return response;
+    }
+
+    private void validateSignedMessage(JsonObject message, Set<String> allowedTypes, boolean storeNonce, String source) {
+        Set<String> allowed = new HashSet<>(SIGNED_FIELDS);
+        for (String field : message.keySet()) {
+            if (!allowed.contains(field) && !"hmac".equals(field)) {
+                logSecurity("INVALID_INPUT", source, "unexpected field: " + field);
+                throw new IllegalArgumentException("Unexpected field.");
+            }
+        }
+        requireString(message, "type");
+        requireString(message, "spaceId");
+        requireString(message, "correlationId");
+        requireString(message, "timestamp");
+        requireString(message, "nonce");
+        requireString(message, "nodeId");
+        requireString(message, "hmac");
+        String type = message.get("type").getAsString();
+        if (!allowedTypes.contains(type)) {
+            logSecurity("INVALID_INPUT", source, "unsupported type: " + type);
+            throw new IllegalArgumentException("Unsupported type.");
+        }
+        requireValidRecommenderSpace(message.get("spaceId").getAsString());
+        ValidationUtils.requireValidUuid(message.get("correlationId").getAsString(), "correlationId");
+        ValidationUtils.requireValidUuid(message.get("nonce").getAsString(), "nonce");
+        ValidationUtils.requireValidMessageType(message.get("nodeId").getAsString(), "nodeId");
+        if (message.has("localResult") && !message.get("localResult").isJsonPrimitive()) {
+            throw new IllegalArgumentException("localResult must be a string.");
+        }
+        validateTimestamp(message.get("timestamp").getAsString(), source);
+        if (storeNonce && !nonceStore.addNonce(message.get("nonce").getAsString())) {
+            logSecurity("REPLAY_REJECTED", source, "replayed nonce");
+            throw new IllegalArgumentException("Replay rejected.");
+        }
+        if (!verifyMessage(message, signer)) {
+            logSecurity("HMAC_REJECTED", source, "invalid HMAC");
+            throw new IllegalArgumentException("Invalid HMAC.");
+        }
+    }
+
+    private void validateTimestamp(String rawTimestamp, String source) {
+        try {
+            long timestamp = Long.parseLong(rawTimestamp);
+            long age = Math.abs(Instant.now().getEpochSecond() - timestamp);
+            if (age > MAX_MESSAGE_AGE_SECONDS) {
+                logSecurity("TIMESTAMP_REJECTED", source, "timestamp older than 60 seconds");
+                throw new IllegalArgumentException("Timestamp rejected.");
+            }
+        } catch (NumberFormatException e) {
+            logSecurity("TIMESTAMP_REJECTED", source, "timestamp not numeric");
+            throw new IllegalArgumentException("Timestamp rejected.");
+        }
+    }
+
+    /**
+     * Builds a signed recommender protocol message for clients and peer nodes.
+     *
+     * @param type recommender message type
+     * @param spaceId numeric parking space number
+     * @param correlationId request correlation identifier
+     * @param nodeId sender node identity
+     * @param signer HMAC-SHA256 signer
+     * @return a signed JSON message
+     */
+    public static JsonObject createSignedRequest(String type, String spaceId, String correlationId,
+                                                 String nodeId, SecureMessageSigner signer) {
+        JsonObject request = createSignedMessage(type, spaceId, correlationId, nodeId);
+        signMessage(request, signer);
+        return request;
+    }
+
+    private static JsonObject createSignedMessage(String type, String spaceId, String correlationId, String nodeId) {
+        JsonObject request = new JsonObject();
+        request.addProperty("type", ValidationUtils.requireValidMessageType(type, "type"));
+        request.addProperty("spaceId", requireValidRecommenderSpace(spaceId));
+        request.addProperty("correlationId", ValidationUtils.requireValidUuid(correlationId, "correlationId"));
+        request.addProperty("timestamp", String.valueOf(Instant.now().getEpochSecond()));
+        request.addProperty("nonce", UUID.randomUUID().toString());
+        request.addProperty("nodeId", ValidationUtils.requireValidMessageType(nodeId, "nodeId"));
+        return request;
+    }
+
+    private static void signMessage(JsonObject message, SecureMessageSigner signer) {
+        message.remove("hmac");
+        message.addProperty("hmac", signer.sign(canonicalSigningContent(message)));
+    }
+
+    private static boolean verifyMessage(JsonObject message, SecureMessageSigner signer) {
+        String hmac = message.get("hmac").getAsString();
+        return signer.verify(canonicalSigningContent(message), hmac);
+    }
+
+    private static String canonicalSigningContent(JsonObject message) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        SIGNED_FIELDS.stream().sorted().forEach(field -> {
+            if (message.has(field)) {
+                fields.put(field, message.get(field).getAsString());
             }
         });
+        StringBuilder canonical = new StringBuilder();
+        fields.forEach((key, value) -> canonical.append(key).append('=').append(value).append('\n'));
+        return canonical.toString();
+    }
 
+    private SSLSocket openTlsSocket(String host, int targetPort) throws IOException {
+        SSLSocketFactory factory = sslContext.getSocketFactory();
+        SSLSocket socket = (SSLSocket) factory.createSocket();
+        socket.setEnabledProtocols(enabledTlsProtocols(socket.getSupportedProtocols()));
+        socket.connect(new InetSocketAddress(host, targetPort), TIMEOUT_MS);
+        socket.startHandshake();
+        return socket;
+    }
+
+    /**
+     * Serializes a list of recommendation results into a sorted comma-separated string.
+     *
+     * @param results list of results
+     * @return serialized string, for example "3;1, Space 4;2"
+     */
+    public static String serializeResults(List<RecommendationResult> results) {
+        if (results == null || results.isEmpty()) {
+            return "";
+        }
+        List<RecommendationResult> sorted = new ArrayList<>(results);
+        sorted.sort(Comparator.comparingInt(r -> parseSpaceNumber(r.spaceId())));
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < sorted.size(); i++) {
             RecommendationResult r = sorted.get(i);
@@ -547,17 +692,19 @@ public class RecommenderServer implements AutoCloseable {
         return sb.toString();
     }
 
-    private void sendClientFailure(PrintWriter writer, String reason) {
-        JsonObject response = new JsonObject();
+    private void sendSignedFailure(PrintWriter writer, String type, String correlationId, String reason) {
+        JsonObject response = createSignedMessage(type, "1", correlationId, nodeId);
         response.addProperty("status", "FAILURE");
         response.addProperty("reason", reason);
-        writer.println(response.toString());
+        signMessage(response, signer);
+        writer.println(response);
     }
 
     /**
      * Configures the malicious mode at runtime.
      *
      * @param malicious true to enable malicious faked responses
+     * @return no return value
      */
     public void setMalicious(boolean malicious) {
         this.isMalicious = malicious;
@@ -574,7 +721,9 @@ public class RecommenderServer implements AutoCloseable {
     }
 
     /**
-     * Closes the server socket and shuts down worker threads.
+     * Closes the server socket, nonce store, and worker threads.
+     *
+     * @return no return value
      */
     @Override
     public void close() {
@@ -582,8 +731,10 @@ public class RecommenderServer implements AutoCloseable {
         if (serverSocket != null) {
             try {
                 serverSocket.close();
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
+        nonceStore.close();
         if (executorService != null) {
             executorService.shutdown();
             try {
@@ -595,6 +746,114 @@ public class RecommenderServer implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    private static JsonObject parseJsonObject(String line) {
+        try {
+            if (!JsonParser.parseString(line).isJsonObject()) {
+                throw new IllegalArgumentException("Message must be a JSON object.");
+            }
+            return JsonParser.parseString(line).getAsJsonObject();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Malformed recommender message.", e);
+        }
+    }
+
+    private static void requireString(JsonObject object, String fieldName) {
+        if (!object.has(fieldName) || !object.get(fieldName).isJsonPrimitive()
+                || !object.get(fieldName).getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException(fieldName + " is required.");
+        }
+    }
+
+    private static String requireValidRecommenderSpace(String spaceId) {
+        String safe = ValidationUtils.requireNonEmpty(spaceId, "spaceId");
+        if (!safe.matches("\\d+")) {
+            throw new IllegalArgumentException("Parking space number must be numeric.");
+        }
+        int parsed = parseSpaceNumber(safe);
+        if (parsed < 1 || parsed > MAX_SPACE_NUMBER) {
+            throw new IllegalArgumentException("Parking space number is out of range.");
+        }
+        return String.valueOf(parsed);
+    }
+
+    private static int parseSpaceNumber(String spaceId) {
+        if (spaceId == null || !spaceId.matches("\\d+")) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(spaceId);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static String[] enabledTlsProtocols(String[] supportedProtocols) {
+        List<String> enabled = new ArrayList<>();
+        for (String protocol : supportedProtocols) {
+            if ("TLSv1.3".equals(protocol) || "TLSv1.2".equals(protocol)) {
+                enabled.add(protocol);
+            }
+        }
+        if (enabled.isEmpty()) {
+            throw new IllegalStateException("TLS 1.2 or newer is required.");
+        }
+        return enabled.toArray(String[]::new);
+    }
+
+    private static List<NodeEndpoint> parseClusterNodes(List<String> rawNodes) {
+        if (rawNodes == null || rawNodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<NodeEndpoint> endpoints = new ArrayList<>();
+        int index = 1;
+        for (String rawNode : rawNodes) {
+            String nodeText = ValidationUtils.requireNonEmpty(rawNode, "clusterNode");
+            String explicitId = null;
+            String address = nodeText;
+            if (nodeText.contains("=")) {
+                String[] idParts = nodeText.split("=", 2);
+                explicitId = ValidationUtils.requireValidMessageType(idParts[0].trim(), "clusterNodeId");
+                address = idParts[1].trim();
+            }
+            String[] addressParts = address.split(":");
+            if (addressParts.length != 2) {
+                throw new IllegalArgumentException("Invalid recommender node entry: " + rawNode);
+            }
+            String host = ValidationUtils.requireNonEmpty(addressParts[0], "clusterNodeHost");
+            int nodePort = Integer.parseInt(addressParts[1]);
+            String resolvedId = explicitId != null ? explicitId : inferNodeId(host, index);
+            endpoints.add(new NodeEndpoint(resolvedId, host, nodePort));
+            index++;
+        }
+        return List.copyOf(endpoints);
+    }
+
+    private static String inferNodeId(String host, int index) {
+        String normalized = host == null ? "" : host.trim();
+        if (normalized.matches("recommender\\d+")) {
+            return normalized;
+        }
+        return "recommender" + index;
+    }
+
+    private void logSecurity(String event, String source, String reason) {
+        SecurityLogger.logSecurityEvent("event=" + event
+                + " timestamp=" + Instant.now()
+                + " source=" + source
+                + " receiver=" + nodeId
+                + " reason=" + reason);
+    }
+
+    private static String remoteAddress(Socket socket) {
+        if (socket == null || socket.getRemoteSocketAddress() == null) {
+            return "unknown";
+        }
+        return socket.getRemoteSocketAddress().toString();
+    }
+
+    private record NodeEndpoint(String nodeId, String host, int port) {
     }
 
     private static class SpaceCandidate {

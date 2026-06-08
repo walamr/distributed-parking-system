@@ -135,11 +135,19 @@ services:
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
+      - ./docker/rabbitmq/certs:/etc/recommender/certs:ro
+      - recommender1-logs:/var/log/mulligan
     working_dir: /
     environment:
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+      - HMAC_SECRET=${HMAC_SECRET}
+      - RABBITMQ_TRUSTSTORE_PATH=/etc/recommender/certs/truststore.jks
+      - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
+      - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
+      - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
+      - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender1 port=8091 leaderHost=recommender1 leaderPort=8091 isLeader=true nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8091:8091"
@@ -152,11 +160,19 @@ services:
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
+      - ./docker/rabbitmq/certs:/etc/recommender/certs:ro
+      - recommender2-logs:/var/log/mulligan
     working_dir: /
     environment:
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+      - HMAC_SECRET=${HMAC_SECRET}
+      - RABBITMQ_TRUSTSTORE_PATH=/etc/recommender/certs/truststore.jks
+      - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
+      - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
+      - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
+      - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender1 leaderPort=8091 isLeader=false nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8092:8092"
@@ -169,11 +185,19 @@ services:
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
+      - ./docker/rabbitmq/certs:/etc/recommender/certs:ro
+      - recommender3-logs:/var/log/mulligan
     working_dir: /
     environment:
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+      - HMAC_SECRET=${HMAC_SECRET}
+      - RABBITMQ_TRUSTSTORE_PATH=/etc/recommender/certs/truststore.jks
+      - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
+      - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
+      - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
+      - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender1 leaderPort=8091 isLeader=false nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8093:8093"
@@ -191,3 +215,6 @@ volumes:
   mongo1-data:
   mongo2-data:
   mongo3-data:
+  recommender1-logs:
+  recommender2-logs:
+  recommender3-logs:

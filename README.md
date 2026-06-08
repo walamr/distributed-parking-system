@@ -14,6 +14,7 @@
 ## Parking System - Stage 3: Clustered Recommender and Consensus
 
 For full setup, deployment, and testing instructions, please refer to the following documents:
-- [DEPLOY.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/DEPLOY.md) - Infrastructure setup and application startup guide.
-- [ConsensusProtocolDesign.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/ConsensusProtocolDesign.md) - Sequence diagrams, JSON message schema, and voting details.
-- [Defense.md](file:///c:/Users/user/assigment%203%20distu/ds-assignment-3-team-5-1/Defense.md) - Security controls and Blue team fixes report.
+- [DEPLOY.md](DEPLOY.md) - Infrastructure setup and application startup guide.
+- [ConsensusProtocolDesign.md](ConsensusProtocolDesign.md) - Sequence diagrams, JSON message schema, and voting details.
+- [Defense.md](Defense.md) - Security controls and Blue team fixes report.
+- [Testing.md](Testing.md) - Automated and manual verification evidence.

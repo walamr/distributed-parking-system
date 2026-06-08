@@ -293,3 +293,72 @@ Expected evidence:
 - no plaintext AMQP listener is active on port `5672`
 - `transactions.queue` and `citations.queue` are quorum queues with group size 3
 - `customer`, `peo_service`, and `mulligan_admin` have role-specific permissions
+
+## 9. Assignment 3 Recommender and Consensus Evidence
+
+Automated evidence collected on 2026-06-08:
+
+```powershell
+.\gradlew.bat :recommender-server:test
+.\gradlew.bat :customer-ui:test
+```
+
+Both commands passed. The recommender test suite covers:
+
+- recommendation algorithm examples from `Assignment3-Images.pdf`
+- requested space available with minimum citations
+- requested space available but not minimum
+- no available spaces returning an empty list
+- multiple equal minimum-citation spaces
+- equal-distance ties returning both closest spaces
+- busy requested space choosing the best available alternative
+- invalid non-numeric and out-of-range parking space input rejection
+- consensus all 3 agree -> success
+- consensus 2 of 3 agree -> success
+- consensus 3 different results -> failure
+- consensus 2 different results + 1 missing -> failure
+- consensus only leader responds -> failure
+- consensus 1 malicious node + 2 honest nodes -> honest majority wins
+- consensus 2 malicious/different nodes causing no majority -> failure
+- consensus missing node but remaining 2 agree -> success
+- exact list equality, not only same first item
+
+Manual/security evidence to collect after Docker startup:
+
+```powershell
+.\gradlew.bat build
+docker compose up -d
+docker compose ps
+docker exec rabbitmq1 rabbitmq-diagnostics listeners
+docker exec rabbitmq1 rabbitmqctl list_users
+docker exec rabbitmq1 rabbitmqctl list_permissions -p /parking
+docker exec mongo1 mongosh --tls --tlsCAFile /etc/mongo/certs/ca-cert.pem --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+```
+
+Expected recommender security evidence:
+
+- plaintext socket attempts to ports `8091`, `8092`, and `8093` fail because listeners are TLS sockets
+- signed TLS `CLIENT_QUERY` messages succeed when HMAC, timestamp, nonce, node identity, and numeric `spaceId` are valid
+- missing or invalid HMAC is rejected and logged in the receiving node's persistent recommender log volume
+- a reused nonce is rejected as replay and logged
+- timestamps older than 60 seconds are rejected and logged
+- invalid input, malformed JSON, unsupported fields, and out-of-range spaces are rejected without stack traces or internal exception text reaching the GUI/CLI
+- failed TLS/mTLS handshakes are logged with source, receiver node identity, timestamp, and reason where the JVM exposes the source address
+- consensus failure/no majority is logged
+- recommender logs survive `docker compose down` through the `recommender1-logs`, `recommender2-logs`, and `recommender3-logs` Docker volumes
+
+Expected GUI/CLI evidence:
+
+- Customer GUI shows a visible `Recommend Parking` button
+- the customer enters a parking space number and retries invalid input without crashing
+- recommendation output displays recommended spaces with citation counts
+- Customer CLI option `[5] Recommend Parking` rejects blank, non-numeric, and out-of-range spaces before sending
+
+RabbitMQ/Mongo hardening evidence to include in the final submission:
+
+- RabbitMQ definitions load automatically from `docker/rabbitmq/definitions.json`
+- the `guest` account is absent or disabled
+- management listeners are restricted to loopback host publishing
+- RabbitMQ client and inter-node listeners use TLS
+- MongoDB replica-set status shows one primary and secondaries
+- direct writes to a Mongo secondary are rejected or documented as rejected by replica-set role/RBAC

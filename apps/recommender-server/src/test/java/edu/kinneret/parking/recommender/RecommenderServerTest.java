@@ -6,11 +6,13 @@ import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RecommenderServerTest {
     private AppConfig appConfig;
@@ -27,42 +29,89 @@ public class RecommenderServerTest {
                 8099,
                 true,
                 false,
-                Collections.emptyList(),
+                List.of("recommender1=localhost:8091", "recommender2=localhost:8092", "recommender3=localhost:8093"),
                 appConfig
         );
     }
 
     @Test
     public void testSerialization() {
-        List<RecommendationResult> results = Arrays.asList(
+        List<RecommendationResult> results = List.of(
                 new RecommendationResult("4", 2),
                 new RecommendationResult("3", 1)
         );
-        String serialized = RecommenderServer.serializeResults(results);
-        // Verify it returns a formatted comma-separated list
-        assertEquals("3;1, Space 4;2", serialized);
+        assertEquals("3;1, Space 4;2", RecommenderServer.serializeResults(results));
     }
 
     @Test
-    public void testMaliciousMode() {
+    public void requestedSpaceAvailableAndMinimumCitationCount() {
+        assertEquals("3;1", serialize("3", candidates(10, 5, 1, 5, 3, 3)));
+    }
+
+    @Test
+    public void requestedSpaceAvailableAndTiedForMinimumWins() {
+        assertEquals("3;3", serialize("3", candidates(10, 5, 3, 5, 3, 3)));
+    }
+
+    @Test
+    public void requestedSpaceAvailableButNotMinimumChoosesClosestMinimum() {
+        assertEquals("5;3", serialize("3", candidates(10, 5, 7, 5, 3, 3)));
+    }
+
+    @Test
+    public void equalDistanceTieReturnsBothClosestSpaces() {
+        assertEquals("2;3, Space 4;3", serialize("3", candidates(10, 3, 7, 3, 5, 3)));
+    }
+
+    @Test
+    public void zeroCitationTieIncludesRequestedSpaceWhenAvailable() {
+        assertEquals("3;0", serialize("3", candidates(0, 0, 0, 0, 0, 0)));
+    }
+
+    @Test
+    public void requestedSpaceWithCitationChoosesAdjacentZeroCitationSpaces() {
+        assertEquals("2;0, Space 4;0", serialize("3", candidates(0, 0, 1, 0, 0, 0)));
+    }
+
+    @Test
+    public void busyRequestedSpaceChoosesBestAvailableAlternative() {
+        List<RecommendationResult> available = List.of(
+                new RecommendationResult("1", 2),
+                new RecommendationResult("4", 2),
+                new RecommendationResult("5", 2),
+                new RecommendationResult("6", 3)
+        );
+        assertEquals("4;2", serialize("3", available));
+    }
+
+    @Test
+    public void noAvailableSpacesReturnsEmptyList() {
+        assertTrue(RecommenderServer.recommendFromCandidates("3", List.of()).isEmpty());
+    }
+
+    @Test
+    public void multipleSpacesWithSameMinimumCitationsReturnsClosestSubset() {
+        List<RecommendationResult> available = List.of(
+                new RecommendationResult("1", 10),
+                new RecommendationResult("6", 10)
+        );
+        assertEquals("1;10", serialize("3", available));
+    }
+
+    @Test
+    public void invalidParkingSpaceInputIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> RecommenderServer.recommendFromCandidates("ABC", candidates(1, 2, 3)));
+        assertThrows(IllegalArgumentException.class, () -> RecommenderServer.recommendFromCandidates("101", candidates(1, 2, 3)));
+    }
+
+    @Test
+    public void maliciousModeReturnsFakedResult() {
         server.setMalicious(true);
-        String result = server.calculateLocalRecommendation("3");
-        assertTrue(result.startsWith("Request: Space 3\nResult: Space 999;999"));
+        assertTrue(server.calculateLocalRecommendation("3").startsWith("Request: Space 3\nResult: Space 999;999"));
     }
 
     @Test
-    public void testNormalModeBranchB() {
-        // With an offline database client, all spaces default to 0 citations and available.
-        // Therefore, the desired space itself is available and has minimum citations (0).
-        // Branch B should apply and return the desired space itself.
-        try (ParkingRepository repository = new ParkingRepository(appConfig)) {
-            String result = server.calculateLocalRecommendation("3", repository);
-            assertTrue(result.startsWith("Request: Space 3\nResult: Space 3;0"));
-        }
-    }
-
-    @Test
-    public void testZoneFilteringAndBranchA() {
+    public void offlineRepositoryPathStillFiltersByZone() {
         try (ParkingRepository occupiedRepo = new ParkingRepository(appConfig) {
             @Override
             public Document getLatestTransactionForSpace(String spaceId) {
@@ -74,18 +123,72 @@ public class RecommenderServerTest {
             }
         }) {
             String result = server.calculateLocalRecommendation("3", occupiedRepo);
-            // Space 3 is in zone "Fifth Dr". Space 3 is occupied.
-            // Under SUC 8, only other spaces in "Fifth Dr" (13, 23, 33, ...) should be considered.
-            // Since all have 0 citations, the nearest available space in zone is 13.
-            // (Without zone filtering, the nearest available would be 2 or 4).
             assertTrue(result.contains("Result: Space 13;0"), "Expected recommendation to be Space 13;0 but was: " + result);
         }
     }
 
     @Test
-    public void testInvalidSpaceId() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            server.calculateLocalRecommendation("INVALID_SPACE_NAME");
-        });
+    public void consensusAllThreeAgreeSucceeds() {
+        assertEquals("3;1", consensus("3;1", "3;1", "3;1"));
+    }
+
+    @Test
+    public void consensusTwoOfThreeAgreeSucceeds() {
+        assertEquals("3;1", consensus("3;1", "4;1", "3;1"));
+    }
+
+    @Test
+    public void consensusThreeDifferentResultsFails() {
+        assertEquals(null, consensus("3;1", "4;1", "5;1"));
+    }
+
+    @Test
+    public void consensusTwoDifferentResultsAndOneMissingFails() {
+        assertEquals(null, consensus("3;1", "4;1", null));
+    }
+
+    @Test
+    public void consensusOnlyLeaderRespondsFails() {
+        assertEquals(null, consensus("3;1", null, null));
+    }
+
+    @Test
+    public void consensusOneMaliciousNodeHonestMajorityWins() {
+        assertEquals("3;1", consensus("3;1", "999;999", "3;1"));
+    }
+
+    @Test
+    public void consensusTwoMaliciousDifferentNodesNoMajorityFails() {
+        assertEquals(null, consensus("3;1", "999;999", "998;998"));
+    }
+
+    @Test
+    public void consensusMissingNodeButRemainingTwoAgreeSucceeds() {
+        assertEquals("3;1", consensus("3;1", null, "3;1"));
+    }
+
+    @Test
+    public void consensusRequiresExactListEquality() {
+        assertEquals(null, consensus("3;1, Space 4;1", "3;1", "4;1"));
+    }
+
+    private static List<RecommendationResult> candidates(long... citations) {
+        java.util.ArrayList<RecommendationResult> results = new java.util.ArrayList<>();
+        for (int i = 0; i < citations.length; i++) {
+            results.add(new RecommendationResult(String.valueOf(i + 1), citations[i]));
+        }
+        return results;
+    }
+
+    private static String serialize(String desired, List<RecommendationResult> candidates) {
+        return RecommenderServer.serializeResults(RecommenderServer.recommendFromCandidates(desired, candidates));
+    }
+
+    private static String consensus(String server1, String server2, String server3) {
+        Map<String, String> votes = new LinkedHashMap<>();
+        votes.put("recommender1", server1);
+        votes.put("recommender2", server2);
+        votes.put("recommender3", server3);
+        return RecommenderServer.determineMajority(votes, 2);
     }
 }

@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
+import javax.net.ssl.SSLSocket;
 
 /**
  * Command-Line Interface for the Customer application.
@@ -149,7 +150,7 @@ public class CustomerCLI {
                             } else if ("3".equals(nodeChoice)) {
                                 port = 8093;
                             }
-                            queryRecommender(spaceIdRec, port);
+                            queryRecommender(spaceIdRec, port, config, signer);
                             break;
                         case "6":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
@@ -236,25 +237,52 @@ public class CustomerCLI {
         return payload.toString();
     }
 
-    private static void queryRecommender(String spaceId, int port) {
+    /**
+     * Sends a signed TLS recommendation query from the CLI.
+     *
+     * @param spaceId requested numeric parking space number
+     * @param port recommender node TLS port
+     * @param config application TLS configuration
+     * @param signer HMAC-SHA256 signer
+     */
+    private static void queryRecommender(String spaceId, int port, AppConfig config, SecureMessageSigner signer) {
         if (spaceId == null || spaceId.isBlank()) {
             System.out.println("ERROR: Space ID cannot be empty.");
             return;
         }
+        if (!spaceId.matches("\\d+")) {
+            System.out.println("ERROR: Space ID must be numeric.");
+            return;
+        }
         try {
-            ValidationUtils.requireValidSpaceId(spaceId.toUpperCase());
+            ValidationUtils.requireValidSpaceId(spaceId);
+            int numericSpace = Integer.parseInt(spaceId);
+            if (numericSpace < 1 || numericSpace > 100) {
+                System.out.println("ERROR: Space ID must be between 1 and 100.");
+                return;
+            }
         } catch (IllegalArgumentException e) {
             System.out.println("ERROR: Invalid space ID format.");
             return;
         }
 
-        JsonObject request = new JsonObject();
-        request.addProperty("type", "CLIENT_QUERY");
-        request.addProperty("spaceId", spaceId);
-        request.addProperty("correlationId", UUID.randomUUID().toString());
+        JsonObject request = edu.kinneret.parking.recommender.RecommenderServer.createSignedRequest(
+                "CLIENT_QUERY",
+                spaceId,
+                UUID.randomUUID().toString(),
+                "customer-cli",
+                signer);
 
-        try (java.net.Socket socket = new java.net.Socket()) {
+        try {
+            javax.net.ssl.SSLContext sslContext = TlsUtils.createSslContext(
+                    config.getTlsTruststorePath(),
+                    config.getTlsTruststorePassword(),
+                    config.getTlsKeystorePath(),
+                    config.getTlsKeystorePassword());
+            try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
+            socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
             socket.connect(new java.net.InetSocketAddress("localhost", port), 3000);
+            socket.startHandshake();
             try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
                  java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
                 
@@ -274,8 +302,10 @@ public class CustomerCLI {
                     System.out.println("ERROR: Received empty response from recommender node.");
                 }
             }
+            }
         } catch (Exception e) {
-            System.out.println("ERROR: Could not connect to recommender node on port " + port + ": " + e.getMessage());
+            logger.warn("Could not query recommender node on port {}", port, e);
+            System.out.println("ERROR: Recommendation service temporarily unavailable.");
         }
     }
 
