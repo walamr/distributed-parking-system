@@ -362,3 +362,223 @@ RabbitMQ/Mongo hardening evidence to include in the final submission:
 - RabbitMQ client and inter-node listeners use TLS
 - MongoDB replica-set status shows one primary and secondaries
 - direct writes to a Mongo secondary are rejected or documented as rejected by replica-set role/RBAC
+
+## 10. Assignment 3 Docker Runtime Verification
+
+Runtime verification was performed on 2026-06-08 with Docker Desktop running.
+
+### Stack Startup
+
+Command:
+
+```powershell
+docker compose up -d --build
+docker compose ps
+```
+
+Result:
+
+- `docker compose up -d --build` passed after removing stopped name-conflicting containers from the previous Assignment 2 compose project.
+- Compose reported `No services to build` because the services use prebuilt images and mounted Gradle jars.
+- `docker compose ps` showed `mongo1`, `mongo2`, `mongo3`, `rabbitmq1`, `rabbitmq2`, `rabbitmq3`, `recommender1`, `recommender2`, and `recommender3` running.
+- RabbitMQ containers became healthy; recommender containers were running on ports `8091`, `8092`, and `8093`.
+
+### RabbitMQ Hardening
+
+Commands:
+
+```powershell
+docker exec rabbitmq1 rabbitmq-diagnostics listeners
+docker exec rabbitmq1 rabbitmqctl list_users
+docker exec rabbitmq1 rabbitmqctl list_permissions -p /parking
+```
+
+Observed result:
+
+```text
+Interface: [::], port: 5671, protocol: amqp/ssl
+Interface: [::], port: 15671, protocol: https
+Interface: 127.0.0.1, port: 15672, protocol: http
+```
+
+```text
+user             tags
+customer         []
+mulligan_admin   [administrator]
+peo_service      []
+```
+
+```text
+peo_service      ^(amq\.default|transactions\.queue|citations\.queue)$  ...
+customer         ^(amq\.default|transactions\.queue)$                  ...  ^$
+mulligan_admin   .*                                                     .*   .*
+```
+
+Pass:
+
+- AMQP TLS listener is active on `5671`.
+- Plaintext AMQP `5672` is not listed.
+- `guest` is not present after definitions are loaded.
+- `/parking` exists.
+- Service users exist with limited permissions.
+- HTTPS management is active on `15671`; HTTP management is bound to container loopback and is not published by compose.
+
+Configuration fix made during verification:
+
+- `docker/rabbitmq/rabbitmq.conf` now enables `management.load_definitions = /etc/rabbitmq/definitions.json`.
+- `docker-compose.yml` now mounts `docker/rabbitmq/definitions.json` into each RabbitMQ node.
+
+### MongoDB Replica Set and TLS
+
+Initial bootstrap command:
+
+```powershell
+.\docker\mongodb\init-rs.ps1
+```
+
+Observed result:
+
+```text
+mongo1:27017: PRIMARY
+mongo2:27018: SECONDARY
+mongo3:27019: SECONDARY
+```
+
+After restart, authenticated TLS status command:
+
+```powershell
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/admin?tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+```
+
+Observed result after restart:
+
+```text
+mongo1:27017:SECONDARY
+mongo2:27018:SECONDARY
+mongo3:27019:PRIMARY
+```
+
+The exact unauthenticated command from the assignment prompt did not pass after RBAC was enabled:
+
+```powershell
+docker exec mongo1 mongosh --tls --tlsCAFile /etc/mongo/certs/ca-cert.pem --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+```
+
+Observed failures:
+
+- Without an explicit host, `mongosh` used `127.0.0.1`, which failed strict certificate hostname validation because the certificate does not include `127.0.0.1`.
+- With `--host mongo1`, the command then required authentication because RBAC was enabled.
+
+### Mongo Secondary Write Rejection
+
+Command:
+
+```powershell
+docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem&directConnection=true" --eval "db.secondary_write_test.insertOne({proof:'secondary-write-rejection', ts:new Date()})"
+```
+
+Observed result:
+
+```text
+MongoServerError: not primary
+```
+
+Pass: direct write to a secondary node was rejected.
+
+### Recommender Startup and Persistent Logs
+
+Commands:
+
+```powershell
+docker logs recommender1
+docker logs recommender2
+docker logs recommender3
+docker exec recommender1 sh -c "ls -l /var/log/mulligan"
+```
+
+Observed result:
+
+- Each recommender started with the expected node identity and port.
+- Each recommender logged `Distributed NonceStore initialized using MongoDB TTL collection`.
+- Each recommender logged `verified RabbitMQ TLS connectivity`.
+- Each recommender logged `started with TLS/mTLS`.
+- Persistent log file exists as Java `FileHandler` output: `/var/log/mulligan/recommender-security.log.0`.
+
+Configuration/code fixes made during verification:
+
+- Recommender runtime profile changed to `QUEUE_SERVER` so it can create the distributed nonce TTL index.
+- Recommender TLS was split by role: server listeners present the server certificate, while outgoing mTLS clients present the client certificate.
+- Recommender Docker environment now uses `RABBITMQ_NODES=rabbitmq1:5671,rabbitmq2:5671,rabbitmq3:5671` instead of container-local localhost.
+
+### Recommender Runtime Protocol Tests
+
+Signed TLS test client:
+
+- Loaded `docker/rabbitmq/certs/client.p12`.
+- Used TLS 1.2.
+- Signed JSON messages with HMAC-SHA256 using `.env` `HMAC_SECRET`.
+
+Cases tested:
+
+```text
+all normal:
+status SUCCESS, result "Request: Space 3\nResult: Space 3;0"
+
+one recommender malicious:
+recommender2 started with malicious=true
+status SUCCESS, honest result "Request: Space 3\nResult: Space 3;0"
+
+one recommender stopped:
+docker compose stop recommender3
+status SUCCESS, honest result "Request: Space 3\nResult: Space 3;0"
+
+two recommenders stopped:
+docker compose stop recommender2
+status FAILURE, reason "No majority consensus reached in cluster."
+
+one malicious plus one missing:
+recommender2 malicious=true and recommender3 stopped
+status FAILURE, reason "No majority consensus reached in cluster."
+
+invalid parking space:
+spaceId=0 was rejected server-side; no stack trace or internal exception text was returned
+
+old timestamp:
+timestamp older than 60 seconds was rejected and logged as TIMESTAMP_REJECTED
+
+invalid HMAC:
+bad HMAC was rejected and logged as HMAC_REJECTED
+
+replayed nonce:
+reused nonce was rejected and logged as REPLAY_REJECTED
+```
+
+Security log evidence:
+
+```text
+event=HMAC_REJECTED ... reason=invalid HMAC
+event=TIMESTAMP_REJECTED ... reason=timestamp older than 60 seconds
+event=REPLAY_REJECTED ... reason=replayed nonce
+event=CONSENSUS_FAILURE ... reason=no exact-list majority
+```
+
+Persistent log check:
+
+```powershell
+docker compose down
+docker compose up -d
+docker exec recommender1 sh -c "ls -l /var/log/mulligan"
+```
+
+Observed result:
+
+```text
+recommender-security.log.0
+recommender-security.log.0.lck
+```
+
+Pass: recommender security logs persisted across `docker compose down` and restart through named Docker volumes.
+
+Remaining limitation:
+
+- Runtime malicious mode currently has one fixed malicious result (`Space 999;999`). This allowed runtime verification of one malicious node and malicious-plus-missing no-majority behavior. The specific "two different malicious results" scenario is covered by automated unit tests through direct majority-vote inputs, but the Docker runtime does not currently expose a per-node custom malicious payload selector.

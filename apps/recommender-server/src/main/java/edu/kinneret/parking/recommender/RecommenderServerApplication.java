@@ -93,7 +93,7 @@ public class RecommenderServerApplication extends Application {
         }
 
         SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/recommender-security.log"));
-        AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.CUSTOMER_UI);
+        AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.QUEUE_SERVER);
 
         try {
             server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes, appConfig);

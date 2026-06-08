@@ -1,6 +1,7 @@
 package edu.kinneret.parking.customer.cli;
 
 import edu.kinneret.parking.common.*;
+import edu.kinneret.parking.customer.RecommenderRequestSigner;
 import com.google.gson.JsonObject;
 import org.bson.Document;
 import org.slf4j.Logger;
@@ -266,7 +267,7 @@ public class CustomerCLI {
             return;
         }
 
-        JsonObject request = edu.kinneret.parking.recommender.RecommenderServer.createSignedRequest(
+        JsonObject request = RecommenderRequestSigner.createSignedRequest(
                 "CLIENT_QUERY",
                 spaceId,
                 UUID.randomUUID().toString(),

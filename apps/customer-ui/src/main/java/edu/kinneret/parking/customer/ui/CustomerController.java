@@ -1,6 +1,7 @@
 package edu.kinneret.parking.customer.ui;
 
 import edu.kinneret.parking.common.*;
+import edu.kinneret.parking.customer.RecommenderRequestSigner;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -1491,7 +1492,7 @@ public class CustomerController {
         Task<String> task = new Task<>() {
             @Override
             protected String call() throws Exception {
-                JsonObject request = edu.kinneret.parking.recommender.RecommenderServer.createSignedRequest(
+                JsonObject request = RecommenderRequestSigner.createSignedRequest(
                         "CLIENT_QUERY",
                         spaceId.trim(),
                         UUID.randomUUID().toString(),

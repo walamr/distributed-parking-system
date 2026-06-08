@@ -68,7 +68,8 @@ public class RecommenderServer implements AutoCloseable {
     private final AppConfig appConfig;
     private final SecureMessageSigner signer;
     private final NonceStore nonceStore;
-    private final javax.net.ssl.SSLContext sslContext;
+    private final javax.net.ssl.SSLContext serverSslContext;
+    private final javax.net.ssl.SSLContext clientSslContext;
 
     private ServerSocket serverSocket;
     private ExecutorService executorService;
@@ -100,7 +101,12 @@ public class RecommenderServer implements AutoCloseable {
         this.signer = new SecureMessageSigner(appConfig.getHmacSecret());
         this.nonceStore = new NonceStore(appConfig);
         try {
-            this.sslContext = TlsUtils.createSslContext(
+            this.clientSslContext = TlsUtils.createSslContext(
+                    appConfig.getTlsTruststorePath(),
+                    appConfig.getTlsTruststorePassword(),
+                    appConfig.getTlsKeystorePath(),
+                    appConfig.getTlsKeystorePassword());
+            this.serverSslContext = TlsUtils.createSslContext(
                     appConfig.getTlsTruststorePath(),
                     appConfig.getTlsTruststorePassword(),
                     appConfig.getTlsKeystorePath(),
@@ -116,7 +122,7 @@ public class RecommenderServer implements AutoCloseable {
      * @throws IOException if the secure server socket cannot be opened
      */
     public void start() throws IOException {
-        SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
+        SSLServerSocketFactory factory = serverSslContext.getServerSocketFactory();
         SSLServerSocket tlsServerSocket = (SSLServerSocket) factory.createServerSocket(port);
         tlsServerSocket.setEnabledProtocols(enabledTlsProtocols(tlsServerSocket.getSupportedProtocols()));
         tlsServerSocket.setNeedClientAuth(true);
@@ -325,10 +331,6 @@ public class RecommenderServer implements AutoCloseable {
         }
         signMessage(response, signer);
         writer.println(response);
-    }
-
-    private String executeLeaderConsensus(String spaceId) {
-        return executeLeaderConsensus(spaceId, Collections.emptyMap());
     }
 
     private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
@@ -661,7 +663,7 @@ public class RecommenderServer implements AutoCloseable {
     }
 
     private SSLSocket openTlsSocket(String host, int targetPort) throws IOException {
-        SSLSocketFactory factory = sslContext.getSocketFactory();
+        SSLSocketFactory factory = clientSslContext.getSocketFactory();
         SSLSocket socket = (SSLSocket) factory.createSocket();
         socket.setEnabledProtocols(enabledTlsProtocols(socket.getSupportedProtocols()));
         socket.connect(new InetSocketAddress(host, targetPort), TIMEOUT_MS);

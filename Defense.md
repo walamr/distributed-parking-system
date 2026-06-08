@@ -157,7 +157,13 @@ The customer GUI now exposes an explicit `Recommend Parking` button and validate
 
 Recommender log files are configured through `SECURITY_LOG_PATH`. Docker Compose mounts separate persistent volumes named `recommender1-logs`, `recommender2-logs`, and `recommender3-logs`, so recommender security logs survive `docker compose down`.
 
-Current limitation: the recommender HMAC secret is shared cluster-wide through `HMAC_SECRET`. This satisfies the assignment's HMAC requirement, but a production deployment should rotate it through a secret manager rather than a plain `.env` value.
+Docker runtime verification on 2026-06-08 confirmed that all three recommender nodes start with TLS/mTLS, initialize the distributed MongoDB nonce TTL store, verify RabbitMQ TLS connectivity, reject invalid HMACs, reject old timestamps, reject replayed nonces, and log no-majority consensus failures to persistent Docker log volumes. Runtime consensus tests confirmed all-normal success, one-malicious-node honest-majority success, one-missing-node success, two-missing-node failure, and malicious-plus-missing failure.
+
+Current limitations:
+
+- The recommender HMAC secret is shared cluster-wide through `HMAC_SECRET`. This satisfies the assignment's HMAC requirement, but a production deployment should rotate it through a secret manager rather than a plain `.env` value.
+- Docker runtime malicious mode currently has one fixed malicious payload. A runtime test for two different malicious payloads would require a per-node malicious payload selector; exact-list no-majority behavior for different malicious payloads is covered by automated unit tests.
+- The unauthenticated MongoDB `rs.status()` command from the prompt fails after RBAC is enabled, as expected. Authenticated TLS status checks pass. Strict TLS hostname validation also requires using `mongo1`, `mongo2`, or `mongo3` hostnames rather than `127.0.0.1`.
 
 ### 4.9 Verification-oriented tests
 

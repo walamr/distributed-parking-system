@@ -14,7 +14,6 @@ repositories {
 
 dependencies {
     implementation project(':common')
-    implementation project(':recommender-server')
     
     // JavaFX
     implementation "org.openjfx:javafx-controls:21.0.2"
