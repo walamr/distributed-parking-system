@@ -713,11 +713,8 @@ public class CustomerController {
         task.setOnFailed(e -> {
             Throwable ex = e.getSource().getException();
             logger.error("Failed to start parking request.", ex);
-            String msg = ex.getMessage();
-            if (msg == null || msg.trim().isEmpty()) {
-                msg = "Unable to process request. Please try again later.";
-            }
-            setStatus("Error: " + msg, true);
+            String genericMsg = "Unable to process request. Please try again later.";
+            setStatus("Error: " + genericMsg, true);
         });
         new Thread(task).start();
     }

@@ -7,18 +7,28 @@
   "users": [
     {
       "name": "customer",
-      "password": "customer_secure_pass_2026",
+      "password": "customer_pwd_rotated",
       "tags": ""
     },
     {
       "name": "peo_service",
-      "password": "peo_secure_pass_2026",
+      "password": "peo_pwd_rotated",
       "tags": ""
     },
     {
       "name": "mulligan_admin",
-      "password": "admin_ultra_secure_99",
+      "password": "admin_pwd_rotated",
       "tags": "administrator"
+    },
+    {
+      "name": "queue_service",
+      "password": "queue_pwd_rotated",
+      "tags": ""
+    },
+    {
+      "name": "storage_service",
+      "password": "storage_pwd_rotated",
+      "tags": ""
     }
   ],
   "permissions": [
@@ -34,7 +44,7 @@
       "vhost": "/parking",
       "configure": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
       "write": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
-      "read": "^(amq\\.default|transactions\\.queue|citations\\.queue)$"
+      "read": "^$"
     },
     {
       "user": "mulligan_admin",
@@ -42,6 +52,20 @@
       "configure": ".*",
       "write": ".*",
       "read": ".*"
+    },
+    {
+      "user": "queue_service",
+      "vhost": "/parking",
+      "configure": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
+      "write": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
+      "read": "^(amq\\.default|transactions\\.queue|citations\\.queue)$"
+    },
+    {
+      "user": "storage_service",
+      "vhost": "/parking",
+      "configure": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
+      "write": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
+      "read": "^(amq\\.default|transactions\\.queue|citations\\.queue)$"
     }
   ],
   "queues": [

@@ -52,9 +52,9 @@ public final class NonceStore implements AutoCloseable {
                     new IndexOptions().expireAfter((long) ttlSeconds, TimeUnit.SECONDS));
             logger.info("Distributed NonceStore initialized using MongoDB TTL collection.");
         } catch (Exception e) {
-            logger.warning("Could not initialize MongoDB NonceStore. Falling back to In-Memory storage. "
+            logger.severe("Could not initialize MongoDB NonceStore. Failing fast to prevent replay attacks! "
                     + SecurityLogger.sanitize(e.getMessage()));
-            initInMemoryScheduler();
+            throw new IllegalStateException("Distributed NonceStore is required but MongoDB connection failed.", e);
         }
     }
 

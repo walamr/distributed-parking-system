@@ -57,32 +57,32 @@ public final class AppConfig {
         /**
          * Profile for the Customer User Interface application.
          */
-        CUSTOMER_UI("customer", "customer_secure_pass_2026", "customer_db_user", "db_pass_cust_2026"),
+        CUSTOMER_UI("customer", "customer_pwd_rotated", "customer_db_user", "db_pwd_rotated_cust"),
 
         /**
          * Profile for the Parking Enforcement Officer UI application.
          */
-        PEO_UI("peo_service", "peo_secure_pass_2026", "peo_db_user", "db_pass_peo_2026"),
+        PEO_UI("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo"),
 
         /**
          * Profile for the Municipality Officer UI application.
          */
-        MO_UI("mulligan_admin", "admin_ultra_secure_99", "mulligan_db_admin", "db_pass_admin_99"),
+        MO_UI("mulligan_admin", "admin_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
 
         /**
          * Profile for the main message Queue Server backend daemon.
          */
-        QUEUE_SERVER("mulligan_admin", "admin_ultra_secure_99", "mulligan_db_admin", "db_pass_admin_99"),
+        QUEUE_SERVER("queue_service", "queue_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
 
         /**
          * Profile for the backend Storage Server microservice.
          */
-        STORAGE_SERVER("peo_service", "peo_secure_pass_2026", "peo_db_user", "db_pass_peo_2026"),
+        STORAGE_SERVER("storage_service", "storage_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo"),
 
         /**
          * Profile used by integration smoke tests to verify infrastructure sanity.
          */
-        SMOKE_TEST("peo_service", "peo_secure_pass_2026", "peo_db_user", "db_pass_peo_2026");
+        SMOKE_TEST("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo");
 
         private final String defaultUsername;
         private final String defaultPassword;
@@ -324,7 +324,7 @@ public final class AppConfig {
         if (hmacSecret.isBlank()) {
             throw new IllegalStateException("Security Risk: HMAC_SECRET must be configured.");
         }
-        if (hmacSecret.equals("change-me-in-production-12345")) {
+        if (hmacSecret.equals("change-me-for-real-deployments")) {
             throw new IllegalStateException("Security Risk: You must change the default HMAC_SECRET in production.");
         }
         long nonceTtlSeconds = Long
