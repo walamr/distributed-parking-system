@@ -34,6 +34,7 @@ public final class QueueServerApplication {
             consumerService.start();
         } catch (Exception e) {
             SecurityLogger.logSecurityEvent("Queue server startup failed: " + e.toString());
+            e.printStackTrace();
             System.err.println("Queue server startup failed. See server logs for details.");
             System.exit(1);
         }

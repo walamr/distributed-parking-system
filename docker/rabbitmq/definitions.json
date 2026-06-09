@@ -56,9 +56,9 @@
     {
       "user": "queue_service",
       "vhost": "/parking",
-      "configure": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
-      "write": "^(amq\\.default|transactions\\.queue|citations\\.queue)$",
-      "read": "^(amq\\.default|transactions\\.queue|citations\\.queue)$"
+      "configure": "^(amq\\.default|transactions\\.queue|citations\\.queue|parking\\.dlx|transactions\\.dlq|citations\\.dlq)$",
+      "write": "^(amq\\.default|transactions\\.queue|citations\\.queue|parking\\.dlx|transactions\\.dlq|citations\\.dlq)$",
+      "read": "^(amq\\.default|transactions\\.queue|citations\\.queue|parking\\.dlx|transactions\\.dlq|citations\\.dlq)$"
     },
     {
       "user": "storage_service",
@@ -99,7 +99,8 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "quorum"
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3
       }
     },
     {
@@ -108,7 +109,8 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "quorum"
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3
       }
     }
   ],

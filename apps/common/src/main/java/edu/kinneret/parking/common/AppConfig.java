@@ -21,7 +21,7 @@ public final class AppConfig {
     private static final String DEFAULT_MONGO_URI = "mongodb://%s:%s@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin";
     private static final boolean DEFAULT_MONGO_TLS_ENABLED = true;
     private static final String DEFAULT_MONGO_TLS_CA_CERT_PATH = "docker/mongodb/certs/ca-cert.pem";
-    private static final boolean DEFAULT_MONGO_TLS_ALLOW_INVALID_HOSTNAMES = false;
+    private static final boolean DEFAULT_MONGO_TLS_ALLOW_INVALID_HOSTNAMES = true;
     private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 5000;
     private static final long DEFAULT_RABBITMQ_RECOVERY_INTERVAL_MS = 5000;
     private static final String DEFAULT_HMAC_SECRET = "";

@@ -86,7 +86,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27017:27017"
@@ -104,7 +104,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27018:27018"
@@ -122,7 +122,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27019:27019"
@@ -210,6 +210,56 @@ services:
     networks:
       - rabbitmq-internal
 
+  queue-server:
+    image: eclipse-temurin:21-jre-alpine
+    container_name: queue-server
+    restart: on-failure
+    volumes:
+      - ./apps/queue-server/build/libs:/app
+      - ./docker/mongodb/certs:/etc/mongo/certs:ro
+      - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
+      - queue-server-logs:/var/log/mulligan
+    working_dir: /
+    environment:
+      - MONGO_TLS_ENABLED=true
+      - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
+      - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+      - HMAC_SECRET=${HMAC_SECRET}
+      - RABBITMQ_NODES=rabbitmq1:5671,rabbitmq2:5671,rabbitmq3:5671
+      - RABBITMQ_TRUSTSTORE_PATH=/etc/rabbitmq/certs/truststore.jks
+      - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
+      - RABBITMQ_KEYSTORE_PATH=/etc/rabbitmq/certs/keystore.jks
+      - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
+      - SECURITY_LOG_PATH=/var/log/mulligan/queue-security.log
+    command: java -jar /app/queue-service-1.0.jar
+    networks:
+      - rabbitmq-internal
+
+  storage-server:
+    image: eclipse-temurin:21-jre-alpine
+    container_name: storage-server
+    restart: on-failure
+    volumes:
+      - ./apps/storage-server/build/libs:/app
+      - ./docker/mongodb/certs:/etc/mongo/certs:ro
+      - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
+      - storage-server-logs:/var/log/mulligan
+    working_dir: /
+    environment:
+      - MONGO_TLS_ENABLED=true
+      - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
+      - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+      - HMAC_SECRET=${HMAC_SECRET}
+      - RABBITMQ_NODES=rabbitmq1:5671,rabbitmq2:5671,rabbitmq3:5671
+      - RABBITMQ_TRUSTSTORE_PATH=/etc/rabbitmq/certs/truststore.jks
+      - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
+      - RABBITMQ_KEYSTORE_PATH=/etc/rabbitmq/certs/keystore.jks
+      - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
+      - SECURITY_LOG_PATH=/var/log/mulligan/storage-security.log
+    command: java -jar /app/database-service-1.0.jar
+    networks:
+      - rabbitmq-internal
+
 networks:
   rabbitmq-internal:
     driver: bridge
@@ -224,3 +274,5 @@ volumes:
   recommender1-logs:
   recommender2-logs:
   recommender3-logs:
+  queue-server-logs:
+  storage-server-logs:

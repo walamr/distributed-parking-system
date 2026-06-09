@@ -39,7 +39,7 @@ class AppConfigTest {
 
         assertTrue(config.isMongoTlsEnabled());
         assertEquals("docker/mongodb/certs/ca-cert.pem", config.getMongoTlsCaCertPath());
-        assertEquals(false, config.isMongoTlsAllowInvalidHostnames());
+        assertEquals(true, config.isMongoTlsAllowInvalidHostnames());
     }
 
     @Test
