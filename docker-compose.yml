@@ -86,7 +86,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27017:27017"
@@ -104,7 +104,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27018:27018"
@@ -122,7 +122,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode preferTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27019:27019"

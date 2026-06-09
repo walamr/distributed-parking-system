@@ -1,34 +1,38 @@
 # Defense Report
 
 ## 1. Executive Summary
-During the Round 2 Red Teaming exercise, multiple critical vulnerabilities were discovered in the Mulligan parking system's architecture. The red teams successfully exploited misconfigurations in RabbitMQ, MongoDB, and application components to compromise the Confidentiality, Integrity, and Availability (CIA) of the system. This report details the implemented fixes that address these findings, bringing the system into compliance with industry standard security best practices. All default secrets have been rotated, mTLS enforcement is strict across the cluster, and robust replay prevention has been implemented.
+During the Round 2 Red Teaming exercise, our system was audited by two red teams: **FantasticFour** and **The Distinguished Syndicate**. Both teams discovered multiple critical vulnerabilities in the Mulligan parking system's architecture. The red teams successfully exploited misconfigurations in RabbitMQ, MongoDB, and our distribution bundle to compromise the Confidentiality, Integrity, and Availability (CIA) of the system. This report details the implemented fixes that address their specific findings, bringing the system into compliance with industry standard security best practices. All default secrets have been rotated, mTLS enforcement is strict across the cluster, our distribution bundles have been sanitized of private keys, and robust replay prevention has been implemented.
 
 ## 2. Vulnerability Inventory
-The red teams reported the following vulnerabilities:
-*   **T5-I-01: Shared Secrets & Insecure Access (RabbitMQ):** Default, hardcoded credentials (`change-me-for-real-deployments`, `mulligan-secure-cookie-rotated-99213`, and default passwords) were used in production environments, exposing the RabbitMQ management API to unauthenticated actors.
-*   **T5-C-02 & T5-C-03: Lack of Mutual TLS (mTLS):** MongoDB cluster communication was configured with `--tlsAllowConnectionsWithoutCertificates`, effectively allowing plaintext access despite the presence of certificates.
-*   **T5-I-02: Message Replay (Split-Brain Nonce Store):** The anti-replay validation (NonceStore) fell back to an in-memory cache when it couldn't connect to MongoDB, meaning that nonces were not shared across distributed consumers, allowing cross-node replay attacks.
-*   **T5-A-01: Drain Attack & Missing Authorization:** Users like `peo_service` possessed excessive read permissions, allowing them to drain messages from the `transactions.queue` intended for the backend server.
-*   **T5-I-03: Information Leakage:** System errors and database stack traces were being propagated to the UI, exposing internal cluster topology and details.
+| Attack ID(s) | Description | CIA Dimension | Severity | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **R2-C-01** | Private Key Recovery from Distribution Bundle | Confidentiality | Critical | Accepted |
+| **R2-I-01 / T5-I-01** | HMAC Default Secret Recovery & Forged Citation Injection | Integrity | Critical | Accepted |
+| **R2-C-02 / T5-CIA-01** | mTLS Bypass + Management API Hijack (RabbitMQ) | Confidentiality, Integrity | Critical | Accepted |
+| **R2-C-03 / T5-C-01** | MongoDB Unauthorized Access via Stolen CA (mTLS lack) | Confidentiality | High | Accepted |
+| **R2-CIA-01 / T5-A-01** | RabbitMQ Cluster Control + Drain Attack | CIA | High | Accepted |
+| **R2-I-03 / T5-I-03** | Forged Citation Injection via Stolen Admin | Integrity | High | Accepted |
+| **R2-I-02 / T5-I-02** | Replay Attack (Cross-node nonce & old timestamp) | Integrity | High | Accepted |
+| **R2-A-01** | Rogue MongoDB Node via Leaked Keyfile | Availability, Integrity | Medium | Accepted |
+
+*(Note: Network Partition (T5-IA-01) and Fuzzing (T5-A-02) were evaluated as Resilient or expected by-design downtime, and required no active code fixes.)*
 
 ## 3. Root Cause Analysis
-The root causes for the discovered vulnerabilities were predominantly related to "security through obscurity" and improper default configurations:
-*   **Hardcoded Fallbacks:** `AppConfig.java` checked for an incorrect default HMAC string, meaning the actual default (`change-me-for-real-deployments`) was accepted as valid in production. 
-*   **Silent Failures:** The `NonceStore` was built with a "fail-open" or resilient mindset where, if MongoDB was unavailable, it fell back to local memory to keep the system running. However, for a security control, this resulted in a silent bypass of distributed validation.
-*   **Permissive Defaults:** MongoDB was launched with permissive flags (`--tlsAllowConnectionsWithoutCertificates`) to ease local testing, but this flag was carried over to the production `docker-compose.yml`.
-*   **Broad Permissions:** RabbitMQ profiles in `definitions.json` utilized a broad, non-least-privilege model. Profiles used for merely publishing messages also had read/consume access to those queues.
+*   **R2-C-01 / R2-A-01:** We incorrectly treated our private keys (`server-key.pem`, `client-key.pem`) and the MongoDB `mongodb-keyfile` as configuration files and included them in the distribution ZIP file, allowing the attackers to extract our entire cryptographic identity.
+*   **R2-I-01 / T5-I-01:** In `AppConfig.java`, there was a bug where the code checked against an incorrect default HMAC string (`change-me-in-production-12345`), meaning the actual default from `.env` (`change-me-for-real-deployments`) bypassed the security check and was accepted as valid in production. 
+*   **R2-C-02 / T5-CIA-01 / T5-A-01:** RabbitMQ profiles in `definitions.json` utilized a broad, non-least-privilege model, and the `ALLOW_INVALID_HOSTNAMES` flag was left as `true`. This allowed attackers with stolen certs to hijack the management API and drain queues (`transactions.queue`).
+*   **R2-C-03 / T5-C-01:** MongoDB was launched with permissive flags (`--tlsAllowConnectionsWithoutCertificates`) to ease local testing. This effectively disabled two-way mTLS, meaning any attacker with our stolen passwords could connect to both primary and secondary nodes without a valid client certificate.
+*   **R2-I-02 / T5-I-02:** The `NonceStore` was built with a "fail-open" or resilient mindset where, if MongoDB was unavailable, it fell back to local memory. For a distributed security control, this resulted in a silent bypass of cross-node validation, allowing replay attacks across different queue-server nodes.
+*   **R2-I-03 / T5-I-03:** Because the database admin passwords (`db_pass_admin_99`) were leaked in the `.env` file, attackers could directly connect to the MongoDB Primary node and inject forged citations, bypassing the RabbitMQ application layer entirely.
 
 ## 4. Fix Details
-The following mitigation strategies were implemented:
-1.  **Strict mTLS Enforcement:** Removed the `--tlsAllowConnectionsWithoutCertificates` flag from all MongoDB instances in `docker-compose.yml`. Changed `ALLOW_INVALID_HOSTNAMES` to `false` in `.env` to enforce strict certificate validation on all cluster links.
-2.  **Secret Rotation & Removal:** Rotated the `HMAC_SECRET` and `RABBITMQ_ERLANG_COOKIE` in `.env` to new cryptographic random values. Updated the RabbitMQ passwords and removed the leaked `mulligan_admin` default password.
-3.  **Least-Privilege Profiles:** Created dedicated `queue_service` and `storage_service` users in `definitions.json` and `AppConfig.java`. Restricted the `customer` and `peo_service` users to `write`-only permissions on their respective queues.
-4.  **Fail-Fast Security Validation:** Modified `NonceStore.java` to throw a fatal `IllegalStateException` instead of falling back to an in-memory cache. This ensures the cluster fails closed if distributed replay validation cannot be guaranteed.
-5.  **Input Validation & Error Handling:** Modified `CustomerController.java` to catch all exceptions during transaction submission and map them to generic user-friendly messages (e.g., "Unable to process request"), explicitly preventing the leak of stack traces.
-6.  **Persistent Security Logging:** Validated that `SecurityLogger` successfully initializes a persistent rotating file handler (`logs/security.log`) for all major backend services.
+*   **R2-C-01 / R2-A-01:** Removed all private keys (`*-key.pem`, `mongodb-keyfile`, `keystore.jks`) from the repository using `.gitignore` and `.dockerignore`. The distribution bundle now only includes the public `ca-cert.pem`.
+*   **R2-I-01 / T5-I-01 / T5-I-03:** Rotated the `HMAC_SECRET`, `RABBITMQ_ERLANG_COOKIE`, and all MongoDB database passwords to new cryptographic random values (e.g., `db_pwd_rotated_admin`). Updated the `AppConfig.java` fallback check to match the correct string (`change-me-for-real-deployments`).
+*   **R2-C-03 / T5-C-01:** Removed the `--tlsAllowConnectionsWithoutCertificates` flag from all MongoDB instances in `docker-compose.yml`. Changed `ALLOW_INVALID_HOSTNAMES` to `false` in `.env` to enforce strict certificate validation.
+*   **R2-CIA-01 / T5-A-01:** Created dedicated `queue_service` and `storage_service` users in `definitions.json` and `AppConfig.java`. Restricted the `customer` and `peo_service` users to `write`-only permissions (`^$`) on their respective queues.
+*   **R2-I-02 / T5-I-02:** Modified `NonceStore.java` to throw a fatal `IllegalStateException` instead of falling back to an in-memory cache. This ensures the cluster fails closed if distributed replay validation cannot be guaranteed via the MongoDB TTL collection.
 
 ## 5. Updated Security Architecture
-
 ```mermaid
 flowchart TD
     subgraph UI Clients
@@ -44,7 +48,7 @@ flowchart TD
     subgraph Microservices
         QS[Queue Server\n(Role: queue_service)]
         SS[Storage Server\n(Role: storage_service)]
-        RS[Recommender Server]
+        RS[Recommender Server Cluster]
     end
 
     subgraph Data Tier
@@ -64,11 +68,28 @@ flowchart TD
 ```
 
 ## 6. Testing Results
-*   **Authentication & Authorization:** Attempting to publish messages using old credentials now results in an authentication failure. Attempting to consume messages as a `customer` or `peo_service` results in a channel exception.
-*   **Replay Prevention:** Resubmitting an identical signed message (same timestamp and nonce) to multiple nodes sequentially results in a rejection from the `NonceStore` backed by MongoDB. Stopping MongoDB explicitly crashes the consumers instead of processing messages insecurely.
-*   **mTLS Enforcement:** Connecting to the MongoDB cluster via `mongosh` without providing the client TLS certificate results in a connection rejection.
+The following screenshots provide concrete runtime and configuration evidence that all vulnerabilities have been successfully remediated:
+
+### Secret Rotation & Code Fixes (R2-I-01 / T5-I-01)
+*   **AppConfig Patch:** The logic bug allowing the fallback to the leaked HMAC secret has been eliminated.
+    ![AppConfig Fix](screenshots/appconfig-fix.png)
+*   **.env Hardening:** All passwords have been rotated and strict hostname validation is enabled.
+    ![Env Hardening](screenshots/env-hardening.png)
+
+### mTLS & Unauthorized Access Prevention (R2-C-02/03)
+*   **mTLS Enforcement:** Connecting to the MongoDB cluster via `mongosh` requires both the rotated password and strict mutual TLS validation.
+    ![MongoDB mTLS](screenshots/mongo-mtls.png)
+
+### Authorization & Drain Prevention (R2-CIA-01 / T5-A-01)
+*   **Least Privilege Routing:** The `read` permission for `customer` and `peo_service` is explicitly configured to `^$` (empty regex), making drain attacks impossible.
+    ![RabbitMQ Permissions](screenshots/rabbitmq-permissions.png)
+
+### Replay Prevention (R2-I-02 / T5-I-02)
+*   **Fail-Closed Nonce Store:** Running `.\gradlew.bat test` confirms that `NonceStoreTest` passes, meaning identical signed messages submitted across multiple nodes sequentially result in a rejection backed by the MongoDB TTL index.
+    ![Gradle Tests](screenshots/gradle-test.png)
 
 ## 7. Lessons Learned
+*   **Secrets Management:** Private keys and keyfiles should never be checked into version control or included in distribution bundles. They must be generated locally or injected via a secure vault during deployment.
 *   **Fail-Closed Principle:** Security mechanisms like anti-replay caches must fail closed. Falling back to local memory breaks distributed security guarantees and is worse than crashing.
-*   **Configuration Management:** Default secrets must be actively detected and rejected at startup. The codebase must have logic to explicitly prevent deployment if default/placeholder secrets are found in the environment.
+*   **Configuration Management:** Default secrets must be actively detected and rejected at startup, and the code checking them must be strictly verified against the actual `.env` file contents.
 *   **Least Privilege:** Message brokers require careful routing and permission design. Publishers should rarely, if ever, have consume permissions on the queues they publish to.
