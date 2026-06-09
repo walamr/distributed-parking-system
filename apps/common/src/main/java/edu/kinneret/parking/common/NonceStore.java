@@ -24,6 +24,8 @@ public final class NonceStore implements AutoCloseable {
     private final long ttlSeconds;
     private final Clock clock;
     
+    public static volatile boolean requireDbOnline = true;
+    
     // In-memory fallback
     private final Map<String, Long> noncesByValue;
     private ScheduledExecutorService scheduler;
@@ -54,7 +56,9 @@ public final class NonceStore implements AutoCloseable {
         } catch (Exception e) {
             logger.severe("Could not initialize MongoDB NonceStore. Failing fast to prevent replay attacks! "
                     + SecurityLogger.sanitize(e.getMessage()));
-            throw new IllegalStateException("Distributed NonceStore is required but MongoDB connection failed.", e);
+            if (requireDbOnline) {
+                throw new IllegalStateException("Distributed NonceStore is required but MongoDB connection failed.", e);
+            }
         }
     }
 

@@ -21,6 +21,7 @@ public class RecommenderServerTest {
     @BeforeEach
     public void setUp() {
         ParkingRepository.isDbOnline = false;
+        edu.kinneret.parking.common.NonceStore.requireDbOnline = false;
         appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.CUSTOMER_UI);
         server = new RecommenderServer(
                 "recommender-test",

@@ -96,7 +96,7 @@ public class MulliganApp extends Application {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/WelcomeView.fxml"));
                 Parent root = loader.load();
-                Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+                Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
                 scene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
                 primaryStage.setScene(scene);
             } catch (Exception e) {}
@@ -111,7 +111,7 @@ public class MulliganApp extends Application {
                 if ("Customer".equals(role) || "customer".equals(user)) {
                     edu.kinneret.parking.customer.ui.CustomerApp app = new edu.kinneret.parking.customer.ui.CustomerApp();
                     javafx.scene.Parent root = app.createContent(primaryStage);
-                    Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+                    Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
                     try {
                         scene.getStylesheets().add(getClass().getResource("/customer-style.css").toExternalForm());
                     } catch (Exception ex) {}
@@ -119,7 +119,7 @@ public class MulliganApp extends Application {
                 } else if ("PEO".equals(role) || "peo_service".equals(user)) {
                     edu.kinneret.parking.peo.ui.PEOApp app = new edu.kinneret.parking.peo.ui.PEOApp();
                     javafx.scene.Parent root = app.createContent();
-                    Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+                    Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
                     try {
                         scene.getStylesheets().add(getClass().getResource("/peo-style.css").toExternalForm());
                     } catch (Exception ex) {}
@@ -154,7 +154,7 @@ public class MulliganApp extends Application {
                         try {
                             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/WelcomeView.fxml"));
                             Parent welcomeRoot = loader.load();
-                            Scene welcomeScene = PhoneFrameBuilder.createScaledScene(welcomeRoot, primaryStage);
+                            Scene welcomeScene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)welcomeRoot, primaryStage);
                             welcomeScene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
                             primaryStage.setScene(welcomeScene);
                         } catch (Exception ex) {}
@@ -172,7 +172,7 @@ public class MulliganApp extends Application {
                 if ("Customer".equals(role)) {
                     edu.kinneret.parking.customer.ui.CustomerApp app = new edu.kinneret.parking.customer.ui.CustomerApp();
                     javafx.scene.Parent root = app.createContent(primaryStage);
-                    Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+                    Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
                     try {
                         scene.getStylesheets().add(getClass().getResource("/customer-style.css").toExternalForm());
                     } catch (Exception ex) {}
@@ -180,7 +180,7 @@ public class MulliganApp extends Application {
                 } else if ("PEO".equals(role)) {
                     edu.kinneret.parking.peo.ui.PEOApp app = new edu.kinneret.parking.peo.ui.PEOApp();
                     javafx.scene.Parent root = app.createContent();
-                    Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+                    Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
                     try {
                         scene.getStylesheets().add(getClass().getResource("/peo-style.css").toExternalForm());
                     } catch (Exception ex) {}
@@ -211,7 +211,7 @@ public class MulliganApp extends Application {
                         try {
                             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/WelcomeView.fxml"));
                             Parent welcomeRoot = loader.load();
-                            Scene welcomeScene = PhoneFrameBuilder.createScaledScene(welcomeRoot, primaryStage);
+                            Scene welcomeScene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)welcomeRoot, primaryStage);
                             welcomeScene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
                             primaryStage.setScene(welcomeScene);
                         } catch (Exception ex) {}
@@ -225,7 +225,7 @@ public class MulliganApp extends Application {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/WelcomeView.fxml"));
             Parent root = loader.load();
-            Scene scene = PhoneFrameBuilder.createScaledScene(root, primaryStage);
+            Scene scene = PhoneFrameBuilder.createScaledScene((javafx.scene.Node)root, primaryStage);
             scene.getStylesheets().add(getClass().getResource("/auth-style.css").toExternalForm());
 
             primaryStage.setScene(scene);

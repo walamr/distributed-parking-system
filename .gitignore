@@ -18,3 +18,10 @@ gradle-bin/
 *.log
 logs/
 .gradle/
+
+# Security - do not distribute private keys
+docker/rabbitmq/certs/*-key.pem
+docker/rabbitmq/certs/*.jks
+docker/rabbitmq/certs/*.p12
+docker/mongodb/certs/mongo*.pem
+docker/mongodb/certs/mongodb-keyfile

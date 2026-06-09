@@ -15,7 +15,7 @@ class AppConfigTest {
                 Map.of("HMAC_SECRET", "test-secret-1234567890"));
 
         assertEquals("customer", config.getRabbitMqUsername());
-        assertEquals("customer_secure_pass_2026", config.getRabbitMqPassword());
+        assertEquals("customer_pwd_rotated", config.getRabbitMqPassword());
     }
 
     @Test
@@ -68,7 +68,7 @@ class AppConfigTest {
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
-        assertEquals("mongodb://mulligan_db_admin:db_pass_admin_99@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin", config.getMongoUri());
+        assertEquals("mongodb://mulligan_db_admin:db_pwd_rotated_admin@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin", config.getMongoUri());
     }
 
     @Test
@@ -80,6 +80,6 @@ class AppConfigTest {
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
-        assertEquals("mongodb://peo_db_user:db_pass_peo_2026@10.0.201.25:27017/parking_db", config.getMongoUri());
+        assertEquals("mongodb://peo_db_user:db_pwd_rotated_peo@10.0.201.25:27017/parking_db", config.getMongoUri());
     }
 }
