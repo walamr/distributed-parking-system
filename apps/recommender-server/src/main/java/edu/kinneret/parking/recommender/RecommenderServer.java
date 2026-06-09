@@ -455,10 +455,19 @@ public class RecommenderServer implements AutoCloseable {
                 throw new IllegalArgumentException("Zone could not be identified for requested space.");
             }
 
+            long requestedCitations = 0;
+            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                requestedCitations = repository.getDatabase().getCollection("citations")
+                        .countDocuments(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.eq("payload.spaceId", safeSpaceId),
+                                com.mongodb.client.model.Filters.eq("spaceId", safeSpaceId)
+                        ));
+            }
+
             List<SpaceCandidate> candidates = loadAvailableCandidates(safeSpaceId, zoneName, repository);
             List<RecommendationResult> results = recommendFromSpaceCandidates(safeSpaceId, candidates);
             String resultPart = results.isEmpty() ? "NONE" : "Space " + serializeResults(results);
-            return "Request: Space " + safeSpaceId + "\nResult: " + resultPart;
+            return "Request: Space " + safeSpaceId + " (" + requestedCitations + " Citations)\nResult: " + resultPart;
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
