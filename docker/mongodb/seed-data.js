@@ -38,7 +38,7 @@ db.zones.insertMany(zonesList);
 
 const spacesList = [];
 for (let i = 1; i <= 100; i++) {
-  const zoneIndex = (i - 1) % 10;
+  const zoneIndex = Math.floor((i - 1) / 10);
   const zone = zonesList[zoneIndex];
   spacesList.push({
     spaceId: i.toString(),
