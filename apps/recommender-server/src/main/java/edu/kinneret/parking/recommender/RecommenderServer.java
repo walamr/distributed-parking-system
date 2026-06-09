@@ -109,8 +109,8 @@ public class RecommenderServer implements AutoCloseable {
             this.serverSslContext = TlsUtils.createSslContext(
                     appConfig.getTlsTruststorePath(),
                     appConfig.getTlsTruststorePassword(),
-                    appConfig.getTlsKeystorePath(),
-                    appConfig.getTlsKeystorePassword());
+                    appConfig.getTlsServerKeystorePath(),
+                    appConfig.getTlsServerKeystorePassword());
         } catch (Exception e) {
             throw new IllegalStateException("Recommender TLS/mTLS configuration is invalid.", e);
         }

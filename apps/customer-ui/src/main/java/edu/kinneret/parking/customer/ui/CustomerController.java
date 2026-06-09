@@ -1543,6 +1543,9 @@ public class CustomerController {
         });
 
         task.setOnFailed(e -> {
+            if (task.getException() != null) {
+                task.getException().printStackTrace();
+            }
             requestLabel.setText("Failed");
             resultLabel.setText("Node unreachable");
         });

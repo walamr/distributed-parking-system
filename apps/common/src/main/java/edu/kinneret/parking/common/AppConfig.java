@@ -39,6 +39,8 @@ public final class AppConfig {
     private final String tlsTruststorePassword;
     private final String tlsKeystorePath;
     private final String tlsKeystorePassword;
+    private final String tlsServerKeystorePath;
+    private final String tlsServerKeystorePassword;
     private final String mongoUri;
     private final int rabbitMqConnectionTimeoutMs;
     private final long rabbitMqRecoveryIntervalMs;
@@ -146,6 +148,8 @@ public final class AppConfig {
             String tlsTruststorePassword,
             String tlsKeystorePath,
             String tlsKeystorePassword,
+            String tlsServerKeystorePath,
+            String tlsServerKeystorePassword,
             String mongoUri,
             int rabbitMqConnectionTimeoutMs,
             long rabbitMqRecoveryIntervalMs,
@@ -166,6 +170,8 @@ public final class AppConfig {
         this.tlsTruststorePassword = tlsTruststorePassword;
         this.tlsKeystorePath = tlsKeystorePath;
         this.tlsKeystorePassword = tlsKeystorePassword;
+        this.tlsServerKeystorePath = tlsServerKeystorePath;
+        this.tlsServerKeystorePassword = tlsServerKeystorePassword;
         this.mongoUri = mongoUri;
         this.rabbitMqConnectionTimeoutMs = rabbitMqConnectionTimeoutMs;
         this.rabbitMqRecoveryIntervalMs = rabbitMqRecoveryIntervalMs;
@@ -297,6 +303,10 @@ public final class AppConfig {
                 DEFAULT_TRUSTSTORE_PASSWORD);
         String tlsKeystorePath = readOrDefault(environment, "RABBITMQ_KEYSTORE_PATH", DEFAULT_KEYSTORE_PATH);
         String tlsKeystorePassword = readOrDefault(environment, "RABBITMQ_KEYSTORE_PASSWORD", DEFAULT_KEYSTORE_PASSWORD);
+        
+        String tlsServerKeystorePath = readOrDefault(environment, "TLS_SERVER_KEYSTORE_PATH", tlsKeystorePath);
+        String tlsServerKeystorePassword = readOrDefault(environment, "TLS_SERVER_KEYSTORE_PASSWORD", tlsKeystorePassword);
+
         String mongoUri = environment.get("MONGO_URI");
         if (mongoUri == null || mongoUri.isBlank()) {
             mongoUri = String.format(DEFAULT_MONGO_URI, activeProfile.defaultMongoUser(), activeProfile.defaultMongoPass());
@@ -343,6 +353,8 @@ public final class AppConfig {
                 tlsTruststorePassword,
                 tlsKeystorePath,
                 tlsKeystorePassword,
+                tlsServerKeystorePath,
+                tlsServerKeystorePassword,
                 mongoUri,
                 connectionTimeoutMs,
                 recoveryIntervalMs,
@@ -479,6 +491,20 @@ public final class AppConfig {
      */
     public String getTlsKeystorePassword() {
         return tlsKeystorePassword;
+    }
+
+    /**
+     * @return the server keystore file path
+     */
+    public String getTlsServerKeystorePath() {
+        return tlsServerKeystorePath;
+    }
+
+    /**
+     * @return the password for the server keystore
+     */
+    public String getTlsServerKeystorePassword() {
+        return tlsServerKeystorePassword;
     }
 
     /**
