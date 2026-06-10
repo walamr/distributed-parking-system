@@ -59,32 +59,32 @@ public final class AppConfig {
         /**
          * Profile for the Customer User Interface application.
          */
-        CUSTOMER_UI("customer", "customer_pwd_rotated", "customer_db_user", "db_pwd_rotated_cust"),
+        CUSTOMER_UI("customer", "REQUIRED_BUT_MISSING", "customer_db_user", "REQUIRED_BUT_MISSING"),
 
         /**
          * Profile for the Parking Enforcement Officer UI application.
          */
-        PEO_UI("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo"),
+        PEO_UI("peo_service", "REQUIRED_BUT_MISSING", "peo_db_user", "REQUIRED_BUT_MISSING"),
 
         /**
          * Profile for the Municipality Officer UI application.
          */
-        MO_UI("mulligan_admin", "admin_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
+        MO_UI("mulligan_admin", "REQUIRED_BUT_MISSING", "mulligan_db_admin", "REQUIRED_BUT_MISSING"),
 
         /**
          * Profile for the main message Queue Server backend daemon.
          */
-        QUEUE_SERVER("queue_service", "queue_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
+        QUEUE_SERVER("queue_service", "REQUIRED_BUT_MISSING", "mulligan_db_admin", "REQUIRED_BUT_MISSING"),
 
         /**
          * Profile for the backend Storage Server microservice.
          */
-        STORAGE_SERVER("storage_service", "storage_pwd_rotated", "storage_db_user", "db_pwd_rotated_storage"),
+        STORAGE_SERVER("storage_service", "REQUIRED_BUT_MISSING", "storage_db_user", "REQUIRED_BUT_MISSING"),
 
         /**
          * Profile used by integration smoke tests to verify infrastructure sanity.
          */
-        SMOKE_TEST("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo");
+        SMOKE_TEST("peo_service", "REQUIRED_BUT_MISSING", "peo_db_user", "REQUIRED_BUT_MISSING");
 
         private final String defaultUsername;
         private final String defaultPassword;
@@ -269,6 +269,9 @@ public final class AppConfig {
         if ("guest".equals(username)) {
             throw new IllegalArgumentException("RABBITMQ_USERNAME must not use guest credentials.");
         }
+        if ("REQUIRED_BUT_MISSING".equals(password)) {
+            throw new IllegalStateException("Security Risk: RABBITMQ_PASSWORD is not configured in the environment. Falling back to hardcoded defaults is disabled.");
+        }
         String virtualHost = readOrDefault(environment, "RABBITMQ_VHOST", DEFAULT_VHOST);
         boolean tlsEnabled = Boolean.parseBoolean(readOrDefault(
                 environment,
@@ -307,16 +310,21 @@ public final class AppConfig {
         String tlsServerKeystorePath = readOrDefault(environment, "TLS_SERVER_KEYSTORE_PATH", tlsKeystorePath);
         String tlsServerKeystorePassword = readOrDefault(environment, "TLS_SERVER_KEYSTORE_PASSWORD", tlsKeystorePassword);
 
+        String mongoPass = readOrDefault(environment, "MONGO_PASSWORD", activeProfile.defaultMongoPass());
+        if ("REQUIRED_BUT_MISSING".equals(mongoPass)) {
+            throw new IllegalStateException("Security Risk: MONGO_PASSWORD (or database password) is not configured. Falling back to hardcoded defaults is disabled.");
+        }
+
         String mongoUri = environment.get("MONGO_URI");
         if (mongoUri == null || mongoUri.isBlank()) {
-            mongoUri = String.format(DEFAULT_MONGO_URI, activeProfile.defaultMongoUser(), activeProfile.defaultMongoPass());
+            mongoUri = String.format(DEFAULT_MONGO_URI, activeProfile.defaultMongoUser(), mongoPass);
         } else {
             if (mongoUri.startsWith("mongodb://")) {
                 int atIndex = mongoUri.indexOf("@");
                 if (atIndex > 0) {
                     String prefix = "mongodb://";
                     String rest = mongoUri.substring(atIndex);
-                    mongoUri = prefix + activeProfile.defaultMongoUser() + ":" + activeProfile.defaultMongoPass() + rest;
+                    mongoUri = prefix + activeProfile.defaultMongoUser() + ":" + mongoPass + rest;
                 }
             }
         }

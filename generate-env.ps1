@@ -51,7 +51,7 @@ function Get-CommonEnvContent {
         $M1_P = "27017"; $M2_P = "27017"; $M3_P = "27017"
     }
 
-    return @"
+  return @"
 RABBITMQ_NODES=${RABBIT1_IP}:${R1_P},${RABBIT2_IP}:${R2_P},${RABBIT3_IP}:${R3_P}
 RABBITMQ_VHOST=/parking
 RABBITMQ_TLS_ENABLED=true
@@ -67,6 +67,7 @@ MONGO_URI=mongodb://${mongoUser}:${mongoPass}@${MONGO1_IP}:${M1_P},${MONGO2_IP}:
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+MONGO_PASSWORD=${mongoPass}
 
 HMAC_SECRET=b7f8e9a2d3c4b5a6f7e8d9c0b1a2938475645342312
 NONCE_TTL_SECONDS=60
@@ -77,11 +78,7 @@ New-Item -ItemType Directory -Force -Path "env-configs" | Out-Null
 
 $customerEnv = @"
 RABBITMQ_USERNAME=customer
-<<<<<<< Updated upstream
 RABBITMQ_PASSWORD=customer_pwd_rotated
-=======
-RABBITMQ_PASSWORD=customer_secure_pass_2026
->>>>>>> Stashed changes
 $(Get-CommonEnvContent "customer_db_user" "db_pwd_rotated_cust")
 "@
 $customerEnv | Out-File -FilePath "env-configs/customer.env" -Encoding utf8
@@ -89,11 +86,7 @@ Write-Host "Created: env-configs/customer.env"
 
 $peoEnv = @"
 RABBITMQ_USERNAME=peo_service
-<<<<<<< Updated upstream
 RABBITMQ_PASSWORD=peo_pwd_rotated
-=======
-RABBITMQ_PASSWORD=peo_secure_pass_2026
->>>>>>> Stashed changes
 $(Get-CommonEnvContent "peo_db_user" "db_pwd_rotated_peo")
 "@
 $peoEnv | Out-File -FilePath "env-configs/peo.env" -Encoding utf8
@@ -101,39 +94,24 @@ Write-Host "Created: env-configs/peo.env"
 
 $moEnv = @"
 RABBITMQ_USERNAME=mulligan_admin
-<<<<<<< Updated upstream
 RABBITMQ_PASSWORD=admin_pwd_rotated
-=======
-RABBITMQ_PASSWORD=admin_ultra_secure_99
->>>>>>> Stashed changes
 $(Get-CommonEnvContent "mulligan_db_admin" "db_pwd_rotated_admin")
 "@
 $moEnv | Out-File -FilePath "env-configs/mo.env" -Encoding utf8
 Write-Host "Created: env-configs/mo.env"
 
 $queueEnv = @"
-<<<<<<< Updated upstream
 RABBITMQ_USERNAME=queue_service
 RABBITMQ_PASSWORD=queue_pwd_rotated
-=======
-RABBITMQ_USERNAME=mulligan_admin
-RABBITMQ_PASSWORD=admin_ultra_secure_99
->>>>>>> Stashed changes
 $(Get-CommonEnvContent "mulligan_db_admin" "db_pwd_rotated_admin")
 "@
 $queueEnv | Out-File -FilePath "env-configs/queue-server.env" -Encoding utf8
 Write-Host "Created: env-configs/queue-server.env"
 
 $storageEnv = @"
-<<<<<<< Updated upstream
 RABBITMQ_USERNAME=storage_service
 RABBITMQ_PASSWORD=storage_pwd_rotated
 $(Get-CommonEnvContent "storage_db_user" "db_pwd_rotated_storage")
-=======
-RABBITMQ_USERNAME=peo_service
-RABBITMQ_PASSWORD=peo_secure_pass_2026
-$(Get-CommonEnvContent "peo_db_user" "db_pwd_rotated_peo")
->>>>>>> Stashed changes
 "@
 $storageEnv | Out-File -FilePath "env-configs/storage-server.env" -Encoding utf8
 Write-Host "Created: env-configs/storage-server.env"
@@ -156,15 +134,13 @@ RABBITMQ_TRUSTSTORE_PASSWORD=password
 RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
 RABBITMQ_KEYSTORE_PASSWORD=password
 RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=false
+RABBITMQ_PASSWORD=admin_pwd_rotated
 
-<<<<<<< Updated upstream
 MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
-=======
-MONGO_URI=mongodb://customer_db_user:db_pwd_rotated_cust@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
->>>>>>> Stashed changes
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
+MONGO_PASSWORD=db_pwd_rotated_admin
 
 HMAC_SECRET=b7f8e9a2d3c4b5a6f7e8d9c0b1a2938475645342312
 NONCE_TTL_SECONDS=60

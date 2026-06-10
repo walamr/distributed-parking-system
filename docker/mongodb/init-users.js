@@ -1,57 +1,17 @@
-// Initialize or update MongoDB users for the local academic demo.
+// Initialize or update MongoDB users and roles for the local academic demo.
 // These passwords intentionally match AppConfig.java and the Docker env files.
 db = db.getSiblingDB('admin');
 
-<<<<<<< Updated upstream
-// Create Admin User
-db.createUser({
-  user: "mulligan_db_admin",
-  pwd: "db_pwd_rotated_admin",
-  roles: [ { role: "root", db: "admin" } ]
-});
-
-// Authenticate as the newly created admin user, because the localhost exception 
-// expires the moment the first user is created!
-db.auth("mulligan_db_admin", "db_pwd_rotated_admin");
-
-// Create Storage Server User (Now in admin DB for centralized auth)
-db.createUser({
-  user: "storage_db_user",
-  pwd: "db_pwd_rotated_storage",
-  roles: [ { role: "readWrite", db: "parking_db" } ]
-});
-
-// Create PEO User (Now in admin DB for centralized auth)
-db.createUser({
-  user: "peo_db_user",
-  pwd: "db_pwd_rotated_peo",
-  roles: [ { role: "read", db: "parking_db" } ]
-});
-
-// Create Customer/MO User (Now in admin DB for centralized auth)
-db.createUser({
-  user: "customer_db_user",
-  pwd: "db_pwd_rotated_cust",
-  roles: [ { role: "read", db: "parking_db" } ]
-});
-=======
-const users = [
-  {
-    user: "mulligan_db_admin",
-    pwd: "db_pwd_rotated_admin",
-    roles: [ { role: "root", db: "admin" } ]
-  },
-  {
-    user: "peo_db_user",
-    pwd: "db_pwd_rotated_peo",
-    roles: [ { role: "readWrite", db: "parking_db" } ]
-  },
-  {
-    user: "customer_db_user",
-    pwd: "db_pwd_rotated_cust",
-    roles: [ { role: "read", db: "parking_db" } ]
+function ensureRole(spec) {
+  const existing = db.getRole(spec.role);
+  if (existing) {
+    db.updateRole(spec.role, { privileges: spec.privileges, roles: spec.roles });
+    print("Updated MongoDB role: " + spec.role);
+  } else {
+    db.createRole(spec);
+    print("Created MongoDB role: " + spec.role);
   }
-];
+}
 
 function ensureUser(spec) {
   const existing = db.getUser(spec.user);
@@ -64,12 +24,52 @@ function ensureUser(spec) {
   }
 }
 
-const adminSpec = users[0];
-ensureUser(adminSpec);
-db.auth(adminSpec.user, adminSpec.pwd);
+// 1. Ensure custom roles exist
+ensureRole({
+  role: "peoReadRole",
+  privileges: [
+    { resource: { db: "parking_db", collection: "vehicles" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "spaces" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "transactions" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "system_log" }, actions: [ "insert" ] }
+  ],
+  roles: []
+});
 
-ensureUser(users[1]);
-ensureUser(users[2]);
->>>>>>> Stashed changes
+ensureRole({
+  role: "customerRole",
+  privileges: [
+    { resource: { db: "parking_db", collection: "vehicles" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "spaces" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "transactions" }, actions: [ "find" ] },
+    { resource: { db: "parking_db", collection: "users" }, actions: [ "find", "insert", "update" ] }
+  ],
+  roles: []
+});
 
-print("--- MongoDB RBAC Users Ready in Admin DB ---");
+// 2. Ensure users exist
+ensureUser({
+  user: "mulligan_db_admin",
+  pwd: "db_pwd_rotated_admin",
+  roles: [ { role: "root", db: "admin" } ]
+});
+
+ensureUser({
+  user: "storage_db_user",
+  pwd: "db_pwd_rotated_storage",
+  roles: [ { role: "readWrite", db: "parking_db" } ]
+});
+
+ensureUser({
+  user: "peo_db_user",
+  pwd: "db_pwd_rotated_peo",
+  roles: [ { role: "peoReadRole", db: "parking_db" } ]
+});
+
+ensureUser({
+  user: "customer_db_user",
+  pwd: "db_pwd_rotated_cust",
+  roles: [ { role: "customerRole", db: "parking_db" } ]
+});
+
+print("--- MongoDB RBAC Users and Roles Created Successfully in Admin DB ---");

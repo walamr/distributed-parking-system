@@ -17,7 +17,9 @@ class RabbitMqConnectionManagerTest {
                         "RABBITMQ_NODES", "localhost:5671,localhost:5673,localhost:5674",
                         "RABBITMQ_TLS_ENABLED", "false",
                         "RABBITMQ_RECOVERY_INTERVAL_MS", "7000",
-                        "HMAC_SECRET", "test-secret-1234567890"));
+                        "HMAC_SECRET", "test-secret-1234567890",
+                        "RABBITMQ_PASSWORD", "test-pass",
+                        "MONGO_PASSWORD", "test-pass"));
         RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(config);
 
         ConnectionFactory factory = connectionManager.buildFactory(config.getRabbitMqNodes().getFirst());

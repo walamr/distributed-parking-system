@@ -6,3 +6,10 @@
 !README.md
 target/
 node_modules/
+
+# Security - do not copy private keys/keyfile to Docker
+docker/rabbitmq/certs/*-key.pem
+docker/rabbitmq/certs/*.jks
+docker/rabbitmq/certs/*.p12
+docker/mongodb/certs/mongo*.pem
+docker/mongodb/certs/mongodb-keyfile

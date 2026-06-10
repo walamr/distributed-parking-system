@@ -7,27 +7,32 @@
   "users": [
     {
       "name": "customer",
-      "password": "customer_pwd_rotated",
+      "password_hash": "4ydtMENBfV5/TjzV3Q/FDcwWV6uHtLMPn9zxInQK4IcdLIU3",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     },
     {
       "name": "peo_service",
-      "password": "peo_pwd_rotated",
+      "password_hash": "B4qrncvGNx8y19/GNXgO0QxMcc4YK4+LRFdvREWXEyTRzNe9",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     },
     {
       "name": "mulligan_admin",
-      "password": "admin_pwd_rotated",
+      "password_hash": "Fmf4/vLrBNE5CV1BPxYFBm4zjtgCoPlkP2R8CzLsO4/zwJxO",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": "administrator"
     },
     {
       "name": "queue_service",
-      "password": "queue_pwd_rotated",
+      "password_hash": "k9EVAfflztyaE9OxVpkqOhhzctZyTM4PNa1cwqmbzFkDT1x1",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     },
     {
       "name": "storage_service",
-      "password": "storage_pwd_rotated",
+      "password_hash": "eJe3MYaO2NK+xfYscVNfRHR8qIwETd2lUxzeioDPfi9bAxe/",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ""
     }
   ],
