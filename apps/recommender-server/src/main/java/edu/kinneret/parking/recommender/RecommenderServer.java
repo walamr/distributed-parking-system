@@ -75,6 +75,9 @@ public class RecommenderServer implements AutoCloseable {
     private ExecutorService executorService;
     private volatile boolean running = true;
 
+    private final Map<String, List<Long>> ipRequestTimestamps = new ConcurrentHashMap<>();
+    private static final int MAX_REQUESTS_PER_MINUTE = 60;
+
     /**
      * Creates a recommender server node.
      *
@@ -173,6 +176,17 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    private boolean isRateLimited(String ip) {
+        long now = Instant.now().getEpochSecond();
+        List<Long> timestamps = ipRequestTimestamps.computeIfAbsent(ip, k -> new java.util.concurrent.CopyOnWriteArrayList<>());
+        timestamps.removeIf(ts -> now - ts > 60);
+        if (timestamps.size() >= MAX_REQUESTS_PER_MINUTE) {
+            return true;
+        }
+        timestamps.add(now);
+        return false;
+    }
+
     /**
      * Reads a single signed JSON request from a TLS socket and routes it by type.
      *
@@ -180,6 +194,15 @@ public class RecommenderServer implements AutoCloseable {
      * @return no return value
      */
     private void handleConnection(Socket socket) {
+        String ip = socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "unknown";
+        if (isRateLimited(ip)) {
+            logSecurity("RATE_LIMIT_EXCEEDED", remoteAddress(socket), "too many requests from IP");
+            try {
+                socket.close();
+            } catch (IOException ignored) {}
+            return;
+        }
+
         try (Socket s = socket;
              BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
              PrintWriter writer = new PrintWriter(s.getOutputStream(), true)) {

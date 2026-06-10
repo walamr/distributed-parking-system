@@ -39,6 +39,11 @@ foreach ($key in $required) {
     }
 }
 
+# Dynamically generate a 256-bit cryptographically secure random key
+$bytes = New-Object Byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$DYNAMIC_HMAC_SECRET = [System.BitConverter]::ToString($bytes) -replace '-'
+
 function Get-CommonEnvContent {
     param([string]$mongoUser, [string]$mongoPass)
     
@@ -69,7 +74,7 @@ MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
 MONGO_PASSWORD=${mongoPass}
 
-HMAC_SECRET=b7f8e9a2d3c4b5a6f7e8d9c0b1a2938475645342312
+HMAC_SECRET=$DYNAMIC_HMAC_SECRET
 NONCE_TTL_SECONDS=60
 "@
 }
@@ -142,7 +147,7 @@ MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
 MONGO_PASSWORD=db_pwd_rotated_admin
 
-HMAC_SECRET=b7f8e9a2d3c4b5a6f7e8d9c0b1a2938475645342312
+HMAC_SECRET=$DYNAMIC_HMAC_SECRET
 NONCE_TTL_SECONDS=60
 
 # Individual IPs for Docker Compose variable interpolation
