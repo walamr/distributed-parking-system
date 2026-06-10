@@ -89,6 +89,7 @@
     -fx-border-radius: 12 !important;
     border-radius: 12 !important;
     -fx-opacity: 1.0 !important;
+    opacity: 1.0 !important;
 }
 
 .text-field-editable {
@@ -222,11 +223,15 @@
 .history-table .scroll-bar:vertical, 
 .history-table .scroll-bar:horizontal {
     -fx-opacity: 0;
+    opacity: 0;
     -fx-pref-width: 0;
     -fx-pref-height: 0;
     -fx-max-width: 0;
+    max-width: 0;
     -fx-max-height: 0;
+    max-height: 0;
     -fx-padding: 0;
+    padding: 0;
 }
 
 .history-table .table-row-cell {
@@ -291,6 +296,7 @@
     -fx-font-size: 13px;
     font-size: 13px;
     -fx-font-weight: bold;
+    font-weight: bold;
 }
 
 .status-label {
@@ -587,6 +593,7 @@
     -fx-min-height: 60;
     min-height: 60;
     -fx-max-height: 60;
+    max-height: 60;
     -fx-background-radius: 15;
     -fx-cursor: hand;
     cursor: hand;
