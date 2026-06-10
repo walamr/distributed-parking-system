@@ -63,13 +63,13 @@ ensureUser({
 ensureUser({
   user: "peo_db_user",
   pwd: "db_pwd_rotated_peo",
-  roles: [ { role: "peoReadRole", db: "parking_db" } ]
+  roles: [ { role: "peoReadRole", db: "admin" } ]
 });
 
 ensureUser({
   user: "customer_db_user",
   pwd: "db_pwd_rotated_cust",
-  roles: [ { role: "customerRole", db: "parking_db" } ]
+  roles: [ { role: "customerRole", db: "admin" } ]
 });
 
 print("--- MongoDB RBAC Users and Roles Created Successfully in Admin DB ---");

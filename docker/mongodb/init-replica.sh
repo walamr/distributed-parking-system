@@ -19,10 +19,14 @@ until mongosh "${TLS_ARGS[@]}" --quiet --eval "db.adminCommand({ ping: 1 }).ok" 
 done
 
 echo "--- Ensuring replica set rs0 is initialized ---"
-if mongosh "${TLS_ARGS[@]}" --quiet --eval "rs.status().ok" >/dev/null 2>&1; then
+if mongosh "$ADMIN_URI" --quiet --eval "rs.status().ok" >/dev/null 2>&1; then
+  echo "Replica set already initialized and authenticated with new credentials."
+elif mongosh "$OLD_ADMIN_URI" --quiet --eval "rs.status().ok" >/dev/null 2>&1; then
+  echo "Replica set already initialized and authenticated with old credentials."
+elif mongosh "${TLS_ARGS[@]}" --quiet --eval "rs.status().ok" >/dev/null 2>&1; then
   echo "Replica set already initialized."
 else
-  mongosh "${TLS_ARGS[@]}" --eval 'rs.initiate({ _id: "rs0", members: [ { _id: 0, host: "mongo1:27017" }, { _id: 1, host: "mongo2:27018" }, { _id: 2, host: "mongo3:27019" } ] })'
+  mongosh "${TLS_ARGS[@]}" --eval 'rs.initiate({ _id: "rs0", members: [ { _id: 0, host: "mongo1:27017" }, { _id: 1, host: "mongo2:27018" }, { _id: 2, host: "mongo3:27019" } ] })' || true
 fi
 
 echo "--- Waiting for primary election ---"
