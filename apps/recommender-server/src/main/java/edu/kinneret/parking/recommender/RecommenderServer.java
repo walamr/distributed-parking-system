@@ -128,7 +128,7 @@ public class RecommenderServer implements AutoCloseable {
         tlsServerSocket.setNeedClientAuth(true);
         serverSocket = tlsServerSocket;
 
-        executorService = Executors.newCachedThreadPool(runnable -> {
+        executorService = Executors.newFixedThreadPool(50, runnable -> {
             Thread t = new Thread(runnable, "recommender-worker-" + nodeId);
             t.setDaemon(true);
             return t;
@@ -252,9 +252,10 @@ public class RecommenderServer implements AutoCloseable {
                     clientWriter.println(signedReply);
                 }
             } catch (Exception e) {
-                logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach leader.", e);
-                logSecurity("CONSENSUS_FAILURE", leaderHost + ":" + leaderPort, "follower could not reach leader");
-                sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
+                logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach configured leader.", e);
+                logSecurity("CONSENSUS_FALLBACK", leaderHost + ":" + leaderPort, "follower could not reach leader, stepping up");
+                logger.info("Leader unreachable. Node '" + nodeId + "' is stepping up to execute consensus locally.");
+                sendConsensusResponse(spaceId, correlationId, clientWriter);
             }
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleClientQuery on node " + nodeId, e);
@@ -271,9 +272,7 @@ public class RecommenderServer implements AutoCloseable {
      */
     private void handleForwardQuery(JsonObject forwardRequest, PrintWriter leaderWriter) {
         if (!isLeader) {
-            sendSignedFailure(leaderWriter, "CLIENT_RESPONSE",
-                    forwardRequest.get("correlationId").getAsString(), SAFE_CLIENT_FAILURE);
-            return;
+            logger.info("Non-leader node '" + nodeId + "' received FORWARD_QUERY. Executing consensus dynamically as fallback leader.");
         }
 
         String correlationId = forwardRequest.get("correlationId").getAsString();
@@ -338,7 +337,7 @@ public class RecommenderServer implements AutoCloseable {
         votes.put(nodeId, calculateLocalRecommendation(spaceId));
         votes.putAll(explicitVotes);
 
-        ExecutorService collectExecutor = Executors.newCachedThreadPool();
+        ExecutorService collectExecutor = Executors.newFixedThreadPool(10);
         List<Future<Void>> futures = new ArrayList<>();
 
         for (NodeEndpoint endpoint : clusterNodes) {

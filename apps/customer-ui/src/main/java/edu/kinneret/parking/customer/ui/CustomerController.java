@@ -83,22 +83,12 @@ public class CustomerController {
             String content = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
             if (content.isEmpty() || content.equals("[]"))
                 return;
-            // Parse a simple JSON array of objects: [{...}, {...}]
-            // We rely on org.bson.Document.parse for individual objects
-            content = content.trim();
-            if (content.startsWith("["))
-                content = content.substring(1);
-            if (content.endsWith("]"))
-                content = content.substring(0, content.length() - 1);
-            content = content.trim();
-            if (content.isEmpty())
-                return;
-            // Split by top-level } , { boundaries
-            java.util.List<String> parts = splitJsonObjects(content);
+            
+            com.google.gson.JsonArray jsonArray = com.google.gson.JsonParser.parseString(content).getAsJsonArray();
             localOfflineTransactions.clear();
-            for (String part : parts) {
+            for (com.google.gson.JsonElement el : jsonArray) {
                 try {
-                    Document doc = Document.parse(part.trim());
+                    Document doc = Document.parse(el.getAsJsonObject().toString());
                     localOfflineTransactions.add(doc);
                 } catch (Exception ignored) {
                 }
@@ -134,44 +124,6 @@ public class CustomerController {
         } catch (Exception e) {
             logger.warn("Could not save local transactions for VIN {}: {}", vin, e.getMessage());
         }
-    }
-
-    /**
-     * Splits a JSON array body (without outer brackets) into individual JSON object
-     * strings.
-     * Handles nested objects/arrays correctly.
-     */
-    private static java.util.List<String> splitJsonObjects(String arrayBody) {
-        java.util.List<String> result = new java.util.ArrayList<>();
-        int depth = 0;
-        int start = 0;
-        boolean inString = false;
-        char prev = 0;
-        for (int i = 0; i < arrayBody.length(); i++) {
-            char c = arrayBody.charAt(i);
-            if (c == '"' && prev != '\\')
-                inString = !inString;
-            if (!inString) {
-                if (c == '{' || c == '[')
-                    depth++;
-                else if (c == '}' || c == ']')
-                    depth--;
-                if (depth == 0 && c == '}') {
-                    String token = arrayBody.substring(start, i + 1).trim();
-                    if (!token.isEmpty())
-                        result.add(token);
-                    // skip comma/whitespace
-                    int j = i + 1;
-                    while (j < arrayBody.length()
-                            && (arrayBody.charAt(j) == ',' || Character.isWhitespace(arrayBody.charAt(j))))
-                        j++;
-                    start = j;
-                    i = j - 1;
-                }
-            }
-            prev = c;
-        }
-        return result;
     }
 
     /**
