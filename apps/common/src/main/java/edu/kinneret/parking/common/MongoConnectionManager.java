@@ -55,13 +55,13 @@ public final class MongoConnectionManager implements AutoCloseable {
         // Default to reading from primary, but allow failover to secondaries
         settingsBuilder.readPreference(ReadPreference.primaryPreferred());
 
-        // Fast timeouts for fail-fast behavior (2000 milliseconds selection and socket timeout)
+        // Keep startup tolerant enough for a freshly initialized Docker replica set.
         settingsBuilder.applyToClusterSettings(builder -> 
-            builder.serverSelectionTimeout(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            builder.serverSelectionTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
         );
         settingsBuilder.applyToSocketSettings(builder ->
-            builder.connectTimeout(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
-                   .readTimeout(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            builder.connectTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                   .readTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
         );
 
         com.mongodb.client.MongoClient clientTemp = null;

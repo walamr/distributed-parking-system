@@ -23,7 +23,7 @@ if ($containers.Count -gt 0) {
 # 2. Check MongoDB Replica Set Status
 Write-Host "`n2. Checking MongoDB Replica Set (rs0)..." -ForegroundColor Yellow
 try {
-    $mongoStatus = docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "var s = rs.status(); var mems = s.members.map(function(m) { return {name: m.name, stateStr: m.stateStr, health: m.health}; }); JSON.stringify({members: mems});" --quiet | ConvertFrom-Json
+    $mongoStatus = docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "var s = rs.status(); var mems = s.members.map(function(m) { return {name: m.name, stateStr: m.stateStr, health: m.health}; }); JSON.stringify({members: mems});" --quiet | ConvertFrom-Json
     $members = $mongoStatus.members
     $healthyCount = ($members | Where-Object { $_.health -eq 1 }).Count
     

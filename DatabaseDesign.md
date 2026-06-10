@@ -21,7 +21,7 @@
 Host-run Java applications default to:
 
 ```text
-mongodb://customer_db_user:db_pass_cust_2026@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+mongodb://customer_db_user:db_pwd_rotated_cust@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
 ```
 
 ## 2. MongoDB TLS for Host-Run Apps
@@ -105,8 +105,8 @@ The database cluster can be verified without screenshots by running:
 docker compose up -d
 .\docker\mongodb\init-rs.ps1
 .\scripts\verify-cluster-health.ps1
-docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
-docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "db.vehicles.countDocuments(); db.zones.countDocuments(); db.spaces.countDocuments();"
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "db.vehicles.countDocuments(); db.zones.countDocuments(); db.spaces.countDocuments();"
 ```
 
 Expected output:

@@ -23,7 +23,7 @@ During the Round 2 Red Teaming exercise, our system was audited by two red teams
 *   **R2-C-02 / T5-CIA-01 / T5-A-01:** RabbitMQ profiles in `definitions.json` utilized a broad, non-least-privilege model, and the `ALLOW_INVALID_HOSTNAMES` flag was left as `true`. This allowed attackers with stolen certs to hijack the management API and drain queues (`transactions.queue`).
 *   **R2-C-03 / T5-C-01:** MongoDB was launched with permissive flags (`--tlsAllowConnectionsWithoutCertificates`) to ease local testing. This effectively disabled two-way mTLS, meaning any attacker with our stolen passwords could connect to both primary and secondary nodes without a valid client certificate.
 *   **R2-I-02 / T5-I-02:** The `NonceStore` was built with a "fail-open" or resilient mindset where, if MongoDB was unavailable, it fell back to local memory. For a distributed security control, this resulted in a silent bypass of cross-node validation, allowing replay attacks across different queue-server nodes.
-*   **R2-I-03 / T5-I-03:** Because the database admin passwords (`db_pass_admin_99`) were leaked in the `.env` file, attackers could directly connect to the MongoDB Primary node and inject forged citations, bypassing the RabbitMQ application layer entirely.
+*   **R2-I-03 / T5-I-03:** Because the previous database admin demo password was leaked in the `.env` file, attackers could directly connect to the MongoDB Primary node and inject forged citations, bypassing the RabbitMQ application layer entirely.
 
 ## 4. Fix Details
 *   **R2-C-01 / R2-A-01:** Removed all private keys (`*-key.pem`, `mongodb-keyfile`, `keystore.jks`) from the repository using `.gitignore` and `.dockerignore`. The distribution bundle now only includes the public `ca-cert.pem`.

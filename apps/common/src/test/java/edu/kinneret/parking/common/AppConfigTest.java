@@ -64,7 +64,7 @@ class AppConfigTest {
         AppConfig config = AppConfig.fromEnvironment(
                 AppConfig.ApplicationProfile.MO_UI,
                 Map.of(
-                        "MONGO_URI", "mongodb://customer_db_user:db_pass_cust_2026@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin",
+                        "MONGO_URI", "mongodb://customer_db_user:db_pwd_rotated_cust@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin",
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
@@ -76,7 +76,7 @@ class AppConfigTest {
         AppConfig config = AppConfig.fromEnvironment(
                 AppConfig.ApplicationProfile.STORAGE_SERVER,
                 Map.of(
-                        "MONGO_URI", "mongodb://customer_db_user:db_pass_cust_2026@10.0.201.25:27017/parking_db",
+                        "MONGO_URI", "mongodb://customer_db_user:db_pwd_rotated_cust@10.0.201.25:27017/parking_db",
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 

@@ -29,7 +29,7 @@ docker exec $primaryNodeName mongosh --tls --tlsAllowInvalidHostnames --tlsCAFil
 
 # 4. Import Sample Data (Now using the admin user we just created on the Primary)
 Write-Host "--- Importing Sample Data ---"
-$ADMIN_URI = "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:$primaryPort/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/${primaryNodeName}.pem"
+$ADMIN_URI = "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:$primaryPort/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/${primaryNodeName}.pem"
 docker cp ./docker/mongodb/seed-data.js "${primaryNodeName}:/tmp/seed-data.js"
 docker exec $primaryNodeName mongosh "$ADMIN_URI" /tmp/seed-data.js
 

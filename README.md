@@ -15,35 +15,39 @@
 
 Welcome to **Mulligan Parking System**, a highly resilient and distributed smart parking application built for Stage 3 of the Distributed Systems course.
 
-### 🚗 Project Overview
-The Mulligan Parking System manages parking space transactions, citations, and recommendations across a distributed node network. In Stage 3, we have successfully implemented a **Leader-Follower Consensus Protocol** to ensure that all parking recommendations are synchronized and resilient against node failures or malicious actors.
+## Demo Run Steps
 
-### 🏗️ Architecture & Tech Stack
-- **Languages/Build:** Java 21, Gradle
-- **Message Broker:** RabbitMQ (Quorum Queues for high availability)
-- **Database:** MongoDB Replica Set (rs0)
-- **Security:** Strict mTLS between all components, distributed Nonce validation for anti-replay protection.
-- **Microservices:**
-  - `queue-server`: Ingests messages and validates nonces.
-  - `storage-server`: Persists parking transactions and citations to MongoDB.
-  - `recommender-server`: A 3-node cluster that calculates parking recommendations using a strict majority consensus protocol.
-- **Client UIs:** JavaFX applications for Customers, Parking Enforcement Officers (PEO), and Management (MO).
+Demo credentials, TLS certificates, and local private keys are intentionally included for academic grading and local lab execution only. They are not production credentials.
 
-### 🚀 Quick Start
-To run the project locally:
-1. **Start the Infrastructure:**
-   ```bash
-   docker-compose up -d
-   ```
-2. **Build the Application:**
-   ```bash
-   ./gradlew.bat build
-   ```
-3. **Launch the Mulligan Client UI:**
-   ```bash
-   ./gradlew.bat :mulligan-app:run
+1. **Build:**
+   ```powershell
+   .\gradlew.bat clean build
    ```
 
+2. **Start the full system:**
+   ```powershell
+   docker compose up -d
+   ```
+
+3. **Check containers:**
+   ```powershell
+   docker compose ps
+   ```
+
+4. **Run/verify the customer app or CLI:**
+   ```powershell
+   .\gradlew.bat :customer-ui:run
+   ```
+
+   CLI alternative:
+   ```powershell
+   .\gradlew.bat :customer-ui:runCLI
+   ```
+
+5. **Stop system:**
+   ```powershell
+   docker compose down
+   ```
 ---
 
 ### 📚 Extended Documentation

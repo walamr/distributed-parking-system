@@ -188,7 +188,7 @@ Expected result:
    ```
 2. **Verify election of new primary**: Wait 5 seconds, then check the status of the replica set nodes on `mongo2` (port 27018) to verify that either `mongo2` or `mongo3` was elected as the new `PRIMARY`:
    ```powershell
-   docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
+   docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
    ```
 3. **Verify application failover**: Interact with the UI application or test queries to verify that connections failover automatically to the new primary database node.
 4. **Restart the original primary node**: Re-enable the container:

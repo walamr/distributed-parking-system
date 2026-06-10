@@ -154,7 +154,7 @@ This test verifies the high availability, auto-failover, and data replication ca
    ```
 3. Check the status of the replica set nodes. Identify which node is the `PRIMARY` (usually `mongo1`) and which ones are `SECONDARY` (`mongo2`, `mongo3`):
    ```powershell
-   docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
+   docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
    ```
 
 #### B. Secondary Node Failure and Recovery Test
@@ -168,7 +168,7 @@ This test verifies the high availability, auto-failover, and data replication ca
    ```
 3. Check status from the primary container (`mongo1`), verifying `mongo2` is marked as `(not reachable/healthy)` while the other two are healthy:
    ```powershell
-   docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ': ' + (m.health == 1 ? 'UP' : 'DOWN'))"
+   docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ': ' + (m.health == 1 ? 'UP' : 'DOWN'))"
    ```
 4. **Simulate secondary node recovery**: Restart the stopped secondary node:
    ```powershell
@@ -186,7 +186,7 @@ This test verifies the high availability, auto-failover, and data replication ca
    ```
 2. **Verify automatic primary reelection**: Wait a few seconds for the replica set to elect a new primary among the remaining online secondary nodes (`mongo2`/`mongo3`). Check replica set status on `mongo2` (which is now port 27018) to verify a new primary has been chosen:
    ```powershell
-   docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
+   docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem" --eval "rs.status().members.map(m => m.name + ' is ' + m.stateStr)"
    ```
 3. **Verify application connectivity**: Launch the UI Gateway or run CLI queries to verify that applications automatically switch their connection to the newly elected primary and that database writes/reads remain fully functional.
 4. **Simulate primary node recovery**: Restart the original primary node:
@@ -264,8 +264,8 @@ Use these commands to collect database evidence without screenshots:
 docker compose up -d
 .\docker\mongodb\init-rs.ps1
 .\scripts\verify-cluster-health.ps1
-docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
-docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "db.vehicles.countDocuments(); db.zones.countDocuments(); db.spaces.countDocuments();"
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/parking_db?authSource=admin&tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "db.vehicles.countDocuments(); db.zones.countDocuments(); db.spaces.countDocuments();"
 ```
 
 Expected evidence:
@@ -447,7 +447,7 @@ mongo3:27019: SECONDARY
 After restart, authenticated TLS status command:
 
 ```powershell
-docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017/admin?tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
+docker exec mongo1 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017/admin?tls=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem" --eval "rs.status().members.map(m => m.name + ':' + m.stateStr)"
 ```
 
 Observed result after restart:
@@ -474,7 +474,7 @@ Observed failures:
 Command:
 
 ```powershell
-docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem&directConnection=true" --eval "db.secondary_write_test.insertOne({proof:'secondary-write-rejection', ts:new Date()})"
+docker exec mongo2 mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27018/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo2.pem&directConnection=true" --eval "db.secondary_write_test.insertOne({proof:'secondary-write-rejection', ts:new Date()})"
 ```
 
 Observed result:

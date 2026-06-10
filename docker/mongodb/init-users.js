@@ -1,6 +1,8 @@
-// Initialize MongoDB users for RBAC hardening
+// Initialize or update MongoDB users for the local academic demo.
+// These passwords intentionally match AppConfig.java and the Docker env files.
 db = db.getSiblingDB('admin');
 
+<<<<<<< Updated upstream
 // Create Admin User
 db.createUser({
   user: "mulligan_db_admin",
@@ -32,5 +34,42 @@ db.createUser({
   pwd: "db_pwd_rotated_cust",
   roles: [ { role: "read", db: "parking_db" } ]
 });
+=======
+const users = [
+  {
+    user: "mulligan_db_admin",
+    pwd: "db_pwd_rotated_admin",
+    roles: [ { role: "root", db: "admin" } ]
+  },
+  {
+    user: "peo_db_user",
+    pwd: "db_pwd_rotated_peo",
+    roles: [ { role: "readWrite", db: "parking_db" } ]
+  },
+  {
+    user: "customer_db_user",
+    pwd: "db_pwd_rotated_cust",
+    roles: [ { role: "read", db: "parking_db" } ]
+  }
+];
 
-print("--- MongoDB RBAC Users Created Successfully in Admin DB ---");
+function ensureUser(spec) {
+  const existing = db.getUser(spec.user);
+  if (existing) {
+    db.updateUser(spec.user, { pwd: spec.pwd, roles: spec.roles });
+    print("Updated MongoDB user: " + spec.user);
+  } else {
+    db.createUser(spec);
+    print("Created MongoDB user: " + spec.user);
+  }
+}
+
+const adminSpec = users[0];
+ensureUser(adminSpec);
+db.auth(adminSpec.user, adminSpec.pwd);
+
+ensureUser(users[1]);
+ensureUser(users[2]);
+>>>>>>> Stashed changes
+
+print("--- MongoDB RBAC Users Ready in Admin DB ---");

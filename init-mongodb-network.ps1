@@ -52,7 +52,7 @@ docker exec mongo1 mongosh --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mon
 
 # 4. Import test data
 Write-Host "--- Step 4: Import sample data ---"
-$ADMIN_URI = "mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$ADMIN_URI = "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/seed-data.js "mongo1:/tmp/seed-data.js"
 docker exec mongo1 mongosh "$ADMIN_URI" /tmp/seed-data.js
 

@@ -84,7 +84,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsAllowConnectionsWithoutCertificates --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27017:27017"
@@ -102,7 +102,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsAllowConnectionsWithoutCertificates --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27018:27018"
@@ -120,7 +120,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsAllowConnectionsWithoutCertificates --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "127.0.0.1:27019:27019"
@@ -130,9 +130,34 @@ services:
       - mongo3-data:/data/db
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
 
+  mongo-init:
+    image: mongo:7.0
+    container_name: mongo-init
+    depends_on:
+      mongo1:
+        condition: service_started
+      mongo2:
+        condition: service_started
+      mongo3:
+        condition: service_started
+    network_mode: "service:mongo1"
+    volumes:
+      - ./docker/mongodb:/docker/mongodb:ro
+      - ./docker/mongodb/certs:/etc/mongo/certs:ro
+    entrypoint: ["bash", "/docker/mongodb/init-replica.sh"]
+
   recommender1:
     image: eclipse-temurin:21-jre-alpine
     container_name: recommender1
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      rabbitmq1:
+        condition: service_healthy
+      rabbitmq2:
+        condition: service_healthy
+      rabbitmq3:
+        condition: service_healthy
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
@@ -149,7 +174,7 @@ services:
       - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
       - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
-      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
+      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender1 port=8091 leaderHost=recommender1 leaderPort=8091 isLeader=true malicious=${RECOMMENDER1_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
@@ -161,6 +186,15 @@ services:
   recommender2:
     image: eclipse-temurin:21-jre-alpine
     container_name: recommender2
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      rabbitmq1:
+        condition: service_healthy
+      rabbitmq2:
+        condition: service_healthy
+      rabbitmq3:
+        condition: service_healthy
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
@@ -177,7 +211,7 @@ services:
       - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
       - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
-      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
+      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER2_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
@@ -189,6 +223,15 @@ services:
   recommender3:
     image: eclipse-temurin:21-jre-alpine
     container_name: recommender3
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      rabbitmq1:
+        condition: service_healthy
+      rabbitmq2:
+        condition: service_healthy
+      rabbitmq3:
+        condition: service_healthy
     volumes:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
@@ -205,7 +248,7 @@ services:
       - RABBITMQ_TRUSTSTORE_PASSWORD=${RABBITMQ_TRUSTSTORE_PASSWORD:-password}
       - RABBITMQ_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - RABBITMQ_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
-      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
+      - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
     command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER3_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
@@ -218,6 +261,15 @@ services:
     image: eclipse-temurin:21-jre-alpine
     container_name: queue-server
     restart: on-failure
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      rabbitmq1:
+        condition: service_healthy
+      rabbitmq2:
+        condition: service_healthy
+      rabbitmq3:
+        condition: service_healthy
     volumes:
       - ./apps/queue-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
@@ -243,6 +295,15 @@ services:
     image: eclipse-temurin:21-jre-alpine
     container_name: storage-server
     restart: on-failure
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      rabbitmq1:
+        condition: service_healthy
+      rabbitmq2:
+        condition: service_healthy
+      rabbitmq3:
+        condition: service_healthy
     volumes:
       - ./apps/storage-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro

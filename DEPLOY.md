@@ -100,7 +100,7 @@ It also creates the MongoDB RBAC users and imports sample `vehicles`, `zones`, a
 Host-run applications default to:
 
 ```text
-mongodb://customer_db_user:db_pass_cust_2026@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+mongodb://customer_db_user:db_pwd_rotated_cust@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
 ```
 
 Default MongoDB TLS values in the current code:
