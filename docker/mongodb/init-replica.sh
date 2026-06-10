@@ -38,6 +38,7 @@ elif mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >
   mongosh "$OLD_ADMIN_URI" /docker/mongodb/init-users.js
 else
   mongosh "${TLS_ARGS[@]}" /docker/mongodb/init-users-fresh.js
+  mongosh "$ADMIN_URI" /docker/mongodb/init-users.js
 fi
 
 echo "--- Importing idempotent demo seed data ---"

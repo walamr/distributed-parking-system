@@ -33,6 +33,7 @@ public final class AppConfig {
     private final String rabbitMqPassword;
     private final String rabbitMqVirtualHost;
     private final boolean rabbitMqTlsEnabled;
+    private final boolean rabbitMqTlsAllowInvalidHostnames;
     private final String transactionsQueueName;
     private final String citationsQueueName;
     private final String tlsTruststorePath;
@@ -142,6 +143,7 @@ public final class AppConfig {
             String rabbitMqPassword,
             String rabbitMqVirtualHost,
             boolean rabbitMqTlsEnabled,
+            boolean rabbitMqTlsAllowInvalidHostnames,
             String transactionsQueueName,
             String citationsQueueName,
             String tlsTruststorePath,
@@ -164,6 +166,7 @@ public final class AppConfig {
         this.rabbitMqPassword = rabbitMqPassword;
         this.rabbitMqVirtualHost = rabbitMqVirtualHost;
         this.rabbitMqTlsEnabled = rabbitMqTlsEnabled;
+        this.rabbitMqTlsAllowInvalidHostnames = rabbitMqTlsAllowInvalidHostnames;
         this.transactionsQueueName = transactionsQueueName;
         this.citationsQueueName = citationsQueueName;
         this.tlsTruststorePath = tlsTruststorePath;
@@ -277,6 +280,10 @@ public final class AppConfig {
                 environment,
                 "RABBITMQ_TLS_ENABLED",
                 String.valueOf(DEFAULT_TLS_ENABLED)));
+        boolean rabbitMqTlsAllowInvalidHostnames = Boolean.parseBoolean(readOrDefault(
+                environment,
+                "RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES",
+                "true"));
         int connectionTimeoutMs = parsePositiveInt(
                 readOrDefault(
                         environment,
@@ -355,6 +362,7 @@ public final class AppConfig {
                 password,
                 virtualHost,
                 tlsEnabled,
+                rabbitMqTlsAllowInvalidHostnames,
                 transactionsQueue,
                 citationsQueue,
                 tlsTruststorePath,
@@ -426,7 +434,7 @@ public final class AppConfig {
      * @return {@code true} when TLS should be enabled
      */
     public boolean isRabbitMqTlsAllowInvalidHostnames() {
-        return Boolean.parseBoolean(System.getenv().getOrDefault("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true"));
+        return rabbitMqTlsAllowInvalidHostnames;
     }
 
     /**

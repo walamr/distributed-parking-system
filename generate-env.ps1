@@ -44,6 +44,11 @@ $bytes = New-Object Byte[] 32
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 $DYNAMIC_HMAC_SECRET = [System.BitConverter]::ToString($bytes) -replace '-'
 
+# Dynamically generate a cryptographically secure random Erlang cookie
+$cookieBytes = New-Object Byte[] 24
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($cookieBytes)
+$DYNAMIC_ERLANG_COOKIE = [System.BitConverter]::ToString($cookieBytes) -replace '-'
+
 function Get-CommonEnvContent {
     param([string]$mongoUser, [string]$mongoPass)
     
@@ -160,7 +165,7 @@ MONGO3_IP=${MONGO3_IP}
 CUSTOMER_IP=${CUSTOMER_IP}
 PEO_IP=${PEO_IP}
 MO_IP=${MO_IP}
-RABBITMQ_ERLANG_COOKIE=rotated-secure-cookie-abc123xyz890
+RABBITMQ_ERLANG_COOKIE=$DYNAMIC_ERLANG_COOKIE
 "@
 $mainEnv | Out-File -FilePath ".env" -Encoding utf8
 Write-Host "Updated: .env"

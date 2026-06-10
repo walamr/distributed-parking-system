@@ -32,21 +32,59 @@ Write-Host "Configuring /parking Virtual Host and Users..."
 Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_vhost", "/parking")
 Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("delete_user", "guest") 2>$null
 
+function Get-EnvValue {
+    param([string]$filePath, [string]$key)
+    if (Test-Path $filePath) {
+        $line = Get-Content $filePath | Where-Object { $_ -match "^\s*${key}\s*=(.*)" }
+        if ($line) {
+            $val = ($line -split "=", 2)[1].Trim()
+            if ($val.StartsWith("'") -or $val.StartsWith("""")) {
+                $val = $val.Substring(1, $val.Length - 2)
+            }
+            return $val
+        }
+    }
+    return $null
+}
+
+$adminPass = Get-EnvValue "env-configs/mo.env" "RABBITMQ_PASSWORD"
+if (-not $adminPass) { $adminPass = "admin_pwd_rotated" }
+
+$peoPass = Get-EnvValue "env-configs/peo.env" "RABBITMQ_PASSWORD"
+if (-not $peoPass) { $peoPass = "peo_pwd_rotated" }
+
+$customerPass = Get-EnvValue "env-configs/customer.env" "RABBITMQ_PASSWORD"
+if (-not $customerPass) { $customerPass = "customer_pwd_rotated" }
+
+$queuePass = Get-EnvValue "env-configs/queue-server.env" "RABBITMQ_PASSWORD"
+if (-not $queuePass) { $queuePass = "queue_pwd_rotated" }
+
+$storagePass = Get-EnvValue "env-configs/storage-server.env" "RABBITMQ_PASSWORD"
+if (-not $storagePass) { $storagePass = "storage_pwd_rotated" }
+
 # Create/Update Users
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "mulligan_admin", "admin_ultra_secure_99") 2>$null
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "mulligan_admin", "admin_ultra_secure_99")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "mulligan_admin", $adminPass) 2>$null
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "mulligan_admin", $adminPass)
 Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_user_tags", "mulligan_admin", "administrator")
 
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "peo_service", "peo_secure_pass_2026") 2>$null
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "peo_service", "peo_secure_pass_2026")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "peo_service", $peoPass) 2>$null
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "peo_service", $peoPass)
 
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "customer", "customer_secure_pass_2026") 2>$null
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "customer", "customer_secure_pass_2026")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "customer", $customerPass) 2>$null
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "customer", $customerPass)
+
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "queue_service", $queuePass) 2>$null
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "queue_service", $queuePass)
+
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("add_user", "storage_service", $storagePass) 2>$null
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("change_password", "storage_service", $storagePass)
 
 # Set Permissions (Hardening R1-A-01 / R1-A-02)
 Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "mulligan_admin", ".*", ".*", ".*")
 Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "customer", "^(amq\.default|transactions\.queue)$", "^(amq\.default|transactions\.queue)$", "^$")
-Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "peo_service", "^(amq\.default|transactions\.queue|citations\.queue)$", "^(amq\.default|transactions\.queue|citations\.queue)$", "^(amq\.default|transactions\.queue|citations\.queue)$")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "peo_service", "^(amq\.default|transactions\.queue|citations\.queue)$", "^(amq\.default|transactions\.queue|citations\.queue)$", "^$")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "queue_service", "^(amq\.default|transactions\.queue|citations\.queue|parking\.dlx|transactions\.dlq|citations\.dlq)$", "^(amq\.default|transactions\.queue|citations\.queue|parking\.dlx|transactions\.dlq|citations\.dlq)$", "^(amq\.default|transactions\.queue|citations\.queue|parking\.dlx|transactions\.dlq|citations\.dlq)$")
+Invoke-RabbitMqCtl -ContainerName $PrimaryNode -Arguments @("set_permissions", "-p", "/parking", "storage_service", "^(amq\.default|transactions\.queue|citations\.queue)$", "^(amq\.default|transactions\.queue|citations\.queue)$", "^(amq\.default|transactions\.queue|citations\.queue)$")
 
 
 Write-Host "RabbitMQ cluster status:"

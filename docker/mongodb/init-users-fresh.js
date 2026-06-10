@@ -12,20 +12,4 @@ db.createUser({
 });
 print("Created MongoDB user: " + adminUser);
 
-db.auth(adminUser, adminPassword);
-
-db.createUser({
-  user: "peo_db_user",
-  pwd: "db_pwd_rotated_peo",
-  roles: [ { role: "readWrite", db: "parking_db" } ]
-});
-print("Created MongoDB user: peo_db_user");
-
-db.createUser({
-  user: "customer_db_user",
-  pwd: "db_pwd_rotated_cust",
-  roles: [ { role: "read", db: "parking_db" } ]
-});
-print("Created MongoDB user: customer_db_user");
-
-print("--- MongoDB RBAC Users Ready in Admin DB ---");
+print("--- MongoDB Root Admin User Ready in Admin DB ---");
