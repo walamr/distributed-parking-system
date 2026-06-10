@@ -36,9 +36,14 @@ public final class MongoConnectionManager implements AutoCloseable {
                 builder.enabled(true);
                 builder.invalidHostNameAllowed(config.isMongoTlsAllowInvalidHostnames());
                 try {
-                    builder.context(TlsUtils.createTrustOnlySslContextFromPem(config.getMongoTlsCaCertPath()));
+                    builder.context(TlsUtils.createSslContext(
+                        config.getTlsTruststorePath(),
+                        config.getTlsTruststorePassword(),
+                        config.getTlsKeystorePath(),
+                        config.getTlsKeystorePassword()
+                    ));
                 } catch (Exception ex) {
-                    logger.severe("Could not load CA cert from: " + config.getMongoTlsCaCertPath() + ". TLS context might be invalid.");
+                    logger.severe("Could not load certificates for mTLS. TLS context might be invalid: " + ex.getMessage());
                 }
             });
         }

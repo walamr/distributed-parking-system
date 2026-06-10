@@ -79,7 +79,7 @@ public final class AppConfig {
         /**
          * Profile for the backend Storage Server microservice.
          */
-        STORAGE_SERVER("storage_service", "storage_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo"),
+        STORAGE_SERVER("storage_service", "storage_pwd_rotated", "storage_db_user", "db_pwd_rotated_storage"),
 
         /**
          * Profile used by integration smoke tests to verify infrastructure sanity.

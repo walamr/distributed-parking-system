@@ -80,6 +80,6 @@ class AppConfigTest {
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
-        assertEquals("mongodb://peo_db_user:db_pwd_rotated_peo@10.0.201.25:27017/parking_db", config.getMongoUri());
+        assertEquals("mongodb://storage_db_user:db_pwd_rotated_storage@10.0.201.25:27017/parking_db", config.getMongoUri());
     }
 }

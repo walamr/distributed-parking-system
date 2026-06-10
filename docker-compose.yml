@@ -37,7 +37,6 @@ services:
       HOME: /tmp
     ports:
       - "127.0.0.1:5673:5671"
-      - "127.0.0.1:15673:15671"
     volumes:
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
@@ -63,7 +62,6 @@ services:
       HOME: /tmp
     ports:
       - "127.0.0.1:5674:5671"
-      - "127.0.0.1:15674:15671"
     volumes:
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
