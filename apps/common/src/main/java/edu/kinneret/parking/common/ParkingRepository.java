@@ -12,11 +12,14 @@ import com.mongodb.ReadPreference;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * High-level repository for accessing parking data in the MongoDB cluster.
  */
 public class ParkingRepository implements AutoCloseable {
+    private static final Logger logger = Logger.getLogger(ParkingRepository.class.getName());
     private final MongoConnectionManager connectionManager;
     private final MongoDatabase database;
     /**
@@ -213,8 +216,7 @@ public class ParkingRepository implements AutoCloseable {
             System.out.println("[DB-DEBUG] database query succeeded and returned " + history.size() + " documents.");
         } catch (Exception e) {
             System.out.println("[DB-DEBUG] database query failed with exception: " + e.getMessage());
-            System.err.println("Error querying vehicle history from database: " + e.getMessage());
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Error querying vehicle history from database: " + e.getMessage(), e);
         }
         return history;
     }

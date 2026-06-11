@@ -7,6 +7,8 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 import edu.kinneret.parking.common.ui.PhoneFrameBuilder;
 import edu.kinneret.parking.common.ui.LoginController;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Main graphical entry point for the Mulligan Parking System Unified Gateway.
@@ -14,6 +16,8 @@ import edu.kinneret.parking.common.ui.LoginController;
  * across PEO, Customer, and Municipality (MO) application views.
  */
 public class MulliganApp extends Application {
+    private static final Logger logger = Logger.getLogger(MulliganApp.class.getName());
+
     /**
      * Default constructor for MulliganApp.
      */
@@ -161,7 +165,7 @@ public class MulliganApp extends Application {
                     });
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.log(Level.SEVERE, "Exception routing logged-in user", e);
             }
         };
 
@@ -218,7 +222,7 @@ public class MulliganApp extends Application {
                     });
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.log(Level.SEVERE, "Exception routing signed-up user", e);
             }
         };
 
@@ -231,7 +235,7 @@ public class MulliganApp extends Application {
             primaryStage.setScene(scene);
             primaryStage.show();
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Exception during MulliganApp start", e);
         }
     }
 

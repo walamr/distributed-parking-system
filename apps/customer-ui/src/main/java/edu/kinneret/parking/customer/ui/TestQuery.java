@@ -37,7 +37,7 @@ public class TestQuery {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("[TEST-QUERY] Error: " + e.getMessage());
         }
     }
 }

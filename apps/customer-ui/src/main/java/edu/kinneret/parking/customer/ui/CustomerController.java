@@ -1496,7 +1496,7 @@ public class CustomerController {
 
         task.setOnFailed(e -> {
             if (task.getException() != null) {
-                task.getException().printStackTrace();
+                logger.error("Recommender fetch task failed", task.getException());
             }
             requestLabel.setText("Failed");
             resultLabel.setText("Node unreachable");

@@ -3,11 +3,14 @@ package edu.kinneret.parking.queue;
 import edu.kinneret.parking.common.AppConfig;
 import edu.kinneret.parking.common.RabbitMqConnectionManager;
 import edu.kinneret.parking.common.SecurityLogger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Main entry point for the queue-server foundation.
  */
 public final class QueueServerApplication {
+    private static final Logger logger = Logger.getLogger(QueueServerApplication.class.getName());
 
     private QueueServerApplication() {
     }
@@ -34,7 +37,7 @@ public final class QueueServerApplication {
             consumerService.start();
         } catch (Exception e) {
             SecurityLogger.logSecurityEvent("Queue server startup failed: " + e.toString());
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Queue server startup failed", e);
             System.err.println("Queue server startup failed. See server logs for details.");
             System.exit(1);
         }

@@ -36,7 +36,7 @@ public class TestClient {
             socket.startHandshake();
             System.out.println("Handshake successful");
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Test client run failed: " + e.getMessage());
         }
     }
 }

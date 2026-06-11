@@ -25,3 +25,7 @@ docker/rabbitmq/certs/*.jks
 docker/rabbitmq/certs/*.p12
 docker/mongodb/certs/mongo*.pem
 docker/mongodb/certs/mongodb-keyfile
+
+# Ignore environment config containing actual secrets
+.env
+
