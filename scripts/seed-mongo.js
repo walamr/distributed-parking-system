@@ -14,8 +14,7 @@ const zones = {
 const spaces = [];
 
 for (let i = 1; i <= 100; i++) {
-    let zoneId = Math.floor((i - 1) / 10);
-    if (zoneId === 0) zoneId = 10;
+    let zoneId = ((i - 1) % 10) + 1;
     
     spaces.push({
         spaceId: i.toString(),

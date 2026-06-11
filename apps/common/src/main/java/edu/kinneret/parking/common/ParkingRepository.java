@@ -106,7 +106,7 @@ public class ParkingRepository implements AutoCloseable {
             int id = parseSpaceNumber(spaceId);
             if (id >= 1 && id <= 100) {
                 double[] rates = {1.77, 70.23, 56.33, 24.36, 43.27, 35.37, 87.99, 56.22, 17.29, 55.27};
-                return BigDecimal.valueOf(rates[(id - 1) / 10]);
+                return BigDecimal.valueOf(rates[(id - 1) % 10]);
             }
         } catch (Exception ignored) {}
         return BigDecimal.ZERO;
@@ -136,7 +136,7 @@ public class ParkingRepository implements AutoCloseable {
             int id = parseSpaceNumber(spaceId);
             if (id >= 1 && id <= 100) {
                 String[] zones = {"Magnolia Way", "Summit Ln", "Fifth Dr", "Downing Ave", "Elm Ct", "Central Way", "Queen St", "Main St", "Lansdowne Blvd", "Adams Ave"};
-                return zones[(id - 1) / 10];
+                return zones[(id - 1) % 10];
             }
         } catch (Exception ignored) {}
         return "Unknown";

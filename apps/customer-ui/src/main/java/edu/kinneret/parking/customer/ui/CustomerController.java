@@ -296,7 +296,7 @@ public class CustomerController {
             boolean showSessionData = isMatchingActiveSpace || isMatchingJustStopped;
             boolean hasRecommendation = requestLabel != null && requestLabel.getText() != null && !"-".equals(requestLabel.getText());
             boolean showRec = !showSessionData && hasRecommendation;
-            boolean shouldShowCard = hasStatus || showSessionData || showRec;
+            boolean shouldShowCard = hasRate || hasStatus || showSessionData || showRec;
 
             Platform.runLater(() -> {
                 if (this.infoCard != null) {
@@ -470,7 +470,7 @@ public class CustomerController {
                                     if (id >= 1 && id <= 100) {
                                         double[] rates = { 1.77, 70.23, 56.33, 24.36, 43.27, 35.37, 87.99, 56.22, 17.29,
                                                 55.27 };
-                                        rate = BigDecimal.valueOf(rates[(id - 1) / 10]);
+                                        rate = BigDecimal.valueOf(rates[(id - 1) % 10]);
                                     }
                                 }
                             } catch (Exception ignored) {
@@ -558,7 +558,7 @@ public class CustomerController {
                                                 if (id >= 1 && id <= 100) {
                                                     double[] rates = { 1.77, 70.23, 56.33, 24.36, 43.27, 35.37, 87.99,
                                                             56.22, 17.29, 55.27 };
-                                                    rate = BigDecimal.valueOf(rates[(id - 1) / 10]);
+                                                    rate = BigDecimal.valueOf(rates[(id - 1) % 10]);
                                                 }
                                             }
                                         } catch (Exception ignored) {
@@ -1039,8 +1039,8 @@ public class CustomerController {
                     double[] rates = { 1.77, 70.23, 56.33, 24.36, 43.27, 35.37, 87.99, 56.22, 17.29, 55.27 };
                     String[] zones = { "Magnolia Way", "Summit Ln", "Fifth Dr", "Downing Ave", "Elm Ct", "Central Way",
                             "Queen St", "Main St", "Lansdowne Blvd", "Adams Ave" };
-                    localRate = BigDecimal.valueOf(rates[(id - 1) / 10]);
-                    localZone = zones[(id - 1) / 10];
+                    localRate = BigDecimal.valueOf(rates[(id - 1) % 10]);
+                    localZone = zones[(id - 1) % 10];
                 }
             }
         } catch (Exception ignored) {

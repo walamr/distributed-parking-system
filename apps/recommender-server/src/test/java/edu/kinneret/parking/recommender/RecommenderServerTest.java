@@ -116,15 +116,15 @@ public class RecommenderServerTest {
         try (ParkingRepository occupiedRepo = new ParkingRepository(appConfig) {
             @Override
             public Document getLatestTransactionForSpace(String spaceId) {
-                if ("3".equals(spaceId)) {
+                if ("13".equals(spaceId)) {
                     return new Document("type", "transaction.start")
                             .append("payload", new Document("action", "start"));
                 }
                 return null;
             }
         }) {
-            String result = server.calculateLocalRecommendation("3", occupiedRepo);
-            assertTrue(result.contains("Result: Space 2;0, Space 4;0"), "Expected recommendation to be Space 2;0, Space 4;0 but was: " + result);
+            String result = server.calculateLocalRecommendation("13", occupiedRepo);
+            assertTrue(result.contains("Result: Space 3;0, Space 23;0"), "Expected recommendation to be Space 3;0, Space 23;0 but was: " + result);
         }
     }
 
