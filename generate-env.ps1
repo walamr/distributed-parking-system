@@ -49,6 +49,11 @@ $cookieBytes = New-Object Byte[] 24
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($cookieBytes)
 $DYNAMIC_ERLANG_COOKIE = [System.BitConverter]::ToString($cookieBytes) -replace '-'
 
+# Dynamically generate a cryptographically secure random keystore/truststore password
+$keystoreBytes = New-Object Byte[] 16
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keystoreBytes)
+$DYNAMIC_KEYSTORE_PASSWORD = [System.BitConverter]::ToString($keystoreBytes) -replace '-'
+
 function Get-CommonEnvContent {
     param([string]$mongoUser, [string]$mongoPass)
     
@@ -66,21 +71,27 @@ RABBITMQ_NODES=${RABBIT1_IP}:${R1_P},${RABBIT2_IP}:${R2_P},${RABBIT3_IP}:${R3_P}
 RABBITMQ_VHOST=/parking
 RABBITMQ_TLS_ENABLED=true
 RABBITMQ_TRUSTSTORE_PATH=docker/rabbitmq/certs/truststore.jks
-RABBITMQ_TRUSTSTORE_PASSWORD=password
+RABBITMQ_TRUSTSTORE_PASSWORD=$DYNAMIC_KEYSTORE_PASSWORD
 RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
-RABBITMQ_KEYSTORE_PASSWORD=password
-RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
+RABBITMQ_KEYSTORE_PASSWORD=$DYNAMIC_KEYSTORE_PASSWORD
+RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=false
 RABBITMQ_CONNECTION_TIMEOUT_MS=5000
 RABBITMQ_RECOVERY_INTERVAL_MS=5000
 
 MONGO_URI=mongodb://${mongoUser}:${mongoPass}@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
-MONGO_TLS_ALLOW_INVALID_HOSTNAMES=true
+MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
 MONGO_PASSWORD=${mongoPass}
 
 HMAC_SECRET=$DYNAMIC_HMAC_SECRET
 NONCE_TTL_SECONDS=60
+
+# Rotated MongoDB user passwords for dynamic script consumption
+MONGO_ADMIN_PASSWORD=db_pwd_rotated_admin
+MONGO_STORAGE_PASSWORD=db_pwd_rotated_storage
+MONGO_PEO_PASSWORD=db_pwd_rotated_peo
+MONGO_CUSTOMER_PASSWORD=db_pwd_rotated_cust
 "@
 }
 
@@ -140,20 +151,26 @@ RABBITMQ_NODES=${RABBIT1_IP}:${R1_P},${RABBIT2_IP}:${R2_P},${RABBIT3_IP}:${R3_P}
 RABBITMQ_VHOST=/parking
 RABBITMQ_TLS_ENABLED=true
 RABBITMQ_TRUSTSTORE_PATH=docker/rabbitmq/certs/truststore.jks
-RABBITMQ_TRUSTSTORE_PASSWORD=password
+RABBITMQ_TRUSTSTORE_PASSWORD=$DYNAMIC_KEYSTORE_PASSWORD
 RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
-RABBITMQ_KEYSTORE_PASSWORD=password
-RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
+RABBITMQ_KEYSTORE_PASSWORD=$DYNAMIC_KEYSTORE_PASSWORD
+RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=false
 RABBITMQ_PASSWORD=admin_pwd_rotated
 
 MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
-MONGO_TLS_ALLOW_INVALID_HOSTNAMES=true
+MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
 MONGO_PASSWORD=db_pwd_rotated_admin
 
 HMAC_SECRET=$DYNAMIC_HMAC_SECRET
 NONCE_TTL_SECONDS=60
+
+# Rotated MongoDB user passwords for dynamic script consumption
+MONGO_ADMIN_PASSWORD=db_pwd_rotated_admin
+MONGO_STORAGE_PASSWORD=db_pwd_rotated_storage
+MONGO_PEO_PASSWORD=db_pwd_rotated_peo
+MONGO_CUSTOMER_PASSWORD=db_pwd_rotated_cust
 
 # Individual IPs for Docker Compose variable interpolation
 RABBIT1_IP=${RABBIT1_IP}

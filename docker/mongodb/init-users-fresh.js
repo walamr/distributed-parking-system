@@ -3,7 +3,7 @@
 db = db.getSiblingDB('admin');
 
 const adminUser = "mulligan_db_admin";
-const adminPassword = "db_pwd_rotated_admin";
+const adminPassword = typeof dbAdminPass !== 'undefined' ? dbAdminPass : "db_pwd_rotated_admin";
 
 db.createUser({
   user: adminUser,

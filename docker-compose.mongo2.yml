@@ -12,7 +12,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --port 27017 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --tlsAllowInvalidHostnames --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --port 27017 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "0.0.0.0:27017:27017"

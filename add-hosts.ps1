@@ -2,7 +2,10 @@ $hostsPath = "C:\Windows\System32\drivers\etc\hosts"
 $entries = @(
     "127.0.0.1 mongo1",
     "127.0.0.1 mongo2",
-    "127.0.0.1 mongo3"
+    "127.0.0.1 mongo3",
+    "127.0.0.1 rabbitmq1",
+    "127.0.0.1 rabbitmq2",
+    "127.0.0.1 rabbitmq3"
 )
 $currentContent = Get-Content $hostsPath -Raw
 $toAdd = @()

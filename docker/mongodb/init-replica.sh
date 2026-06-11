@@ -10,7 +10,7 @@ TLS_ARGS=(
   --port 27017
 )
 
-ADMIN_URI="mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+ADMIN_URI="mongodb://mulligan_db_admin:${MONGO_ADMIN_PASSWORD:-db_pwd_rotated_admin}@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 OLD_ADMIN_URI="mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 
 TLS_RS_ARGS=(
@@ -43,14 +43,16 @@ until mongosh "${TLS_ARGS[@]}" --quiet --eval 'rs.isMaster().primary ? true : fa
 done
 
 echo "--- Creating or updating MongoDB demo users ---"
+EVAL_USERS="const dbAdminPass='${MONGO_ADMIN_PASSWORD:-db_pwd_rotated_admin}'; const dbStoragePass='${MONGO_STORAGE_PASSWORD:-db_pwd_rotated_storage}'; const dbPeoPass='${MONGO_PEO_PASSWORD:-db_pwd_rotated_peo}'; const dbCustPass='${MONGO_CUSTOMER_PASSWORD:-db_pwd_rotated_cust}';"
+
 if mongosh "$ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
-  mongosh "$ADMIN_URI" /docker/mongodb/init-users.js
+  mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 elif mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
   echo "Old demo admin password detected; rotating users to current demo credentials."
-  mongosh "$OLD_ADMIN_URI" /docker/mongodb/init-users.js
+  mongosh "$OLD_ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 else
-  mongosh "${TLS_RS_ARGS[@]}" /docker/mongodb/init-users-fresh.js
-  mongosh "$ADMIN_URI" /docker/mongodb/init-users.js
+  mongosh "${TLS_RS_ARGS[@]}" --eval "$EVAL_USERS" /docker/mongodb/init-users-fresh.js
+  mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 fi
 
 echo "--- Importing idempotent demo seed data ---"

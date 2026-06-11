@@ -47,28 +47,34 @@ ensureRole({
   roles: []
 });
 
+// Determine passwords dynamically via global variables passed at execution, or fallback to default rotated passwords.
+var adminPass = typeof dbAdminPass !== 'undefined' ? dbAdminPass : "db_pwd_rotated_admin";
+var storagePass = typeof dbStoragePass !== 'undefined' ? dbStoragePass : "db_pwd_rotated_storage";
+var peoPass = typeof dbPeoPass !== 'undefined' ? dbPeoPass : "db_pwd_rotated_peo";
+var custPass = typeof dbCustPass !== 'undefined' ? dbCustPass : "db_pwd_rotated_cust";
+
 // 2. Ensure users exist
 ensureUser({
   user: "mulligan_db_admin",
-  pwd: "db_pwd_rotated_admin",
+  pwd: adminPass,
   roles: [ { role: "root", db: "admin" } ]
 });
 
 ensureUser({
   user: "storage_db_user",
-  pwd: "db_pwd_rotated_storage",
+  pwd: storagePass,
   roles: [ { role: "readWrite", db: "parking_db" } ]
 });
 
 ensureUser({
   user: "peo_db_user",
-  pwd: "db_pwd_rotated_peo",
+  pwd: peoPass,
   roles: [ { role: "peoReadRole", db: "admin" } ]
 });
 
 ensureUser({
   user: "customer_db_user",
-  pwd: "db_pwd_rotated_cust",
+  pwd: custPass,
   roles: [ { role: "customerRole", db: "admin" } ]
 });
 

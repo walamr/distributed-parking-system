@@ -2,6 +2,28 @@
 $OPENSSL = "C:\Program Files\Git\usr\bin\openssl.exe"
 $CERTS_DIR = "docker/rabbitmq/certs"
 
+$KEYSTORE_PASS = "password"
+$TRUSTSTORE_PASS = "password"
+
+# Load .env to read custom keystore passwords
+if (Test-Path ".env") {
+    Get-Content ".env" | Where-Object { $_ -match "^\s*[^#].*=.*" } | ForEach-Object {
+        $parts = $_ -split "=", 2
+        $key = $parts[0].Trim()
+        $val = $parts[1].Trim()
+        if ($val.StartsWith('"') -and $val.EndsWith('"')) { $val = $val.Substring(1, $val.Length - 2) }
+        if ($val.StartsWith("'") -and $val.EndsWith("'")) { $val = $val.Substring(1, $val.Length - 2) }
+        [System.Environment]::SetEnvironmentVariable($key, $val)
+    }
+}
+
+if ($env:RABBITMQ_KEYSTORE_PASSWORD) {
+    $KEYSTORE_PASS = $env:RABBITMQ_KEYSTORE_PASSWORD
+}
+if ($env:RABBITMQ_TRUSTSTORE_PASSWORD) {
+    $TRUSTSTORE_PASS = $env:RABBITMQ_TRUSTSTORE_PASSWORD
+}
+
 if (-not (Test-Path $CERTS_DIR)) {
     New-Item -ItemType Directory -Path $CERTS_DIR
 } else {
@@ -59,13 +81,13 @@ $CLIENT_CONFIG | Out-File -FilePath "$CERTS_DIR/client.cnf" -Encoding ascii
 
 Write-Host "--- Converting to PKCS12 and JKS for Java ---"
 # Create PKCS12 for the client
-& $OPENSSL pkcs12 -export -in "$CERTS_DIR/client-cert.pem" -inkey "$CERTS_DIR/client-key.pem" -out "$CERTS_DIR/client.p12" -name "parking-client" -passout pass:password
+& $OPENSSL pkcs12 -export -in "$CERTS_DIR/client-cert.pem" -inkey "$CERTS_DIR/client-key.pem" -out "$CERTS_DIR/client.p12" -name "parking-client" -passout "pass:$KEYSTORE_PASS"
 
 # Create Truststore for Java (containing CA)
-keytool -importcert -file "$CERTS_DIR/ca-cert.pem" -alias mulligan-ca -keystore "$CERTS_DIR/truststore.jks" -storepass password -noprompt
+keytool -importcert -file "$CERTS_DIR/ca-cert.pem" -alias mulligan-ca -keystore "$CERTS_DIR/truststore.jks" -storepass "$TRUSTSTORE_PASS" -noprompt
 
 # Create Keystore for Java (containing Client Cert)
-keytool -importkeystore -srckeystore "$CERTS_DIR/client.p12" -srcstoretype PKCS12 -srcstorepass password -destkeystore "$CERTS_DIR/keystore.jks" -deststorepass password
+keytool -importkeystore -srckeystore "$CERTS_DIR/client.p12" -srcstoretype PKCS12 -srcstorepass "$KEYSTORE_PASS" -destkeystore "$CERTS_DIR/keystore.jks" -deststorepass "$KEYSTORE_PASS"
 
 Write-Host "--- Generating MongoDB Cluster Certificates ---"
 $MONGO_CERTS_DIR = "docker/mongodb/certs"

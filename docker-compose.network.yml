@@ -36,7 +36,6 @@ services:
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
     ports:
       - "0.0.0.0:5671:5671"
-      - "0.0.0.0:15671:15671"
     volumes:
       - rabbitmq2-data-v3:/var/lib/rabbitmq
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
@@ -61,7 +60,6 @@ services:
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
     ports:
       - "0.0.0.0:5671:5671"
-      - "0.0.0.0:15671:15671"
     volumes:
       - rabbitmq3-data-v3:/var/lib/rabbitmq
       - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
@@ -83,7 +81,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       # <- Changed 127.0.0.1 to 0.0.0.0 and unified port to 27017
@@ -102,7 +100,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "0.0.0.0:27017:27017"
@@ -120,7 +118,7 @@ services:
       cp /etc/mongo/certs/mongodb-keyfile /tmp/mongodb-keyfile &&
       chmod 600 /tmp/mongodb-keyfile &&
       chown mongodb:mongodb /tmp/mongodb-keyfile &&
-      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/mongodb-keyfile
+      mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/mongodb-keyfile
       "
     ports:
       - "0.0.0.0:27017:27017"

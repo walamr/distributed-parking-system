@@ -100,11 +100,11 @@ public class CustomerCLI {
                     }
                 } else {
                     System.out.println("\nStatus: LOGGED IN as '" + loggedInUser + "' (Vehicle VIN: '" + loggedInVin + "')");
-                    System.out.println("Options: [1] Start Parking, [2] Stop Parking, [3] List Parking Events (History), [4] List All Registered Vehicles, [5] Recommend Parking, [6] Logout, [7] Exit");
+                    System.out.println("Options: [1] Start Parking, [2] Stop Parking, [3] List Parking Events (History), [4] Recommend Parking, [5] Logout, [6] Exit");
                     System.out.print("Select: ");
                     String choice = scanner.nextLine();
 
-                    if ("7".equals(choice)) break;
+                    if ("6".equals(choice)) break;
 
                     switch (choice) {
                         case "1":
@@ -130,17 +130,6 @@ public class CustomerCLI {
                             }
                             break;
                         case "4":
-                            try {
-                                List<Document> vehicles = repository.getAllVehicles();
-                                System.out.println("Registered Vehicles in System (" + vehicles.size() + " found):");
-                                for (Document vehicle : vehicles) {
-                                    System.out.println(" - VIN: " + vehicle.get("vehicleId") + " (Owner: " + vehicle.get("owner") + ", Type: " + vehicle.get("accountType") + ")");
-                                }
-                            } catch (Exception e) {
-                                System.err.println("ERROR: Unable to retrieve vehicles list from the database.");
-                            }
-                            break;
-                        case "5":
                             System.out.print("Enter Space ID to base recommendation on: ");
                             String spaceIdRec = scanner.nextLine().trim();
                             System.out.print("Select Recommender Node (1: port 8091, 2: port 8092, 3: port 8093) [Default 1]: ");
@@ -153,7 +142,7 @@ public class CustomerCLI {
                             }
                             queryRecommender(spaceIdRec, port, config, signer);
                             break;
-                        case "6":
+                        case "5":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
                             loggedInUser = null;
                             loggedInVin = null;
