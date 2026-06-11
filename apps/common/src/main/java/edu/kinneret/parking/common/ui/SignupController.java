@@ -271,7 +271,7 @@ public class SignupController {
         // Save in static in-memory map
         LoginController.signupPasswords.put(username, password);
         LoginController.signupRoles.put(username, role);
-        if ("Customer".equals(role)) {
+        if (vin != null && !vin.isEmpty()) {
             LoginController.signupVins.put(username, vin);
         }
 

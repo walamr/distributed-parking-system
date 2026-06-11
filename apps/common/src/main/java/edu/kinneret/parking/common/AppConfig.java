@@ -60,32 +60,32 @@ public final class AppConfig {
         /**
          * Profile for the Customer User Interface application.
          */
-        CUSTOMER_UI("customer", "REQUIRED_BUT_MISSING", "customer_db_user", "REQUIRED_BUT_MISSING"),
+        CUSTOMER_UI("customer", "customer_pwd_rotated", "customer_db_user", "db_pwd_rotated_cust"),
 
         /**
          * Profile for the Parking Enforcement Officer UI application.
          */
-        PEO_UI("peo_service", "REQUIRED_BUT_MISSING", "peo_db_user", "REQUIRED_BUT_MISSING"),
+        PEO_UI("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo"),
 
         /**
          * Profile for the Municipality Officer UI application.
          */
-        MO_UI("mulligan_admin", "REQUIRED_BUT_MISSING", "mulligan_db_admin", "REQUIRED_BUT_MISSING"),
+        MO_UI("mulligan_admin", "admin_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
 
         /**
          * Profile for the main message Queue Server backend daemon.
          */
-        QUEUE_SERVER("queue_service", "REQUIRED_BUT_MISSING", "mulligan_db_admin", "REQUIRED_BUT_MISSING"),
+        QUEUE_SERVER("queue_service", "queue_pwd_rotated", "mulligan_db_admin", "db_pwd_rotated_admin"),
 
         /**
          * Profile for the backend Storage Server microservice.
          */
-        STORAGE_SERVER("storage_service", "REQUIRED_BUT_MISSING", "storage_db_user", "REQUIRED_BUT_MISSING"),
+        STORAGE_SERVER("storage_service", "storage_pwd_rotated", "storage_db_user", "db_pwd_rotated_storage"),
 
         /**
          * Profile used by integration smoke tests to verify infrastructure sanity.
          */
-        SMOKE_TEST("peo_service", "REQUIRED_BUT_MISSING", "peo_db_user", "REQUIRED_BUT_MISSING");
+        SMOKE_TEST("peo_service", "peo_pwd_rotated", "peo_db_user", "db_pwd_rotated_peo");
 
         private final String defaultUsername;
         private final String defaultPassword;

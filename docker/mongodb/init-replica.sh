@@ -10,8 +10,16 @@ TLS_ARGS=(
   --port 27017
 )
 
-ADMIN_URI="mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
-OLD_ADMIN_URI="mongodb://mulligan_db_admin:db_pass_admin_99@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+ADMIN_URI="mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+OLD_ADMIN_URI="mongodb://mulligan_db_admin:db_pass_admin_99@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+
+TLS_RS_ARGS=(
+  --tls
+  --tlsAllowInvalidHostnames
+  --tlsCAFile /etc/mongo/certs/ca-cert.pem
+  --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem
+  --host rs0/mongo1:27017,mongo2:27018,mongo3:27019
+)
 
 echo "--- Waiting for mongo1 TLS listener ---"
 until mongosh "${TLS_ARGS[@]}" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; do
@@ -30,7 +38,7 @@ else
 fi
 
 echo "--- Waiting for primary election ---"
-until mongosh "${TLS_ARGS[@]}" --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; do
+until mongosh "${TLS_ARGS[@]}" --quiet --eval 'rs.isMaster().primary ? true : false' | grep -q true; do
   sleep 2
 done
 
@@ -41,7 +49,7 @@ elif mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >
   echo "Old demo admin password detected; rotating users to current demo credentials."
   mongosh "$OLD_ADMIN_URI" /docker/mongodb/init-users.js
 else
-  mongosh "${TLS_ARGS[@]}" /docker/mongodb/init-users-fresh.js
+  mongosh "${TLS_RS_ARGS[@]}" /docker/mongodb/init-users-fresh.js
   mongosh "$ADMIN_URI" /docker/mongodb/init-users.js
 fi
 

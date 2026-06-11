@@ -10,12 +10,12 @@ import org.junit.jupiter.api.Test;
 class AppConfigTest {
 
     @Test
-    void shouldThrowWhenPasswordsAreMissing() {
-        assertThrows(IllegalStateException.class, () -> {
-            AppConfig.fromEnvironment(
-                    AppConfig.ApplicationProfile.CUSTOMER_UI,
-                    Map.of("HMAC_SECRET", "test-secret-1234567890"));
-        });
+    void shouldUseHardcodedDefaultsWhenPasswordsAreMissing() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of("HMAC_SECRET", "test-secret-1234567890"));
+        assertEquals("customer", config.getRabbitMqUsername());
+        assertEquals("customer_pwd_rotated", config.getRabbitMqPassword());
     }
 
     @Test

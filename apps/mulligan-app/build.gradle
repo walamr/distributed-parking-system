@@ -88,6 +88,11 @@ shadowJar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+jar {
+    archiveClassifier = 'plain'
+    enabled = true
+}
+
 tasks.build.configure {
     dependsOn tasks.shadowJar
 }

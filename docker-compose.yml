@@ -18,6 +18,7 @@ services:
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
       - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq1-data-v3:/var/lib/rabbitmq
     networks:
       - rabbitmq-internal
     healthcheck:
@@ -44,6 +45,7 @@ services:
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
       - ./docker/rabbitmq/enabled_plugins_secondary:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq2-data-v3:/var/lib/rabbitmq
     networks:
       - rabbitmq-internal
     healthcheck:
@@ -70,6 +72,7 @@ services:
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
       - ./docker/rabbitmq/enabled_plugins_secondary:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq3-data-v3:/var/lib/rabbitmq
     networks:
       - rabbitmq-internal
     healthcheck:
@@ -202,7 +205,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER2_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender2 leaderPort=8092 isLeader=true malicious=${RECOMMENDER2_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8092:8092"
     networks:
@@ -241,7 +244,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER3_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender3 leaderPort=8093 isLeader=true malicious=${RECOMMENDER3_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8093:8093"
     networks:
