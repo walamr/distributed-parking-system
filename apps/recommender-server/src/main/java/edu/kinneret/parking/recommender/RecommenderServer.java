@@ -103,20 +103,24 @@ public class RecommenderServer implements AutoCloseable {
         this.appConfig = appConfig;
         this.signer = new SecureMessageSigner(appConfig.getHmacSecret());
         this.nonceStore = new NonceStore(appConfig);
+        javax.net.ssl.SSLContext cCtx = null;
+        javax.net.ssl.SSLContext sCtx = null;
         try {
-            this.clientSslContext = TlsUtils.createSslContext(
+            cCtx = TlsUtils.createSslContext(
                     appConfig.getTlsTruststorePath(),
                     appConfig.getTlsTruststorePassword(),
                     appConfig.getTlsKeystorePath(),
                     appConfig.getTlsKeystorePassword());
-            this.serverSslContext = TlsUtils.createSslContext(
+            sCtx = TlsUtils.createSslContext(
                     appConfig.getTlsTruststorePath(),
                     appConfig.getTlsTruststorePassword(),
                     appConfig.getTlsServerKeystorePath(),
                     appConfig.getTlsServerKeystorePassword());
         } catch (Exception e) {
-            throw new IllegalStateException("Recommender TLS/mTLS configuration is invalid.", e);
+            logger.warning("Recommender TLS/mTLS configuration is invalid. TLS features will be disabled: " + e.getMessage());
         }
+        this.clientSslContext = cCtx;
+        this.serverSslContext = sCtx;
     }
 
     /**
@@ -125,6 +129,9 @@ public class RecommenderServer implements AutoCloseable {
      * @throws IOException if the secure server socket cannot be opened
      */
     public void start() throws IOException {
+        if (serverSslContext == null || clientSslContext == null) {
+            throw new IllegalStateException("Cannot start RecommenderServer without valid TLS/mTLS configuration.");
+        }
         SSLServerSocketFactory factory = serverSslContext.getServerSocketFactory();
         SSLServerSocket tlsServerSocket = (SSLServerSocket) factory.createServerSocket(port);
         tlsServerSocket.setEnabledProtocols(enabledTlsProtocols(tlsServerSocket.getSupportedProtocols()));
