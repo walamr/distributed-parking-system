@@ -480,6 +480,25 @@ public class RecommenderServer implements AutoCloseable {
     }
 
     /**
+     * Normalizes a recommendation string to remove formatting variations.
+     *
+     * @param recommendation the raw recommendation string
+     * @return the normalized recommendation string
+     */
+    public static String normalizeRecommendation(String recommendation) {
+        if (recommendation == null) {
+            return "";
+        }
+        String clean = recommendation.trim().toUpperCase();
+        if ("NONE".equals(clean)) {
+            return "NONE";
+        }
+        // Remove prefixes like "SPACE" or "RESULT:" and all whitespace for normalization
+        clean = clean.replace("SPACE", "").replace("RESULT:", "").replaceAll("\\s+", "");
+        return clean;
+    }
+
+    /**
      * Determines the exact-list majority value from collected node votes.
      *
      * @param votes map of node identity to complete serialized recommendation list
@@ -488,6 +507,8 @@ public class RecommenderServer implements AutoCloseable {
      */
     public static String determineMajority(Map<String, String> votes, int majorityThreshold) {
         Map<String, Integer> counts = new HashMap<>();
+        Map<String, Map<String, Integer>> originalCounts = new HashMap<>();
+
         for (String vote : votes.values()) {
             if (vote != null && !vote.isBlank()) {
                 String recommendation = extractRecommendationList(vote);
@@ -496,19 +517,34 @@ public class RecommenderServer implements AutoCloseable {
                     cleanRec = cleanRec.substring(6).trim();
                 }
                 if (recommendation.equals("NONE") || cleanRec.matches("\\d+;\\d+(,\\s*(Space\\s*)?\\d+;\\d+)*")) {
-                    counts.put(recommendation, counts.getOrDefault(recommendation, 0) + 1);
+                    String norm = normalizeRecommendation(recommendation);
+                    counts.put(norm, counts.getOrDefault(norm, 0) + 1);
+                    originalCounts.computeIfAbsent(norm, k -> new HashMap<>())
+                                  .put(recommendation, originalCounts.get(norm).getOrDefault(recommendation, 0) + 1);
                 }
             }
         }
-        String consensus = null;
+        String consensusNorm = null;
         int maxVotes = 0;
         for (Map.Entry<String, Integer> entry : counts.entrySet()) {
             if (entry.getValue() > maxVotes) {
                 maxVotes = entry.getValue();
-                consensus = entry.getKey();
+                consensusNorm = entry.getKey();
             }
         }
-        return maxVotes >= majorityThreshold ? consensus : null;
+        if (maxVotes >= majorityThreshold && consensusNorm != null) {
+            Map<String, Integer> originals = originalCounts.get(consensusNorm);
+            String bestOriginal = null;
+            int bestCount = -1;
+            for (Map.Entry<String, Integer> origEntry : originals.entrySet()) {
+                if (origEntry.getValue() > bestCount) {
+                    bestCount = origEntry.getValue();
+                    bestOriginal = origEntry.getKey();
+                }
+            }
+            return bestOriginal;
+        }
+        return null;
     }
 
     public static String extractRecommendationList(String vote) {
@@ -626,18 +662,31 @@ public class RecommenderServer implements AutoCloseable {
 
         if (ParkingRepository.isDbOnline && repository.getDatabase() != null && !spaceIds.isEmpty()) {
             try {
-                // Batch query all transactions for spaceIds in the zone, sorted by latest first
+                // Batch query only the latest transactions for spaceIds in the zone using an aggregation pipeline
                 List<Document> txDocs = new ArrayList<>();
+                List<Document> pipeline = List.of(
+                        new Document("$match", new Document("$or", List.of(
+                                new Document("payload.spaceId", new Document("$in", spaceIds)),
+                                new Document("spaceId", new Document("$in", spaceIds))
+                        ))),
+                        new Document("$sort", new Document("timestamp", -1).append("storedAt", -1)),
+                        new Document("$group", new Document("_id", new Document("$cond", List.of(
+                                new Document("$ne", List.of(new Document("$ifNull", List.of("$payload.spaceId", "")), "")),
+                                "$payload.spaceId",
+                                "$spaceId"
+                        )))
+                        .append("latestDoc", new Document("$first", "$$ROOT")))
+                );
+                List<Document> aggResults = new ArrayList<>();
                 repository.getDatabase().getCollection("transactions")
-                        .find(com.mongodb.client.model.Filters.or(
-                                com.mongodb.client.model.Filters.in("payload.spaceId", spaceIds),
-                                com.mongodb.client.model.Filters.in("spaceId", spaceIds)
-                        ))
-                        .sort(com.mongodb.client.model.Sorts.orderBy(
-                                com.mongodb.client.model.Sorts.descending("timestamp"),
-                                com.mongodb.client.model.Sorts.descending("storedAt")
-                        ))
-                        .into(txDocs);
+                        .aggregate(pipeline)
+                        .into(aggResults);
+                for (Document res : aggResults) {
+                    Document doc = (Document) res.get("latestDoc");
+                    if (doc != null) {
+                        txDocs.add(doc);
+                    }
+                }
 
                 for (Document doc : txDocs) {
                     String spaceId = ParkingRepository.readPayloadField(doc, "spaceId");

@@ -184,6 +184,10 @@ public class CustomerApp extends Application {
         spaceNumberField.setPromptText("Enter space number");
         spaceNumberField.getStyleClass().add("text-field-editable");
 
+        TextField recommendationSpaceField = new TextField();
+        recommendationSpaceField.setPromptText("Enter space for recommendation");
+        recommendationSpaceField.getStyleClass().add("text-field-editable");
+
         Button startButton = new Button("🚗 Start Parking");
         startButton.getStyleClass().add("button-start");
         
@@ -273,7 +277,9 @@ public class CustomerApp extends Application {
         vinBox.getChildren().get(0).setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
         VBox spaceBox = new VBox(5, new Label("Parking Space Number *:"), spaceNumberField);
         spaceBox.getChildren().get(0).setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
-        VBox dashboardInputs = new VBox(16, vinBox, spaceBox);
+        VBox recSpaceBox = new VBox(5, new Label("Recommendation Space ID (1-100):"), recommendationSpaceField);
+        recSpaceBox.getChildren().get(0).setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
+        VBox dashboardInputs = new VBox(16, vinBox, spaceBox, recSpaceBox);
 
         VBox dashboardView = new VBox(25);
         VBox historyView = new VBox(25);
@@ -535,7 +541,7 @@ public class CustomerApp extends Application {
         controller.attachButtons(startButton, stopButton, fetchHistoryBtn, recommendButton);
         controller.attachTimer(infoCard, timerLabel, timerCostLabel, rateItem, timeItem, costItem, cardDivider, requestItem, resultItem, recDivider, requestLabel);
         controller.attachHistoryStatus(historyStatusLabel);
-        controller.attachRecommender(requestLabel, resultLabel);
+        controller.attachRecommender(requestLabel, resultLabel, recommendationSpaceField);
 
         // Restore persisted local transactions from disk (fix: stop operations survive app restarts)
         controller.loadPersistedTransactions(associatedVin);
