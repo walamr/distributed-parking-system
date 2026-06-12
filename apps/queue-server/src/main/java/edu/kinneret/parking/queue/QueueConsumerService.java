@@ -94,6 +94,7 @@ public final class QueueConsumerService {
      */
     public QueueMessageSecurityValidator.ValidationResult validateMessage(String rawMessage) {
         try {
+            ValidationUtils.requireSafePayloadSize(rawMessage, 65536);
             MessageEnvelope envelope = MessageEnvelope.fromJsonString(rawMessage);
             QueueMessageSecurityValidator.ValidationResult securityResult = validator.validate(envelope);
             if (!securityResult.accepted()) {

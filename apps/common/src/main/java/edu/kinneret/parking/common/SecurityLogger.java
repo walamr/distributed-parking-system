@@ -34,7 +34,55 @@ public final class SecurityLogger {
 
             // 5MB limit per file, 5 rotated logs, append mode
             FileHandler fileHandler = new FileHandler(logPath, 5242880, 5, true);
-            fileHandler.setFormatter(new SimpleFormatter());
+            fileHandler.setFormatter(new java.util.logging.Formatter() {
+                @Override
+                public String format(java.util.logging.LogRecord record) {
+                    String rawMsg = formatMessage(record);
+                    String sanitized = sanitize(rawMsg);
+                    String level = record.getLevel().toString();
+                    String time = java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.ofEpochMilli(record.getMillis()));
+                    
+                    StringBuilder json = new StringBuilder();
+                    json.append("{");
+                    json.append("\"timestamp\":\"").append(time).append("\",");
+                    json.append("\"level\":\"").append(level).append("\",");
+                    
+                    if (sanitized.contains("event=") && sanitized.contains("source=")) {
+                        String[] parts = sanitized.split(" ");
+                        for (int i = 0; i < parts.length; i++) {
+                            String[] kv = parts[i].split("=", 2);
+                            if (kv.length == 2) {
+                                String key = kv[0].trim();
+                                String value = kv[1].trim();
+                                json.append("\"").append(escapeJson(key)).append("\":\"").append(escapeJson(value)).append("\"");
+                                if (i < parts.length - 1) {
+                                    json.append(",");
+                                }
+                            }
+                        }
+                    } else if (sanitized.startsWith("[REJECTION]")) {
+                        json.append("\"event\":\"REJECTION\",");
+                        String details = sanitized.substring("[REJECTION]".length()).trim();
+                        String queue = "";
+                        String reason = "";
+                        if (details.contains("Queue:") && details.contains("Reason:")) {
+                            int qIdx = details.indexOf("Queue:");
+                            int rIdx = details.indexOf("| Reason:");
+                            if (rIdx > qIdx) {
+                                queue = details.substring(qIdx + 6, rIdx).trim();
+                                reason = details.substring(rIdx + 9).trim();
+                            }
+                        }
+                        json.append("\"queue\":\"").append(escapeJson(queue)).append("\",");
+                        json.append("\"reason\":\"").append(escapeJson(reason)).append("\",");
+                        json.append("\"message\":\"").append(escapeJson(sanitized)).append("\"");
+                    } else {
+                        json.append("\"message\":\"").append(escapeJson(sanitized)).append("\"");
+                    }
+                    json.append("}\n");
+                    return json.toString();
+                }
+            });
             fileHandler.setLevel(Level.INFO);
             
             logger.setUseParentHandlers(true); // Also log to console for visibility
@@ -47,6 +95,17 @@ public final class SecurityLogger {
             logger.log(Level.SEVERE, "Failed to initialize persistent security logging.", e);
             System.err.println("CRITICAL: Failed to initialize security logging. See application logs for details.");
         }
+    }
+
+    private static String escapeJson(String str) {
+        if (str == null) return "";
+        return str.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\b", "\\b")
+                  .replace("\f", "\\f")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
 
     /**

@@ -222,12 +222,13 @@ public class RecommenderServer implements AutoCloseable {
             sslSocket.setEnabledProtocols(enabledTlsProtocols(sslSocket.getSupportedProtocols()));
             sslSocket.startHandshake();
 
-            String line = reader.readLine();
+            String line = readBoundedLine(reader, 65536);
             if (line == null || line.isBlank()) {
                 logSecurity("INVALID_INPUT", remoteAddress(s), "empty request");
                 return;
             }
 
+            ValidationUtils.requireSafePayloadSize(line, 65536);
             JsonObject request = parseAndValidateRequest(line, remoteAddress(s));
             String type = request.get("type").getAsString();
             String spaceId = request.get("spaceId").getAsString();
@@ -368,53 +369,66 @@ public class RecommenderServer implements AutoCloseable {
         votes.putAll(explicitVotes);
 
         ExecutorService collectExecutor = Executors.newFixedThreadPool(10);
-        List<Future<Void>> futures = new ArrayList<>();
+        try {
+            List<Future<Void>> futures = new ArrayList<>();
 
-        for (NodeEndpoint endpoint : clusterNodes) {
-            if (endpoint.nodeId().equals(nodeId) || votes.containsKey(endpoint.nodeId())) {
-                continue;
-            }
+            for (NodeEndpoint endpoint : clusterNodes) {
+                if (endpoint.nodeId().equals(nodeId) || votes.containsKey(endpoint.nodeId())) {
+                    continue;
+                }
 
-            futures.add(collectExecutor.submit(() -> {
-                try (SSLSocket collectSocket = openTlsSocket(endpoint.host(), endpoint.port())) {
-                    try (PrintWriter collectWriter = new PrintWriter(collectSocket.getOutputStream(), true);
-                         BufferedReader collectReader = new BufferedReader(new InputStreamReader(collectSocket.getInputStream()))) {
-                        JsonObject collectRequest = createSignedMessage("COLLECT_REQUEST", spaceId, UUID.randomUUID().toString(), nodeId);
-                        signMessage(collectRequest, signer);
-                        collectWriter.println(collectRequest);
+                futures.add(collectExecutor.submit(() -> {
+                    try (SSLSocket collectSocket = openTlsSocket(endpoint.host(), endpoint.port())) {
+                        try (PrintWriter collectWriter = new PrintWriter(collectSocket.getOutputStream(), true);
+                             BufferedReader collectReader = new BufferedReader(new InputStreamReader(collectSocket.getInputStream()))) {
+                            JsonObject collectRequest = createSignedMessage("COLLECT_REQUEST", spaceId, UUID.randomUUID().toString(), nodeId);
+                            signMessage(collectRequest, signer);
+                            collectWriter.println(collectRequest);
 
-                        String reply = collectReader.readLine();
-                        if (reply != null) {
-                            JsonObject response = parseAndValidateResponse(reply, endpoint.host() + ":" + endpoint.port());
-                            String val = response.get("localResult").getAsString();
-                            String senderId = response.get("nodeId").getAsString();
-                            if (!endpoint.nodeId().equals(senderId)) {
-                                logSecurity("FAILED_AUTHENTICATION", endpoint.host() + ":" + endpoint.port(),
-                                        "collect response node identity mismatch");
-                                return null;
-                            }
-                            if (!val.isBlank()) {
-                                votes.put(senderId, val);
+                            String reply = collectReader.readLine();
+                            if (reply != null) {
+                                JsonObject response = parseAndValidateResponse(reply, endpoint.host() + ":" + endpoint.port());
+                                String val = response.get("localResult").getAsString();
+                                String senderId = response.get("nodeId").getAsString();
+                                if (!endpoint.nodeId().equals(senderId)) {
+                                    logSecurity("FAILED_AUTHENTICATION", endpoint.host() + ":" + endpoint.port(),
+                                            "collect response node identity mismatch");
+                                    return null;
+                                }
+                                if (!val.isBlank()) {
+                                    votes.put(senderId, val);
+                                }
                             }
                         }
+                    } catch (Exception e) {
+                        logger.warning("Leader node '" + nodeId + "' failed to collect result from "
+                                + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port());
                     }
-                } catch (Exception e) {
-                    logger.warning("Leader node '" + nodeId + "' failed to collect result from "
-                            + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port());
-                }
-                return null;
-            }));
-        }
+                    return null;
+                }));
+            }
 
-        for (Future<Void> fut : futures) {
+            for (Future<Void> fut : futures) {
+                try {
+                    fut.get(TIMEOUT_MS + 200, TimeUnit.MILLISECONDS);
+                } catch (Exception ignored) {
+                }
+            }
+        } finally {
+            collectExecutor.shutdown();
             try {
-                fut.get(TIMEOUT_MS + 200, TimeUnit.MILLISECONDS);
-            } catch (Exception ignored) {
+                if (!collectExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    collectExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                collectExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
-        collectExecutor.shutdown();
 
-        int totalConfiguredNodes = clusterNodes.isEmpty() ? 3 : clusterNodes.size();
+        // Ensure total configured nodes includes the current node if it's not already in the cluster list
+        boolean currentInCluster = clusterNodes.isEmpty() || clusterNodes.stream().anyMatch(node -> node.nodeId().equals(nodeId));
+        int totalConfiguredNodes = clusterNodes.isEmpty() ? 3 : clusterNodes.size() + (currentInCluster ? 0 : 1);
         int majorityThreshold = (totalConfiguredNodes / 2) + 1;
         String consensus = determineMajority(votes, majorityThreshold);
         logger.info("Consensus votes collected: " + votes + " (Threshold: " + majorityThreshold + ")");
@@ -533,6 +547,65 @@ public class RecommenderServer implements AutoCloseable {
             }
         }
 
+        List<String> spaceIds = new ArrayList<>();
+        for (Document spaceDoc : allSpacesInZone) {
+            String spaceId = spaceDoc.getString("spaceId");
+            if (spaceId != null) {
+                spaceIds.add(spaceId);
+            }
+        }
+
+        Map<String, String> spaceToLastAction = new HashMap<>();
+        Map<String, Long> spaceToCitationCount = new HashMap<>();
+
+        if (ParkingRepository.isDbOnline && repository.getDatabase() != null && !spaceIds.isEmpty()) {
+            try {
+                // Batch query all transactions for spaceIds in the zone, sorted by latest first
+                List<Document> txDocs = new ArrayList<>();
+                repository.getDatabase().getCollection("transactions")
+                        .find(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.in("payload.spaceId", spaceIds),
+                                com.mongodb.client.model.Filters.in("spaceId", spaceIds)
+                        ))
+                        .sort(com.mongodb.client.model.Sorts.orderBy(
+                                com.mongodb.client.model.Sorts.descending("timestamp"),
+                                com.mongodb.client.model.Sorts.descending("storedAt")
+                        ))
+                        .into(txDocs);
+
+                for (Document doc : txDocs) {
+                    String spaceId = ParkingRepository.readPayloadField(doc, "spaceId");
+                    if (spaceId.isBlank()) {
+                        spaceId = doc.getString("spaceId");
+                    }
+                    if (spaceId != null && !spaceId.isBlank() && !spaceToLastAction.containsKey(spaceId)) {
+                        spaceToLastAction.put(spaceId, ParkingRepository.readTransactionAction(doc));
+                    }
+                }
+
+                // Batch query all citations for spaceIds in the zone
+                List<Document> citationDocs = new ArrayList<>();
+                repository.getDatabase().getCollection("citations")
+                        .find(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.in("payload.spaceId", spaceIds),
+                                com.mongodb.client.model.Filters.in("spaceId", spaceIds)
+                        ))
+                        .into(citationDocs);
+
+                for (Document doc : citationDocs) {
+                    String spaceId = ParkingRepository.readPayloadField(doc, "spaceId");
+                    if (spaceId.isBlank()) {
+                        spaceId = doc.getString("spaceId");
+                    }
+                    if (spaceId != null && !spaceId.isBlank()) {
+                        spaceToCitationCount.put(spaceId, spaceToCitationCount.getOrDefault(spaceId, 0L) + 1);
+                    }
+                }
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed to load candidates in batch, checking offline repo path", e);
+            }
+        }
+
         List<SpaceCandidate> candidates = new ArrayList<>();
         for (Document spaceDoc : allSpacesInZone) {
             String spaceId = spaceDoc.getString("spaceId");
@@ -544,19 +617,19 @@ public class RecommenderServer implements AutoCloseable {
                 if (!zoneName.equalsIgnoreCase(candidateZone)) {
                     continue;
                 }
+                Document lastTx = repository.getLatestTransactionForSpace(spaceId);
+                if (lastTx != null && "start".equalsIgnoreCase(ParkingRepository.readTransactionAction(lastTx))) {
+                    continue;
+                }
+                candidates.add(new SpaceCandidate(spaceId, 0L));
+            } else {
+                String lastAction = spaceToLastAction.get(spaceId);
+                if (lastAction != null && "start".equalsIgnoreCase(lastAction)) {
+                    continue;
+                }
+                long citationCount = spaceToCitationCount.getOrDefault(spaceId, 0L);
+                candidates.add(new SpaceCandidate(spaceId, citationCount));
             }
-            Document lastTx = repository.getLatestTransactionForSpace(spaceId);
-            if (lastTx != null && "start".equalsIgnoreCase(ParkingRepository.readTransactionAction(lastTx))) {
-                continue;
-            }
-            long citationCount = 0;
-            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                citationCount = repository.getDatabase().getCollection("citations")
-                        .countDocuments(com.mongodb.client.model.Filters.or(
-                                com.mongodb.client.model.Filters.eq("payload.spaceId", spaceId),
-                                com.mongodb.client.model.Filters.eq("spaceId", spaceId)));
-            }
-            candidates.add(new SpaceCandidate(spaceId, citationCount));
         }
         return candidates;
     }
@@ -884,6 +957,24 @@ public class RecommenderServer implements AutoCloseable {
                 + " source=" + source
                 + " receiver=" + nodeId
                 + " reason=" + reason);
+    }
+
+    private String readBoundedLine(BufferedReader reader, int maxChars) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int ch;
+        while ((ch = reader.read()) != -1) {
+            if (ch == '\n') {
+                break;
+            }
+            if (ch == '\r') {
+                continue;
+            }
+            sb.append((char) ch);
+            if (sb.length() > maxChars) {
+                throw new IllegalArgumentException("Payload size limit exceeded to prevent denial of service.");
+            }
+        }
+        return sb.length() == 0 && ch == -1 ? null : sb.toString();
     }
 
     private static String remoteAddress(Socket socket) {

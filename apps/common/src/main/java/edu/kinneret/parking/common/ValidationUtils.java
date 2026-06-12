@@ -329,4 +329,16 @@ public final class ValidationUtils {
         }
         requireAmountInRange(field.getAsDouble(), fieldName, maxAllowedAmount);
     }
+
+    /**
+     * Asserts that a payload's length is within a safe limit to prevent DoS.
+     *
+     * @param payload the message payload
+     * @param maxBytes the maximum allowed bytes (or characters)
+     */
+    public static void requireSafePayloadSize(String payload, int maxBytes) {
+        if (payload != null && payload.length() > maxBytes) {
+            throw new IllegalArgumentException("Payload size limit exceeded to prevent denial of service.");
+        }
+    }
 }

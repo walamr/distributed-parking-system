@@ -130,8 +130,31 @@ public class CustomerCLI {
                             }
                             break;
                         case "4":
-                            System.out.print("Enter Space ID to base recommendation on: ");
-                            String spaceIdRec = scanner.nextLine().trim();
+                            String spaceIdRec = "";
+                            while (true) {
+                                System.out.print("Enter Space ID to base recommendation on: ");
+                                spaceIdRec = scanner.nextLine().trim();
+                                if (spaceIdRec.isEmpty()) {
+                                    System.out.println("ERROR: Space ID cannot be empty.");
+                                    continue;
+                                }
+                                if (!spaceIdRec.matches("\\d+")) {
+                                    System.out.println("ERROR: Space ID must be numeric.");
+                                    continue;
+                                }
+                                try {
+                                    ValidationUtils.requireValidSpaceId(spaceIdRec);
+                                    int numericSpace = Integer.parseInt(spaceIdRec);
+                                    if (numericSpace < 1 || numericSpace > 100) {
+                                        System.out.println("ERROR: Space ID must be between 1 and 100.");
+                                        continue;
+                                    }
+                                } catch (IllegalArgumentException e) {
+                                    System.out.println("ERROR: Invalid space ID format.");
+                                    continue;
+                                }
+                                break;
+                            }
                             System.out.print("Select Recommender Node (1: port 8091, 2: port 8092, 3: port 8093) [Default 1]: ");
                             String nodeChoice = scanner.nextLine().trim();
                             int port = 8091;
