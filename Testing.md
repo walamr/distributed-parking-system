@@ -249,6 +249,58 @@ This test verifies the high availability, failover of quorum queues, and client 
    docker exec rabbitmq1 rabbitmqctl list_queues name type leader members
    ```
 
+---
+
+### 5.3 Recommender Server Cluster Failure and Recovery Test Case
+
+This test verifies the consensus behavior, malicious mode handling, and fault tolerance of the 3-node Recommender Server cluster (`recommender1`, `recommender2`, `recommender3`) operating on TLS ports `8091`, `8092`, and `8093`.
+
+#### A. Initial State Verification
+1. Ensure all recommender containers are running:
+   ```powershell
+   docker compose up -d
+   ```
+2. Verify that they are running and listening on their respective TLS ports:
+   ```powershell
+   docker compose ps
+   ```
+   (Should show `recommender1` on port 8091, `recommender2` on port 8092, and `recommender3` on port 8093 as active/running).
+
+#### B. Failure of 1 Recommender Server
+1. **Simulate a single node failure**: Stop `recommender3`:
+   ```powershell
+   docker stop recommender3
+   ```
+2. **Verify consensus still succeeds**: Send a recommendation query for space ID `3` (using the Customer CLI or UI).
+3. **Expected result**:
+   - The query succeeds and returns the correct list (e.g. `Space 3;0`).
+   - The cluster is still able to reach a majority since 2 out of 3 nodes are online and agree.
+
+#### C. Failure of 2 Recommender Servers
+1. **Simulate double node failure**: Stop both `recommender2` and `recommender3`:
+   ```powershell
+   docker stop recommender2 recommender3
+   ```
+2. **Verify consensus aborts (Fail-safe)**: Send a recommendation query.
+3. **Expected result**:
+   - The query returns `FAILURE` with reason `"No majority consensus reached in cluster."`.
+   - The leader cannot reach a majority since only 1 node is online.
+
+#### D. 1 Recommender Server Returns Malicious Answers
+1. **Restore nodes and configure one as malicious**: Make sure all nodes are running, and set `recommender2` to malicious mode (either via command-line arg `malicious=true` or GUI/CLI toggle).
+2. **Verify honest majority wins**: Query the cluster.
+3. **Expected result**:
+   - The query succeeds and returns the correct honest recommendation (e.g. `Space 3;0`).
+   - The leader detects that `recommender1` and `recommender3` agree on the honest list, while `recommender2` returns the malicious faked result. The leader discards the malicious outlier and returns the consensus list.
+
+#### E. 2 Recommender Servers Return Malicious Answers
+1. **Configure two nodes as malicious**: Set both `recommender2` and `recommender3` to malicious mode.
+2. **Verify consensus behavior**:
+   - If both malicious nodes are configured with the **same** malicious payload (e.g., `999;999`), they will form a majority of 2, and the cluster will return that malicious answer.
+   - If they are configured with **different** malicious payloads (or if one is malicious and one is offline), no majority is reached, and the query returns `FAILURE` with reason `"No majority consensus reached in cluster."`.
+
+---
+
 ## 6. Build Validation Commands
 
 ```powershell
