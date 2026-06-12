@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
  * Tests {@link ClusterClientSelector}.
  */
 class ClusterClientSelectorTest {
+    /**
+     * Should return nodes in round robin failover order.
+     */
 
     @Test
     void shouldReturnNodesInRoundRobinFailoverOrder() {
@@ -25,6 +28,9 @@ class ClusterClientSelectorTest {
         assertEquals(List.of("node2", "node3", "node1"),
                 secondOrder.stream().map(ClusterNode::getHost).toList());
     }
+    /**
+     * Should ignore disabled nodes.
+     */
 
     @Test
     void shouldIgnoreDisabledNodes() {

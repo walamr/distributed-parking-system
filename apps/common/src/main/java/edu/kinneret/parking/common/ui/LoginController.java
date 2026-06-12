@@ -312,6 +312,16 @@ public class LoginController {
         }
     }
 
+/**
+
+ * Set status.
+
+ * @param message the message
+
+ * @param error the error
+
+ */
+
     private void setStatus(String message, boolean error) {
         statusLabel.setText(message);
         statusLabel.setStyle(error ? "-fx-text-fill: #ef4444;" : "-fx-text-fill: #4ade80;");

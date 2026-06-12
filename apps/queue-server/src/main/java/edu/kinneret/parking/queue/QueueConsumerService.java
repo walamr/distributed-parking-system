@@ -108,6 +108,13 @@ public final class QueueConsumerService {
         }
     }
 
+    /**
+     * Validates the business payload embedded in an envelope against the configured
+     * parking payload rules.
+     *
+     * @param envelope the message envelope whose payload is to be validated
+     * @return an accepted result when the payload passes, or a rejected result with a reason
+     */
     private edu.kinneret.parking.common.QueueMessageSecurityValidator.ValidationResult validateBusinessPayload(MessageEnvelope envelope) {
         try {
             double maxAmount = appConfig != null ? appConfig.getMaxAllowedAmount() : 10000.0d;
@@ -119,6 +126,15 @@ public final class QueueConsumerService {
         }
     }
 
+    /**
+     * Registers a RabbitMQ consumer on the specified queue. Accepted messages are
+     * persisted to the repository; rejected messages are nacked and sent to the
+     * dead-letter exchange.
+     *
+     * @param channel   the active RabbitMQ channel
+     * @param queueName the name of the queue to consume
+     * @throws IOException if the consumer cannot be registered
+     */
     private void registerConsumer(Channel channel, String queueName) throws IOException {
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String payload = new String(delivery.getBody(), StandardCharsets.UTF_8);
@@ -145,6 +161,12 @@ public final class QueueConsumerService {
         channel.basicConsume(queueName, false, deliverCallback, cancelCallback);
     }
 
+    /**
+     * Blocks the calling thread until the shutdown latch reaches zero.
+     *
+     * @param shutdownLatch the latch to await
+     * @throws IllegalStateException if the thread is interrupted while waiting
+     */
     private void awaitShutdown(CountDownLatch shutdownLatch) {
         try {
             shutdownLatch.await();
@@ -154,6 +176,13 @@ public final class QueueConsumerService {
         }
     }
 
+    /**
+     * Attaches a shutdown listener and, if the connection supports it, a recovery
+     * listener that logs automatic reconnection events.
+     *
+     * @param connection         the active RabbitMQ connection
+     * @param initialNodeAddress the address string of the node the connection was opened on
+     */
     private void attachRecoveryLogging(com.rabbitmq.client.Connection connection, String initialNodeAddress) {
         connection.addShutdownListener(this::logShutdownSignal);
         if (connection instanceof Recoverable recoverableConnection) {
@@ -171,6 +200,11 @@ public final class QueueConsumerService {
         }
     }
 
+    /**
+     * Logs a warning when the RabbitMQ connection shuts down unexpectedly.
+     *
+     * @param shutdownSignal the shutdown signal received from the broker
+     */
     private void logShutdownSignal(ShutdownSignalException shutdownSignal) {
         if (shutdownSignal != null && !shutdownSignal.isInitiatedByApplication()) {
             logger.warning("RabbitMQ connection shutdown detected: " + SecurityLogger.sanitize(shutdownSignal.getMessage()));

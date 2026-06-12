@@ -1224,6 +1224,14 @@ public class CustomerController {
         return sessions;
     }
 
+/**
+
+ * Check and resume active session.
+
+ * @param merged the merged
+
+ */
+
     private void checkAndResumeActiveSession(List<Document> merged) {
         if (merged == null || merged.isEmpty()) {
             return;
@@ -1251,6 +1259,16 @@ public class CustomerController {
         }
     }
 
+/**
+
+ * Set history status.
+
+ * @param message the message
+
+ * @param isError the isError
+
+ */
+
     private void setHistoryStatus(String message, boolean isError) {
         if (historyStatusLabel != null) {
             Platform.runLater(() -> {
@@ -1276,6 +1294,16 @@ public class CustomerController {
             });
         }
     }
+
+/**
+
+ * Set status.
+
+ * @param message the message
+
+ * @param isError the isError
+
+ */
 
     private void setStatus(String message, boolean isError) {
         Platform.runLater(() -> {
@@ -1321,6 +1349,18 @@ public class CustomerController {
         });
     }
 
+/**
+
+ * Get long safe.
+
+ * @param doc the doc
+
+ * @param key the key
+
+ * @return the long
+
+ */
+
     private static Long getLongSafe(Document doc, String key) {
         if (doc == null || !doc.containsKey(key))
             return null;
@@ -1330,6 +1370,16 @@ public class CustomerController {
         }
         return null;
     }
+
+/**
+
+ * Parse cost safe.
+
+ * @param costStr the costStr
+
+ * @return the double
+
+ */
 
     private static double parseCostSafe(String costStr) {
         if (costStr == null || costStr.isEmpty() || costStr.equals("null") || costStr.equals("-")) {
@@ -1362,6 +1412,16 @@ public class CustomerController {
         this.resultLabel = resultLabel;
         this.recommendationSpaceField = recommendationSpaceField;
     }
+
+/**
+
+ * Format recommendation result.
+
+ * @param rawResult the rawResult
+
+ * @return the string
+
+ */
 
     private String formatRecommendationResult(String rawResult) {
         if (rawResult == null || rawResult.isBlank() || "NONE".equalsIgnoreCase(rawResult)) {

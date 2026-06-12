@@ -80,6 +80,18 @@ public class PEOApp extends Application {
         primaryStage.show();
     }
 
+/**
+
+ * Create field box.
+
+ * @param title the title
+
+ * @param field the field
+
+ * @return the vbox
+
+ */
+
     private VBox createFieldBox(String title, Control field) {
         Label titleLbl = new Label(title);
         titleLbl.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");

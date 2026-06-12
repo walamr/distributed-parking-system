@@ -12,6 +12,12 @@ import java.nio.charset.StandardCharsets;
  */
 public final class QueuePublisherSmokeTest {
 
+/**
+
+ * Constructs a new QueuePublisherSmokeTest.
+
+ */
+
     private QueuePublisherSmokeTest() {
     }
 

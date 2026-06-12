@@ -137,6 +137,34 @@ public final class AppConfig {
         }
     }
 
+    /**
+     * Constructs a fully-configured AppConfig with all infrastructure parameters.
+     *
+     * @param rabbitMqNodes                   the RabbitMQ cluster nodes
+     * @param rabbitMqUsername                the RabbitMQ username
+     * @param rabbitMqPassword                the RabbitMQ password
+     * @param rabbitMqVirtualHost             the RabbitMQ virtual host
+     * @param rabbitMqTlsEnabled              whether TLS is enabled for RabbitMQ
+     * @param rabbitMqTlsAllowInvalidHostnames whether to skip hostname verification for RabbitMQ TLS
+     * @param transactionsQueueName           the transactions queue name
+     * @param citationsQueueName              the citations queue name
+     * @param tlsTruststorePath               the TLS truststore path
+     * @param tlsTruststorePassword           the TLS truststore password
+     * @param tlsKeystorePath                 the TLS client keystore path
+     * @param tlsKeystorePassword             the TLS client keystore password
+     * @param tlsServerKeystorePath           the TLS server keystore path
+     * @param tlsServerKeystorePassword       the TLS server keystore password
+     * @param mongoUri                        the full MongoDB connection URI
+     * @param rabbitMqConnectionTimeoutMs     the RabbitMQ connection timeout in milliseconds
+     * @param rabbitMqRecoveryIntervalMs      the RabbitMQ automatic recovery interval in milliseconds
+     * @param mongoTlsEnabled                 whether TLS is enabled for MongoDB
+     * @param mongoTlsCaCertPath              the MongoDB TLS CA certificate path
+     * @param mongoTlsAllowInvalidHostnames   whether to skip hostname verification for MongoDB TLS
+     * @param hmacSecret                      the HMAC-SHA256 signing secret
+     * @param nonceTtlSeconds                 the nonce time-to-live in seconds
+     * @param maxAllowedAmount                the maximum allowed citation or transaction amount
+     * @param recommenderNodes                the recommender cluster nodes
+     */
 
     private AppConfig(
             List<ClusterNode> rabbitMqNodes,
@@ -189,6 +217,12 @@ public final class AppConfig {
         this.recommenderNodes = List.copyOf(recommenderNodes);
     }
 
+    /**
+     * Loads key-value pairs from a {@code .env} file into the supplied map.
+     * Searches for the file in the working directory and two parent directories.
+     *
+     * @param env the mutable map to populate with values found in the file
+     */
     private static void loadDotEnv(Map<String, String> env) {
         String[] pathsToTry = { ".env", "../.env", "../../.env" };
         java.io.File envFile = null;
@@ -525,6 +559,8 @@ public final class AppConfig {
     }
 
     /**
+     * Returns the path to the TLS keystore (JKS) containing the server certificate.
+     *
      * @return the server keystore file path
      */
     public String getTlsServerKeystorePath() {
@@ -532,6 +568,8 @@ public final class AppConfig {
     }
 
     /**
+     * Returns the password for the TLS server keystore.
+     *
      * @return the password for the server keystore
      */
     public String getTlsServerKeystorePassword() {
@@ -625,6 +663,15 @@ public final class AppConfig {
                 + '}';
     }
 
+    /**
+     * Reads a key from the environment map and returns the trimmed value, or the
+     * supplied default when the key is absent or blank.
+     *
+     * @param environment  the environment variable map
+     * @param key          the configuration key to look up
+     * @param defaultValue the fallback value when the key is missing or blank
+     * @return the resolved configuration value
+     */
     private static String readOrDefault(Map<String, String> environment, String key, String defaultValue) {
         String value = environment.get(key);
         if (value == null || value.isBlank()) {
@@ -633,6 +680,14 @@ public final class AppConfig {
         return value.trim();
     }
 
+    /**
+     * Parses a positive integer from a raw string value.
+     *
+     * @param rawValue  the string to parse
+     * @param fieldName the configuration field name used in error messages
+     * @return the parsed positive integer
+     * @throws IllegalArgumentException if the value is not a positive integer
+     */
     private static int parsePositiveInt(String rawValue, String fieldName) {
         try {
             return ValidationUtils.requirePositive(Integer.parseInt(rawValue), fieldName);
@@ -641,6 +696,14 @@ public final class AppConfig {
         }
     }
 
+    /**
+     * Parses a positive long from a raw string value.
+     *
+     * @param rawValue  the string to parse
+     * @param fieldName the configuration field name used in error messages
+     * @return the parsed positive long
+     * @throws IllegalArgumentException if the value is not a positive integer
+     */
     private static long parsePositiveLong(String rawValue, String fieldName) {
         try {
             long parsedValue = Long.parseLong(rawValue);
@@ -653,6 +716,12 @@ public final class AppConfig {
         }
     }
 
+    /**
+     * Parses a comma-separated list of {@code host:port} RabbitMQ node addresses.
+     *
+     * @param rawNodes the raw comma-separated node addresses
+     * @return the parsed cluster node list
+     */
     private static List<ClusterNode> parseNodes(String rawNodes) {
         List<ClusterNode> nodes = new ArrayList<>();
         String[] parts = rawNodes.split(",");
@@ -674,6 +743,12 @@ public final class AppConfig {
         return nodes;
     }
 
+    /**
+     * Parses a comma-separated list of {@code host:port} recommender node addresses.
+     *
+     * @param rawNodes the raw comma-separated node addresses
+     * @return the parsed recommender node list
+     */
     private static List<ClusterNode> parseRecommenderNodes(String rawNodes) {
         List<ClusterNode> nodes = new ArrayList<>();
         String[] parts = rawNodes.split(",");

@@ -74,6 +74,15 @@ public final class SecureMessageSigner {
                 expectedHmac.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Resolves the HMAC signing secret from the environment, preferring a file-based
+     * secret specified by {@code HMAC_SECRET_FILE} before falling back to the
+     * {@code HMAC_SECRET} variable.
+     *
+     * @param environment the environment variable map
+     * @return the resolved secret string
+     * @throws IllegalStateException if no secret can be found or the file cannot be read
+     */
     private static String readSecret(Map<String, String> environment) {
         String secretFile = environment.get("HMAC_SECRET_FILE");
         if (secretFile != null && !secretFile.isBlank()) {

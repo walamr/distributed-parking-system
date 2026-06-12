@@ -8,7 +8,18 @@ import javax.net.ssl.KeyManagerFactory;
 import java.security.KeyStore;
 import java.io.FileInputStream;
 
+/**
+
+ * Represents a class TestClient.
+
+ */
+
 public class TestClient {
+    /**
+     * Main.
+     * @param args the args
+     * @throws Exception if an error occurs
+     */
     public static void main(String[] args) throws Exception {
         System.out.println("Starting test client...");
         String trustStorePath = "docker/rabbitmq/certs/truststore.jks";

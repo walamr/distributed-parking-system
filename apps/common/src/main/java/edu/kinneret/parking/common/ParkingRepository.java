@@ -72,6 +72,12 @@ public class ParkingRepository implements AutoCloseable {
         this.database = tempDb;
     }
 
+    /**
+     * Extracts the numeric part of a space identifier string.
+     *
+     * @param spaceId the raw space identifier (e.g., "P101" or "42")
+     * @return the parsed integer, or -1 if no numeric part can be found
+     */
     private int parseSpaceNumber(String spaceId) {
         if (spaceId == null) return -1;
         String digits = spaceId.replaceAll("[^\\d]", "");
@@ -366,6 +372,15 @@ public class ParkingRepository implements AutoCloseable {
         return topLevelType;
     }
 
+    /**
+     * Determines whether the given transaction record represents a legal parking
+     * event for the requested space.
+     *
+     * @param transactionRecord the most recent transaction document for the vehicle
+     * @param requestedSpaceId  the space that is being inspected
+     * @return {@code "Parking Ok"} when the vehicle is actively parked in the
+     *         requested space, otherwise {@code "Parking Not Ok"}
+     */
     static String evaluateLegality(Document transactionRecord, String requestedSpaceId) {
         String type = readTransactionAction(transactionRecord);
         String recordedSpace = readPayloadField(transactionRecord, "spaceId");
@@ -402,6 +417,12 @@ public class ParkingRepository implements AutoCloseable {
         }
     }
 
+    /**
+     * Finds the most recent transaction document for a given vehicle.
+     *
+     * @param vehicleId the vehicle VIN to look up
+     * @return the latest transaction document, or {@code null} if none exists
+     */
     private Document findLatestTransactionForVehicle(String vehicleId) {
         List<Document> history = getVehicleHistory(vehicleId);
         return history.isEmpty() ? null : history.getFirst();
@@ -449,6 +470,14 @@ public class ParkingRepository implements AutoCloseable {
         }
     }
 
+    /**
+     * Converts a JSON payload string into a MongoDB-native value.
+     * If the payload is a valid JSON object it is stored as an embedded document;
+     * otherwise the raw string is stored as-is.
+     *
+     * @param payloadJson the payload text to convert
+     * @return a {@link Document} when the payload is a JSON object, or the original string
+     */
     private static Object toMongoPayloadValue(String payloadJson) {
         try {
             com.google.gson.JsonElement parsedPayload = com.google.gson.JsonParser.parseString(payloadJson);

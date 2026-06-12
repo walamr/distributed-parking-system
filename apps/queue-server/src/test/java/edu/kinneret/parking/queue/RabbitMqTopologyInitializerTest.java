@@ -5,7 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+
+ * Represents a class RabbitMqTopologyInitializerTest.
+
+ */
+
 class RabbitMqTopologyInitializerTest {
+    /**
+     * Should declare quorum queue arguments.
+     */
 
     @Test
     void shouldDeclareQuorumQueueArguments() {

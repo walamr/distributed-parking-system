@@ -22,6 +22,12 @@ import javax.net.ssl.TrustManagerFactory;
  */
 public final class TlsUtils {
 
+/**
+
+ * Constructs a new TlsUtils.
+
+ */
+
     private TlsUtils() {
     }
 

@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
  * Tests {@link MessageEnvelope}.
  */
 class MessageEnvelopeTest {
+    /**
+     * Should round trip json payload.
+     */
 
     @Test
     void shouldRoundTripJsonPayload() {
@@ -28,6 +31,9 @@ class MessageEnvelopeTest {
         assertEquals(envelope.toSigningContent(), parsedEnvelope.toSigningContent());
         assertEquals(envelope.getHmac(), parsedEnvelope.getHmac());
     }
+    /**
+     * Should reject invalid nonce uuid.
+     */
 
     @Test
     void shouldRejectInvalidNonceUuid() {

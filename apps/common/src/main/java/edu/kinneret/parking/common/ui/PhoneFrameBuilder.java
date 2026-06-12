@@ -25,6 +25,12 @@ public class PhoneFrameBuilder {
     private static double xOffset = 0;
     private static double yOffset = 0;
 
+/**
+
+ * Constructs a new PhoneFrameBuilder.
+
+ */
+
     private PhoneFrameBuilder() {
         // Prevent instantiation of utility class
     }

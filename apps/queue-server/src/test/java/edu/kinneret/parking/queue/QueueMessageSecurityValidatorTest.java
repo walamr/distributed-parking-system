@@ -17,6 +17,9 @@ import org.junit.jupiter.api.Test;
  * Tests {@link QueueMessageSecurityValidator}.
  */
 class QueueMessageSecurityValidatorTest {
+    /**
+     * Should accept valid signed envelope.
+     */
 
     @Test
     void shouldAcceptValidSignedEnvelope() {
@@ -31,6 +34,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertTrue(result.accepted());
     }
+    /**
+     * Should reject invalid hmac.
+     */
 
     @Test
     void shouldRejectInvalidHmac() {
@@ -49,6 +55,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject old timestamp.
+     */
 
     @Test
     void shouldRejectOldTimestamp() {
@@ -63,6 +72,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject replayed nonce.
+     */
 
     @Test
     void shouldRejectReplayedNonce() {
@@ -81,6 +93,9 @@ class QueueMessageSecurityValidatorTest {
         assertTrue(validator.validate(firstEnvelope).accepted());
         assertFalse(validator.validate(replayEnvelope).accepted());
     }
+    /**
+     * Should accept valid uuid nonce through json parsing.
+     */
 
     @Test
     void shouldAcceptValidUuidNonceThroughJsonParsing() {
@@ -98,6 +113,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertTrue(result.accepted());
     }
+    /**
+     * Should reject malformed envelope json.
+     */
 
     @Test
     void shouldRejectMalformedEnvelopeJson() {
@@ -111,6 +129,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject negative amount in payload.
+     */
 
     @Test
     void shouldRejectNegativeAmountInPayload() {
@@ -128,6 +149,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject wrong json type in payload.
+     */
 
     @Test
     void shouldRejectWrongJsonTypeInPayload() {
@@ -145,6 +169,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject missing hmac field.
+     */
 
     @Test
     void shouldRejectMissingHmacField() {
@@ -164,6 +191,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject missing nonce field.
+     */
 
     @Test
     void shouldRejectMissingNonceField() {
@@ -183,6 +213,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject invalid parking space in payload.
+     */
 
     @Test
     void shouldRejectInvalidParkingSpaceInPayload() {
@@ -200,6 +233,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject oversized payload input.
+     */
 
     @Test
     void shouldRejectOversizedPayloadInput() {
@@ -218,6 +254,9 @@ class QueueMessageSecurityValidatorTest {
 
         assertFalse(result.accepted());
     }
+    /**
+     * Should reject injection like payload input.
+     */
 
     @Test
     void shouldRejectInjectionLikePayloadInput() {
@@ -236,6 +275,16 @@ class QueueMessageSecurityValidatorTest {
         assertFalse(result.accepted());
     }
 
+/**
+
+ * Create validator.
+
+ * @param now the now
+
+ * @return the queuemessagesecurityvalidator
+
+ */
+
     private static QueueMessageSecurityValidator createValidator(Instant now) {
         return new QueueMessageSecurityValidator(
                 new SecureMessageSigner("test-secret"),
@@ -243,6 +292,22 @@ class QueueMessageSecurityValidatorTest {
                 Clock.fixed(now, ZoneOffset.UTC),
                 60);
     }
+
+/**
+
+ * Signed envelope.
+
+ * @param type the type
+
+ * @param payload the payload
+
+ * @param nonce the nonce
+
+ * @param timestamp the timestamp
+
+ * @return the messageenvelope
+
+ */
 
     private static MessageEnvelope signedEnvelope(String type, String payload, String nonce, long timestamp) {
         SecureMessageSigner signer = new SecureMessageSigner("test-secret");

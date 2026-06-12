@@ -192,6 +192,16 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+/**
+
+ * Is rate limited.
+
+ * @param ip the ip
+
+ * @return the boolean
+
+ */
+
     private boolean isRateLimited(String ip) {
         long now = Instant.now().getEpochSecond();
         List<Long> timestamps = ipRequestTimestamps.computeIfAbsent(ip, k -> new java.util.concurrent.CopyOnWriteArrayList<>());
@@ -354,9 +364,37 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+/**
+
+ * Send consensus response.
+
+ * @param spaceId the spaceId
+
+ * @param correlationId the correlationId
+
+ * @param writer the writer
+
+ */
+
     private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer) {
         sendConsensusResponse(spaceId, correlationId, writer, Collections.emptyMap());
     }
+
+/**
+
+ * Send consensus response.
+
+ * @param spaceId the spaceId
+
+ * @param correlationId the correlationId
+
+ * @param writer the writer
+
+ * @param MapString the MapString
+
+ * @param explicitVotes the explicitVotes
+
+ */
 
     private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer, Map<String, String> explicitVotes) {
         String consensus = executeLeaderConsensus(spaceId, explicitVotes);
@@ -383,6 +421,16 @@ public class RecommenderServer implements AutoCloseable {
         writer.println(response);
     }
 
+/**
+
+ * Get local citations count.
+
+ * @param spaceId the spaceId
+
+ * @return the long
+
+ */
+
     private long getLocalCitationsCount(String spaceId) {
         try (ParkingRepository repository = new ParkingRepository(appConfig)) {
             if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
@@ -397,6 +445,20 @@ public class RecommenderServer implements AutoCloseable {
         }
         return 0;
     }
+
+/**
+
+ * Execute leader consensus.
+
+ * @param spaceId the spaceId
+
+ * @param MapString the MapString
+
+ * @param explicitVotes the explicitVotes
+
+ * @return the string
+
+ */
 
     private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
         Map<String, String> votes = new ConcurrentHashMap<>();
@@ -1137,6 +1199,13 @@ public class RecommenderServer implements AutoCloseable {
         return sb.length() == 0 && ch == -1 ? null : sb.toString();
     }
 
+    /**
+     * Returns the remote address string for a socket, or {@code "unknown"} when the
+     * socket or its address is {@code null}.
+     *
+     * @param socket the socket whose remote address is needed
+     * @return the remote socket address as a string
+     */
     private static String remoteAddress(Socket socket) {
         if (socket == null || socket.getRemoteSocketAddress() == null) {
             return "unknown";
@@ -1144,9 +1213,21 @@ public class RecommenderServer implements AutoCloseable {
         return socket.getRemoteSocketAddress().toString();
     }
 
+    /**
+     * Represents a peer recommender node in the cluster, identified by its logical
+     * node ID, hostname, and TCP port.
+     *
+     * @param nodeId the logical node identifier
+     * @param host   the hostname or IP address
+     * @param port   the TCP port
+     */
     private record NodeEndpoint(String nodeId, String host, int port) {
     }
 
+    /**
+     * Holds a candidate parking space and its citation count for ranking during
+     * the recommendation algorithm.
+     */
     private static class SpaceCandidate {
         final String spaceId;
         final long citationCount;

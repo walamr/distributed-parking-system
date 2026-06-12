@@ -112,6 +112,14 @@ public final class RabbitMqConnectionManager {
         });
     }
 
+    /**
+     * Builds a {@link ConnectionFactory} pre-configured with credentials, timeouts,
+     * and optional mTLS settings for the given cluster node.
+     *
+     * @param node the target RabbitMQ cluster node
+     * @return the configured connection factory
+     * @throws IllegalStateException if the TLS context cannot be initialised
+     */
     ConnectionFactory buildFactory(ClusterNode node) {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(node.getHost());

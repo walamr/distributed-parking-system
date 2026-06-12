@@ -13,6 +13,9 @@ import org.junit.jupiter.api.Test;
  * Tests {@link NonceStore}.
  */
 class NonceStoreTest {
+    /**
+     * Should reject duplicate nonce within ttl.
+     */
 
     @Test
     void shouldRejectDuplicateNonceWithinTtl() {
@@ -23,6 +26,9 @@ class NonceStoreTest {
             assertEquals(1, nonceStore.size());
         }
     }
+    /**
+     * Should allow nonce after expiry.
+     */
 
     @Test
     void shouldAllowNonceAfterExpiry() {
@@ -40,6 +46,14 @@ class NonceStoreTest {
      */
     private static final class MutableClock extends Clock {
         private Instant instant;
+
+/**
+
+ * Mutable clock.
+
+ * @param instant the instant
+
+ */
 
         private MutableClock(Instant instant) {
             this.instant = instant;
@@ -59,6 +73,14 @@ class NonceStoreTest {
         public Instant instant() {
             return instant;
         }
+
+/**
+
+ * Set instant.
+
+ * @param instant the instant
+
+ */
 
         private void setInstant(Instant instant) {
             this.instant = instant;

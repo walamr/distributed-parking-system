@@ -41,6 +41,14 @@ public class WelcomeController {
         // Ignored
     }
 
+/**
+
+ * Navigate.
+
+ * @param fxml the fxml
+
+ */
+
     private void navigate(String fxml) {
         try {
             Stage stage = (Stage) Stage.getWindows().filtered(w -> w.isShowing()).get(0);

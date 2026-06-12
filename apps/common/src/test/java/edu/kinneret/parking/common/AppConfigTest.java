@@ -7,7 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+
+ * Represents a class AppConfigTest.
+
+ */
+
 class AppConfigTest {
+    /**
+     * Should use hardcoded defaults when passwords are missing.
+     */
 
     @Test
     void shouldUseHardcodedDefaultsWhenPasswordsAreMissing() {
@@ -17,6 +26,9 @@ class AppConfigTest {
         assertEquals("customer", config.getRabbitMqUsername());
         assertEquals("customer_pwd_rotated", config.getRabbitMqPassword());
     }
+    /**
+     * Should use customer defaults with configured passwords.
+     */
 
     @Test
     void shouldUseCustomerDefaultsWithConfiguredPasswords() {
@@ -31,6 +43,9 @@ class AppConfigTest {
         assertEquals("customer", config.getRabbitMqUsername());
         assertEquals("custom-mq-pass", config.getRabbitMqPassword());
     }
+    /**
+     * Should use peo defaults for peo and smoke profiles.
+     */
 
     @Test
     void shouldUsePeoDefaultsForPeoAndSmokeProfiles() {
@@ -52,6 +67,9 @@ class AppConfigTest {
         assertEquals("peo_service", peoConfig.getRabbitMqUsername());
         assertEquals("peo_service", smokeConfig.getRabbitMqUsername());
     }
+    /**
+     * Should enable mongo tls by default for host run apps.
+     */
 
     @Test
     void shouldEnableMongoTlsByDefaultForHostRunApps() {
@@ -67,6 +85,9 @@ class AppConfigTest {
         assertEquals("docker/mongodb/certs/ca-cert.pem", config.getMongoTlsCaCertPath());
         assertEquals(false, config.isMongoTlsAllowInvalidHostnames());
     }
+    /**
+     * Should allow environment overrides.
+     */
 
     @Test
     void shouldAllowEnvironmentOverrides() {
@@ -85,6 +106,9 @@ class AppConfigTest {
         assertEquals(false, config.isMongoTlsEnabled());
         assertEquals(9000, config.getRabbitMqRecoveryIntervalMs());
     }
+    /**
+     * Should substitute mongo credentials based on profile.
+     */
 
     @Test
     void shouldSubstituteMongoCredentialsBasedOnProfile() {
@@ -99,6 +123,9 @@ class AppConfigTest {
 
         assertEquals("mongodb://mulligan_db_admin:db_pwd_rotated_admin@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin", config.getMongoUri());
     }
+    /**
+     * Should substitute storage mongo credentials based on profile.
+     */
 
     @Test
     void shouldSubstituteStorageMongoCredentialsBasedOnProfile() {

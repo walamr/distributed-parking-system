@@ -85,6 +85,10 @@ public final class NonceStore implements AutoCloseable {
         logger.info("In-Memory NonceStore initialized with " + ttlSeconds + "s TTL.");
     }
 
+    /**
+     * Initializes the scheduled executor that periodically removes expired nonces
+     * from the in-memory map.
+     */
     private void initInMemoryScheduler() {
         long cleanupInterval = Math.max(5, Math.min(30, ttlSeconds / 2));
         this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -148,10 +152,18 @@ public final class NonceStore implements AutoCloseable {
         return nonceCollection != null ? (int) nonceCollection.countDocuments() : noncesByValue.size();
     }
 
+    /**
+     * Returns the current epoch time in seconds from the configured clock.
+     *
+     * @return the current epoch time in seconds
+     */
     private long nowEpochSeconds() {
         return clock.instant().getEpochSecond();
     }
 
+    /**
+     * Removes all nonces from the in-memory map whose expiry time has passed.
+     */
     private void purgeExpiredEntries() {
         long currentTime = nowEpochSeconds();
         int before = noncesByValue.size();

@@ -7,7 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
+/**
+
+ * Represents a class ParkingRepositoryCompatibilityTest.
+
+ */
+
 class ParkingRepositoryCompatibilityTest {
+    /**
+     * Should read nested payload document fields.
+     */
 
     @Test
     void shouldReadNestedPayloadDocumentFields() {
@@ -21,6 +30,9 @@ class ParkingRepositoryCompatibilityTest {
         assertEquals("Expired Meter", ParkingRepository.readPayloadField(record, "reason"));
         assertEquals("Parking Ok", ParkingRepository.evaluateLegality(record, "P101"));
     }
+    /**
+     * Should read legacy string payload fields.
+     */
 
     @Test
     void shouldReadLegacyStringPayloadFields() {
@@ -32,6 +44,9 @@ class ParkingRepositoryCompatibilityTest {
         assertEquals("Expired Meter", ParkingRepository.readPayloadField(record, "reason"));
         assertEquals("Parking Ok", ParkingRepository.evaluateLegality(record, "P101"));
     }
+    /**
+     * Should fall back to top level transaction type when payload has no type.
+     */
 
     @Test
     void shouldFallBackToTopLevelTransactionTypeWhenPayloadHasNoType() {
@@ -41,6 +56,9 @@ class ParkingRepositoryCompatibilityTest {
         assertEquals("stop", ParkingRepository.readTransactionAction(record));
         assertEquals("Parking Not Ok", ParkingRepository.evaluateLegality(record, "P101"));
     }
+    /**
+     * Should return null when payload cannot be parsed.
+     */
 
     @Test
     void shouldReturnNullWhenPayloadCannotBeParsed() {
@@ -49,6 +67,9 @@ class ParkingRepositoryCompatibilityTest {
         assertNull(ParkingRepository.readPayloadDocument(record));
         assertEquals("", ParkingRepository.readPayloadField(record, "vehicleId"));
     }
+    /**
+     * Should return payload document when stored as document.
+     */
 
     @Test
     void shouldReturnPayloadDocumentWhenStoredAsDocument() {

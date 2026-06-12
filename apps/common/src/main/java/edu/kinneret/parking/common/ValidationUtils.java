@@ -20,6 +20,7 @@ public final class ValidationUtils {
     private static final Pattern ACTION_PATTERN = Pattern.compile("^(start|stop)$");
     private static final Pattern COST_PATTERN = Pattern.compile("^\\d{1,6}(?:\\.\\d{1,2})?$");
 
+    /** Utility class; instantiation is not permitted. */
     private ValidationUtils() {
     }
 
@@ -248,6 +249,14 @@ public final class ValidationUtils {
         }
     }
 
+    /**
+     * Ensures that a JSON object contains only fields in the permitted set for the
+     * given message type. Rejects any unrecognised fields to prevent injection.
+     *
+     * @param json        the JSON payload object
+     * @param messageType the lowercase message type (e.g., "transaction.start")
+     * @throws IllegalArgumentException if an unsupported field is present
+     */
     private static void validateKnownFieldsOnly(JsonObject json, String messageType) {
         java.util.Set<String> allowed = new java.util.HashSet<>(java.util.List.of(
                 "vehicleId", "spaceId", "areaName", "type", "cost", "amount", "reason", "officer"));
@@ -262,6 +271,14 @@ public final class ValidationUtils {
         }
     }
 
+    /**
+     * Asserts that all required fields are present in the payload for the given
+     * message type.
+     *
+     * @param json        the JSON payload object
+     * @param messageType the lowercase message type
+     * @throws IllegalArgumentException if a required field is missing
+     */
     private static void validateRequiredFields(JsonObject json, String messageType) {
         if (messageType.endsWith(".smoke-test")) {
             requireJsonStringField(json, "source");
@@ -281,6 +298,13 @@ public final class ValidationUtils {
         }
     }
 
+    /**
+     * Asserts that the specified field is present and is a JSON string primitive.
+     *
+     * @param json      the JSON payload object
+     * @param fieldName the name of the required string field
+     * @throws IllegalArgumentException if the field is absent or not a string
+     */
     private static void requireJsonStringField(JsonObject json, String fieldName) {
         if (!json.has(fieldName) || !json.get(fieldName).isJsonPrimitive()
                 || !json.get(fieldName).getAsJsonPrimitive().isString()) {
@@ -288,6 +312,13 @@ public final class ValidationUtils {
         }
     }
 
+    /**
+     * Asserts that the specified field is present and is a JSON numeric primitive.
+     *
+     * @param json      the JSON payload object
+     * @param fieldName the name of the required numeric field
+     * @throws IllegalArgumentException if the field is absent or not a number
+     */
     private static void requireJsonNumberField(JsonObject json, String fieldName) {
         if (!json.has(fieldName) || !json.get(fieldName).isJsonPrimitive()
                 || !json.get(fieldName).getAsJsonPrimitive().isNumber()) {
@@ -295,6 +326,15 @@ public final class ValidationUtils {
         }
     }
 
+    /**
+     * Validates a string value against a compiled regex pattern.
+     *
+     * @param value     the value to validate
+     * @param pattern   the compiled pattern that the value must match
+     * @param fieldName the field name used in the error message
+     * @return the validated value
+     * @throws IllegalArgumentException if the value exceeds 255 chars or does not match the pattern
+     */
     private static String requirePattern(String value, Pattern pattern, String fieldName) {
         String sanitizedValue = requireMaxLength(value, 255, fieldName);
         if (!pattern.matcher(sanitizedValue).matches()) {
@@ -303,6 +343,15 @@ public final class ValidationUtils {
         return sanitizedValue;
     }
 
+    /**
+     * Validates an optional string field in the JSON payload when present.
+     * Applies the provided validator function to the field value.
+     *
+     * @param json      the JSON payload object
+     * @param fieldName the optional field name
+     * @param validator the validation function to apply
+     * @throws IllegalArgumentException if the field is present but fails validation
+     */
     private static void validateOptionalStringField(
             JsonObject json,
             String fieldName,
@@ -318,6 +367,15 @@ public final class ValidationUtils {
         validator.apply(field.getAsString());
     }
 
+    /**
+     * Validates an optional numeric field in the JSON payload when present.
+     * Ensures the value is a finite number within the configured maximum.
+     *
+     * @param json             the JSON payload object
+     * @param fieldName        the optional field name
+     * @param maxAllowedAmount the maximum allowed amount
+     * @throws IllegalArgumentException if the field is present but fails validation
+     */
     private static void validateOptionalNumericField(JsonObject json, String fieldName, double maxAllowedAmount) {
         if (!json.has(fieldName)) {
             return;

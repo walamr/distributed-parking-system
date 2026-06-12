@@ -133,6 +133,28 @@ public class PEOCLI {
         System.out.println("Exiting CLI.");
     }
 
+/**
+
+ * Issue citation.
+
+ * @param manager the manager
+
+ * @param config the config
+
+ * @param signer the signer
+
+ * @param vin the vin
+
+ * @param spaceId the spaceId
+
+ * @param amount the amount
+
+ * @param reason the reason
+
+ * @param officerId the officerId
+
+ */
+
      private static void issueCitation(RabbitMqConnectionManager manager, AppConfig config, SecureMessageSigner signer, String vin, String spaceId, String amount, String reason, String officerId) {
          try {
              String payload = buildCitationPayload(vin, spaceId, amount, reason, officerId, config);
@@ -150,9 +172,56 @@ public class PEOCLI {
          }
      }
  
+/**
+ 
+ * Build citation payload.
+ 
+ * @param vin the vin
+ 
+ * @param spaceId the spaceId
+ 
+ * @param amount the amount
+ 
+ * @param reason the reason
+ 
+ * @param config the config
+ 
+ * @return the string
+ 
+ */
+ 
      static String buildCitationPayload(String vin, String spaceId, String amount, String reason, AppConfig config) {
+         /**
+          * Build citation payload.
+          * @param vin the vin
+          * @param spaceId the spaceId
+          * @param amount the amount
+          * @param reason the reason
+          * @param config the config
+          * @return the return
+          */
          return buildCitationPayload(vin, spaceId, amount, reason, "", config);
      }
+
+/**
+
+ * Build citation payload.
+
+ * @param vin the vin
+
+ * @param spaceId the spaceId
+
+ * @param amount the amount
+
+ * @param reason the reason
+
+ * @param officerId the officerId
+
+ * @param config the config
+
+ * @return the string
+
+ */
 
      static String buildCitationPayload(String vin, String spaceId, String amount, String reason, String officerId, AppConfig config) {
          String safeVin = ValidationUtils.requireValidVehicleId(vin == null ? "" : vin.trim().toUpperCase());
@@ -177,6 +246,16 @@ public class PEOCLI {
          ValidationUtils.validateParkingPayload(payload.toString(), config.getMaxAllowedAmount(), "citation.issue");
          return payload.toString();
     }
+
+/**
+
+ * Safe for log.
+
+ * @param value the value
+
+ * @return the string
+
+ */
 
     private static String safeForLog(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");

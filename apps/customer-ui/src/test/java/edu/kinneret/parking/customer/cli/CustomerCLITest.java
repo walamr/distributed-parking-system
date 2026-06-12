@@ -21,6 +21,9 @@ public class CustomerCLITest {
         assertEquals("transactions.queue", config.getTransactionsQueueName(), "Queue must be transactions.queue");
         assertTrue(config.isRabbitMqTlsEnabled(), "RabbitMQ TLS must be enabled");
     }
+    /**
+     * Cli payload builder accepts valid parking action.
+     */
 
     @Test
     public void cliPayloadBuilderAcceptsValidParkingAction() {
@@ -31,6 +34,9 @@ public class CustomerCLITest {
         assertTrue(payload.contains("\"spaceId\":\"P01\""));
         assertTrue(payload.contains("\"type\":\"start\""));
     }
+    /**
+     * Cli payload builder rejects invalid input.
+     */
 
     @Test
     public void cliPayloadBuilderRejectsInvalidInput() {

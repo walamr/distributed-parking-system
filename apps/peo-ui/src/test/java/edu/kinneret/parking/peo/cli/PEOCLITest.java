@@ -21,6 +21,9 @@ public class PEOCLITest {
         assertEquals("citations.queue", config.getCitationsQueueName(), "Queue must be citations.queue");
         assertTrue(config.isRabbitMqTlsEnabled(), "RabbitMQ TLS must be enabled");
     }
+    /**
+     * Cli payload builder accepts valid citation.
+     */
 
     @Test
     public void cliPayloadBuilderAcceptsValidCitation() {
@@ -32,6 +35,9 @@ public class PEOCLITest {
         assertTrue(payload.contains("\"amount\":150.0"));
         assertTrue(payload.contains("\"reason\":\"Expired meter\""));
     }
+    /**
+     * Cli payload builder rejects invalid citation input.
+     */
 
     @Test
     public void cliPayloadBuilderRejectsInvalidCitationInput() {

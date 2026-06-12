@@ -80,6 +80,15 @@ public class MongoStorageService {
         }
     }
 
+    /**
+     * Converts a JSON payload string into a MongoDB-native value.
+     * When the payload is a valid JSON object it is stored as an embedded BSON document;
+     * otherwise the raw string is stored as-is for backward compatibility.
+     *
+     * @param payloadJson the payload JSON text
+     * @return a {@link org.bson.Document} when the payload parses as a JSON object,
+     *         or the original string otherwise
+     */
     static Object toMongoPayloadValue(String payloadJson) {
         try {
             JsonElement parsedPayload = JsonParser.parseString(payloadJson);

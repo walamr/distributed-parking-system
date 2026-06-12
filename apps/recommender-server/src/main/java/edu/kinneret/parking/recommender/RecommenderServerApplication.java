@@ -184,6 +184,14 @@ public class RecommenderServerApplication extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Adds a labelled read-only row to the status grid pane.
+     *
+     * @param grid  the target grid pane
+     * @param row   the zero-based row index
+     * @param label the left-column label text
+     * @param value the right-column value text
+     */
     private void addGridRow(GridPane grid, int row, String label, String value) {
         Label lbl = new Label(label);
         lbl.setStyle("-fx-text-fill: #a6adc8; -fx-font-weight: bold;");
@@ -193,6 +201,9 @@ public class RecommenderServerApplication extends Application {
         grid.add(val, 1, row);
     }
 
+    /**
+     * Refreshes the status label to reflect whether malicious mode is active.
+     */
     private void updateStatusText() {
         if (server.isMalicious()) {
             statusLabel.setText("Status: ACTIVE - MALICIOUS MODE (" + server.getMaliciousPayload() + ")");
@@ -203,6 +214,10 @@ public class RecommenderServerApplication extends Application {
         }
     }
 
+    /**
+     * Runs an interactive command-line menu that lets an operator toggle malicious
+     * mode and change the malicious payload at runtime.
+     */
     private static void runConsoleMenu() {
         try (Scanner scanner = new Scanner(System.in)) {
             System.out.println("==========================================");

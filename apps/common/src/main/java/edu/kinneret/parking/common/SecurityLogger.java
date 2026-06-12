@@ -15,6 +15,7 @@ public final class SecurityLogger {
     private static final Logger logger = Logger.getLogger("edu.kinneret.security");
     private static boolean initialized = false;
 
+    /** Utility class; instantiation is not permitted. */
     private SecurityLogger() {}
 
     /**
@@ -97,6 +98,13 @@ public final class SecurityLogger {
         }
     }
 
+    /**
+     * Escapes special JSON characters in a string so it can be safely embedded
+     * within a JSON string value.
+     *
+     * @param str the raw string to escape
+     * @return the JSON-safe escaped string
+     */
     private static String escapeJson(String str) {
         if (str == null) return "";
         return str.replace("\\", "\\\\")

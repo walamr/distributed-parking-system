@@ -188,6 +188,26 @@ public class CustomerCLI {
         System.out.println("Exiting CLI.");
     }
 
+/**
+
+ * Publish message.
+
+ * @param manager the manager
+
+ * @param config the config
+
+ * @param signer the signer
+
+ * @param vin the vin
+
+ * @param spaceId the spaceId
+
+ * @param type the type
+
+ * @param repository the repository
+
+ */
+
     private static void publishMessage(RabbitMqConnectionManager manager, AppConfig config, SecureMessageSigner signer, String vin, String spaceId, String type, ParkingRepository repository) {
         try {
             String payload = buildPayload(vin, spaceId, type, repository, config);
@@ -205,9 +225,52 @@ public class CustomerCLI {
         }
     }
 
+/**
+
+ * Build payload.
+
+ * @param vin the vin
+
+ * @param spaceId the spaceId
+
+ * @param type the type
+
+ * @param config the config
+
+ * @return the string
+
+ */
+
     static String buildPayload(String vin, String spaceId, String type, AppConfig config) {
+        /**
+         * Build payload.
+         * @param vin the vin
+         * @param spaceId the spaceId
+         * @param type the type
+         * @param null the null
+         * @param config the config
+         * @return the return
+         */
         return buildPayload(vin, spaceId, type, null, config);
     }
+
+/**
+
+ * Build payload.
+
+ * @param vin the vin
+
+ * @param spaceId the spaceId
+
+ * @param type the type
+
+ * @param repository the repository
+
+ * @param config the config
+
+ * @return the string
+
+ */
 
     static String buildPayload(String vin, String spaceId, String type, ParkingRepository repository, AppConfig config) {
         String safeVin = ValidationUtils.requireValidVehicleId(vin == null ? "" : vin.trim().toUpperCase());
@@ -331,6 +394,16 @@ public class CustomerCLI {
             System.out.println("ERROR: Recommendation service temporarily unavailable.");
         }
     }
+
+/**
+
+ * Safe for log.
+
+ * @param value the value
+
+ * @return the string
+
+ */
 
     private static String safeForLog(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");

@@ -12,6 +12,12 @@ import java.util.logging.Logger;
 public final class QueueServerApplication {
     private static final Logger logger = Logger.getLogger(QueueServerApplication.class.getName());
 
+/**
+
+ * Constructs a new QueueServerApplication.
+
+ */
+
     private QueueServerApplication() {
     }
 

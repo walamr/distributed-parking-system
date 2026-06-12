@@ -67,6 +67,9 @@ public class MOController {
         startHealthMonitor();
     }
 
+    /**
+     * Starts a daemon thread that refreshes the health labels every five seconds.
+     */
     private void startHealthMonitor() {
         Thread monitorThread = new Thread(() -> {
             while (true) {
@@ -82,6 +85,10 @@ public class MOController {
         monitorThread.start();
     }
 
+    /**
+     * Queries MongoDB replica-set status and RabbitMQ connectivity, then updates
+     * the health labels on the JavaFX Application Thread.
+     */
     private void refreshHealth() {
         Document mongoStatus = repository.getClusterStatus();
         boolean rabbitHealthy = rabbitManager.checkHealth();

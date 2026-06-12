@@ -1,0 +1,123 @@
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\MessageEnvelope.java
+  Line  13: Method/Constructor missing Javadoc | private static final Pattern JSON_PATTERN = Pattern.compile(
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\MongoConnectionManager.java
+  Line  17: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(MongoConnectionManager.class.getName());
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\NonceStore.java
+  Line  22: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(NonceStore.class.getName());
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ParkingRepository.java
+  Line  22: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(ParkingRepository.class.getName());
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\QueueMessageSecurityValidator.java
+  Line  75: Missing @return | public record ValidationResult(boolean accepted, String reason) {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\RabbitMqConnectionManager.java
+  Line 172: Missing @return | public record ConnectionHandle(Connection connection, ClusterNode activeNode) implements AutoCloseable {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\SecurityLogger.java
+  Line  15: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger("edu.kinneret.security");
+  Line  18: Method/Constructor missing Javadoc | private SecurityLogger() {}
+  Line 100: Method/Constructor missing Javadoc | private static String escapeJson(String str) {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\TlsUtils.java
+  Line  25: Method/Constructor missing Javadoc | private TlsUtils() {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ValidationUtils.java
+  Line  14: Method/Constructor missing Javadoc | private static final Pattern QUEUE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]{1,255}$");
+  Line  15: Method/Constructor missing Javadoc | private static final Pattern MESSAGE_TYPE_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]{1,100}$");
+  Line  16: Method/Constructor missing Javadoc | private static final Pattern VEHICLE_ID_PATTERN = Pattern.compile("^[A-Z0-9-]{1,20}$");
+  Line  17: Method/Constructor missing Javadoc | private static final Pattern SPACE_ID_PATTERN = Pattern.compile("^(?:[A-Z]{0,3}\\d{1,4}|\\d{1,4})$");
+  Line  18: Method/Constructor missing Javadoc | private static final Pattern REASON_PATTERN = Pattern.compile("^[a-zA-Z0-9 .,;:()#/'_-]{1,255}$");
+  Line  19: Method/Constructor missing Javadoc | private static final Pattern SAFE_LABEL_PATTERN = Pattern.compile("^[a-zA-Z0-9 .,;:()#/'_-]{1,100}$");
+  Line  20: Method/Constructor missing Javadoc | private static final Pattern ACTION_PATTERN = Pattern.compile("^(start|stop)$");
+  Line  21: Method/Constructor missing Javadoc | private static final Pattern COST_PATTERN = Pattern.compile("^\\d{1,6}(?:\\.\\d{1,2})?$");
+  Line  23: Method/Constructor missing Javadoc | private ValidationUtils() {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ui\LoginController.java
+  Line 315: Method/Constructor missing Javadoc | private void setStatus(String message, boolean error) {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ui\PhoneFrameBuilder.java
+  Line  28: Method/Constructor missing Javadoc | private PhoneFrameBuilder() {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ui\SignupController.java
+  Line 341: Method/Constructor missing Javadoc | private void setStatus(String message, boolean error) {
+
+File: apps\common\src\main\java\edu\kinneret\parking\common\ui\WelcomeController.java
+  Line  44: Method/Constructor missing Javadoc | private void navigate(String fxml) {
+
+File: apps\customer-ui\src\main\java\edu\kinneret\parking\customer\RecommenderRequestSigner.java
+  Line  17: Method/Constructor missing Javadoc | private static final Set<String> SIGNED_FIELDS = Set.of(
+
+File: apps\customer-ui\src\main\java\edu\kinneret\parking\customer\cli\CustomerCLI.java
+  Line  29: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(CustomerCLI.class);
+
+File: apps\customer-ui\src\main\java\edu\kinneret\parking\customer\ui\CustomerApp.java
+  Line  38: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(CustomerApp.class);
+  Line 141: Missing @param "unchecked" | @SuppressWarnings("unchecked")
+
+File: apps\customer-ui\src\main\java\edu\kinneret\parking\customer\ui\CustomerController.java
+  Line  35: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
+  Line  56: Method/Constructor missing Javadoc | private final ObservableList<Document> historyItems = FXCollections.observableArrayList();
+
+File: apps\mo-ui\src\main\java\edu\kinneret\parking\mo\cli\MOCLI.java
+  Line  30: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(MOCLI.class);
+
+File: apps\mo-ui\src\main\java\edu\kinneret\parking\mo\ui\MOApp.java
+  Line  35: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(MOApp.class);
+  Line  70: Missing @param "unchecked" | @SuppressWarnings("unchecked")
+  Line 249: Method/Constructor missing Javadoc | private VBox createHealthDashboard(Label mongoStatus, Label rabbitStatus) {
+
+File: apps\mo-ui\src\main\java\edu\kinneret\parking\mo\ui\MOController.java
+  Line  29: Method/Constructor missing Javadoc | private final ObservableList<Document> transactionItems = FXCollections.observableArrayList();
+  Line  30: Method/Constructor missing Javadoc | private final ObservableList<Document> citationItems = FXCollections.observableArrayList();
+
+File: apps\mulligan-app\src\main\java\edu\kinneret\parking\app\MulliganApp.java
+  Line  19: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(MulliganApp.class.getName());
+
+File: apps\peo-ui\src\main\java\edu\kinneret\parking\peo\cli\PEOCLI.java
+  Line  27: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(PEOCLI.class);
+
+File: apps\peo-ui\src\main\java\edu\kinneret\parking\peo\ui\PEOApp.java
+  Line  38: Method/Constructor missing Javadoc | private static final Logger logger = LoggerFactory.getLogger(PEOApp.class);
+  Line 105: Missing @param "unchecked" | @SuppressWarnings("unchecked")
+
+File: apps\peo-ui\src\main\java\edu\kinneret\parking\peo\ui\PEOController.java
+  Line  78: Method/Constructor missing Javadoc | private final ObservableList<ActivityLogEntry> activityItems = FXCollections.observableArrayList();
+
+File: apps\queue-server\src\main\java\edu\kinneret\parking\queue\QueueConsumerService.java
+  Line  27: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(QueueConsumerService.class.getName());
+
+File: apps\queue-server\src\main\java\edu\kinneret\parking\queue\QueuePublisherSmokeTest.java
+  Line  15: Method/Constructor missing Javadoc | private QueuePublisherSmokeTest() {
+
+File: apps\queue-server\src\main\java\edu\kinneret\parking\queue\QueueServerApplication.java
+  Line  13: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(QueueServerApplication.class.getName());
+  Line  15: Method/Constructor missing Javadoc | private QueueServerApplication() {
+
+File: apps\recommender-server\src\main\java\edu\kinneret\parking\recommender\RecommendationResult.java
+  Line  13: Method/Constructor missing Javadoc | public String toString() {
+
+File: apps\recommender-server\src\main\java\edu\kinneret\parking\recommender\RecommenderServer.java
+  Line  51: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(RecommenderServer.class.getName());
+  Line  56: Method/Constructor missing Javadoc | private static final Set<String> REQUEST_TYPES = Set.of("CLIENT_QUERY", "FORWARD_QUERY", "COLLECT_REQUEST");
+  Line  57: Method/Constructor missing Javadoc | private static final Set<String> RESPONSE_TYPES = Set.of("CLIENT_RESPONSE", "COLLECT_RESPONSE");
+  Line  58: Method/Constructor missing Javadoc | private static final Set<String> SIGNED_FIELDS = Set.of(
+  Line 1331: Missing @return | private record NodeEndpoint(String nodeId, String host, int port) {
+
+File: apps\recommender-server\src\main\java\edu\kinneret\parking\recommender\RecommenderServerApplication.java
+  Line  37: Method/Constructor missing Javadoc | private static List<String> clusterNodes = Arrays.asList("localhost:8091", "localhost:8092", "localhost:8093");
+
+File: apps\storage-server\src\main\java\edu\kinneret\parking\storage\MongoStorageService.java
+  Line  18: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(MongoStorageService.class.getName());
+
+File: apps\storage-server\src\main\java\edu\kinneret\parking\storage\StorageServerApplication.java
+  Line  30: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(StorageServerApplication.class.getName());
+
+File: apps\storage-server\src\main\java\edu\kinneret\parking\storage\TestMongo.java
+  Line  19: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(TestMongo.class.getName());
+
+File: apps\storage-server\src\main\java\edu\kinneret\parking\storage\TestParse.java
+  Line  19: Method/Constructor missing Javadoc | private static final Logger logger = Logger.getLogger(TestParse.class.getName());

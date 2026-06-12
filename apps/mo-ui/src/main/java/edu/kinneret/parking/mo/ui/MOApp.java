@@ -246,6 +246,18 @@ public class MOApp extends Application {
         return root;
     }
 
+/**
+
+ * Create health dashboard.
+
+ * @param mongoStatus the mongoStatus
+
+ * @param rabbitStatus the rabbitStatus
+
+ * @return the vbox
+
+ */
+
     private VBox createHealthDashboard(Label mongoStatus, Label rabbitStatus) {
         VBox dashboard = new VBox(10);
         dashboard.setPadding(new Insets(10));

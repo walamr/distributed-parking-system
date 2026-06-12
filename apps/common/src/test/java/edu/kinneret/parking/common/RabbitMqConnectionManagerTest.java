@@ -7,7 +7,16 @@ import com.rabbitmq.client.ConnectionFactory;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
+/**
+
+ * Represents a class RabbitMqConnectionManagerTest.
+
+ */
+
 class RabbitMqConnectionManagerTest {
+    /**
+     * Should configure factory for recovery and tls.
+     */
 
     @Test
     void shouldConfigureFactoryForRecoveryAndTls() {

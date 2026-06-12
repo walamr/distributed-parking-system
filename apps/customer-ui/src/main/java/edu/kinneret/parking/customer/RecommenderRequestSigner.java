@@ -18,6 +18,12 @@ public final class RecommenderRequestSigner {
             "type", "spaceId", "correlationId", "timestamp", "nonce", "nodeId",
             "localResult", "status", "result", "reason");
 
+/**
+
+ * Constructs a new RecommenderRequestSigner.
+
+ */
+
     private RecommenderRequestSigner() {
     }
 
@@ -43,6 +49,16 @@ public final class RecommenderRequestSigner {
         request.addProperty("hmac", signer.sign(canonicalSigningContent(request)));
         return request;
     }
+
+/**
+
+ * Canonical signing content.
+
+ * @param message the message
+
+ * @return the string
+
+ */
 
     private static String canonicalSigningContent(JsonObject message) {
         Map<String, String> fields = new LinkedHashMap<>();

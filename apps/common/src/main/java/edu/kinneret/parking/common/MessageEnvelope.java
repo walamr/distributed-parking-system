@@ -268,10 +268,24 @@ public final class MessageEnvelope {
                 unescapeJson(matcher.group("hmac")));
     }
 
+    /**
+     * Escapes backslash and double-quote characters so that the value can be safely
+     * embedded as a JSON string.
+     *
+     * @param value the raw string value
+     * @return the JSON-escaped string
+     */
 
     private static String escapeJson(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
+
+    /**
+     * Unescapes JSON backslash sequences in a string value parsed from a JSON literal.
+     *
+     * @param value the JSON-escaped string value
+     * @return the unescaped string
+     */
 
     private static String unescapeJson(String value) {
         StringBuilder builder = new StringBuilder(value.length());
