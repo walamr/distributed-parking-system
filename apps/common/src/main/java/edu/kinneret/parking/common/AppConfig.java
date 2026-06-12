@@ -51,6 +51,7 @@ public final class AppConfig {
     private final String hmacSecret;
     private final long nonceTtlSeconds;
     private final double maxAllowedAmount;
+    private final List<ClusterNode> recommenderNodes;
 
     /**
      * Application-specific defaults used to keep least-privilege credentials aligned
@@ -160,7 +161,8 @@ public final class AppConfig {
             boolean mongoTlsAllowInvalidHostnames,
             String hmacSecret,
             long nonceTtlSeconds,
-            double maxAllowedAmount) {
+            double maxAllowedAmount,
+            List<ClusterNode> recommenderNodes) {
         this.rabbitMqNodes = List.copyOf(rabbitMqNodes);
         this.rabbitMqUsername = rabbitMqUsername;
         this.rabbitMqPassword = rabbitMqPassword;
@@ -184,6 +186,7 @@ public final class AppConfig {
         this.hmacSecret = hmacSecret;
         this.nonceTtlSeconds = nonceTtlSeconds;
         this.maxAllowedAmount = maxAllowedAmount;
+        this.recommenderNodes = List.copyOf(recommenderNodes);
     }
 
     private static void loadDotEnv(Map<String, String> env) {
@@ -356,6 +359,8 @@ public final class AppConfig {
                 .parseLong(readOrDefault(environment, "NONCE_TTL_SECONDS", String.valueOf(DEFAULT_NONCE_TTL_SECONDS)));
         double maxAllowedAmount = Double.parseDouble(readOrDefault(environment, "MAX_ALLOWED_AMOUNT", String.valueOf(DEFAULT_MAX_ALLOWED_AMOUNT)));
 
+        List<ClusterNode> recommenderNodes = parseRecommenderNodes(readOrDefault(environment, "RECOMMENDER_NODES", "localhost:8091,localhost:8092,localhost:8093"));
+
         return new AppConfig(
                 nodes,
                 username,
@@ -379,8 +384,18 @@ public final class AppConfig {
                 mongoTlsAllowInvalidHostnames,
                 hmacSecret,
                 nonceTtlSeconds,
-                maxAllowedAmount);
+                maxAllowedAmount,
+                recommenderNodes);
 
+    }
+
+    /**
+     * Returns the configured Recommender nodes.
+     *
+     * @return the recommender node list
+     */
+    public List<ClusterNode> getRecommenderNodes() {
+        return recommenderNodes;
     }
 
     /**
@@ -654,6 +669,27 @@ public final class AppConfig {
             String host = ValidationUtils.requireNonEmpty(addressParts[0], "rabbitMqNodeHost");
             int port = parsePositiveInt(addressParts[1], "rabbitMqNodePort");
             nodes.add(new ClusterNode(host, port, "rabbitmq" + counter, true));
+            counter++;
+        }
+        return nodes;
+    }
+
+    private static List<ClusterNode> parseRecommenderNodes(String rawNodes) {
+        List<ClusterNode> nodes = new ArrayList<>();
+        String[] parts = rawNodes.split(",");
+        int counter = 1;
+        for (String part : parts) {
+            String trimmedPart = part.trim();
+            if (trimmedPart.isEmpty()) {
+                continue;
+            }
+            String[] addressParts = trimmedPart.split(":");
+            if (addressParts.length != 2) {
+                throw new IllegalArgumentException("Invalid recommender node entry: " + trimmedPart);
+            }
+            String host = ValidationUtils.requireNonEmpty(addressParts[0], "recommenderNodeHost");
+            int port = parsePositiveInt(addressParts[1], "recommenderNodePort");
+            nodes.add(new ClusterNode(host, port, "recommender" + counter, true));
             counter++;
         }
         return nodes;

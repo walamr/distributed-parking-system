@@ -1435,8 +1435,8 @@ public class CustomerController {
             return;
         }
 
-        int[] ports = {8091, 8092, 8093};
-        final int finalPort = ports[(int) (Math.random() * 3)];
+        List<ClusterNode> recNodes = new java.util.ArrayList<>(config.getRecommenderNodes());
+        java.util.Collections.shuffle(recNodes);
 
         Task<String> task = new Task<>() {
             @Override
@@ -1453,21 +1453,32 @@ public class CustomerController {
                         config.getTlsTruststorePassword(),
                         config.getTlsKeystorePath(),
                         config.getTlsKeystorePassword());
-                try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
-                    socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
-                    socket.connect(new java.net.InetSocketAddress("localhost", finalPort), 3000);
-                    socket.startHandshake();
-                    try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-                         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-                        
-                        writer.println(request.toString());
-                        String responseLine = reader.readLine();
-                        if (responseLine == null) {
-                            throw new IOException("Empty response from recommender.");
+
+                Exception lastEx = null;
+                for (ClusterNode node : recNodes) {
+                    try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
+                        socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
+                        socket.connect(new java.net.InetSocketAddress(node.getHost(), node.getPort()), 3000);
+                        socket.startHandshake();
+                        try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+                             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                            
+                            writer.println(request.toString());
+                            String responseLine = reader.readLine();
+                            if (responseLine == null) {
+                                throw new IOException("Empty response from recommender node " + node.getDisplayName());
+                            }
+                            return responseLine;
                         }
-                        return responseLine;
+                    } catch (Exception ex) {
+                        logger.warn("Failed to query recommender node " + node.getDisplayName() + " at " + node.toAddress() + ": " + ex.getMessage());
+                        lastEx = ex;
                     }
                 }
+                if (lastEx != null) {
+                    throw lastEx;
+                }
+                throw new IOException("No configured recommender nodes could be reached.");
             }
         };
 

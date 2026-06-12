@@ -27,6 +27,7 @@ public class RecommenderServerApplication extends Application {
     private static int leaderPort = 8091;
     private static boolean isLeader = true;
     private static boolean isMalicious = false;
+    private static String maliciousPayload = null;
     private static List<String> clusterNodes = Arrays.asList("localhost:8091", "localhost:8092", "localhost:8093");
     private static boolean runCli = false;
 
@@ -74,6 +75,9 @@ public class RecommenderServerApplication extends Application {
                     case "malicious":
                         isMalicious = Boolean.parseBoolean(value);
                         break;
+                    case "maliciousPayload":
+                        maliciousPayload = value;
+                        break;
                     case "nodes":
                         clusterNodes = Arrays.asList(value.split(","));
                         break;
@@ -88,6 +92,7 @@ public class RecommenderServerApplication extends Application {
         leaderPort = Integer.getInteger("leaderPort", leaderPort);
         isLeader = Boolean.getBoolean("isLeader") || isLeader;
         isMalicious = Boolean.getBoolean("malicious") || isMalicious;
+        maliciousPayload = System.getProperty("maliciousPayload", maliciousPayload);
         if (System.getProperty("nodes") != null) {
             clusterNodes = Arrays.asList(System.getProperty("nodes").split(","));
         }
@@ -97,6 +102,9 @@ public class RecommenderServerApplication extends Application {
 
         try {
             server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes, appConfig);
+            if (maliciousPayload != null) {
+                server.setMaliciousPayload(maliciousPayload);
+            }
             server.start();
         } catch (IOException e) {
             System.err.println("Fatal: Could not start recommender server. See server logs for details.");
@@ -141,10 +149,30 @@ public class RecommenderServerApplication extends Application {
             updateStatusText();
         });
 
+        javafx.scene.layout.HBox payloadBox = new javafx.scene.layout.HBox(10);
+        payloadBox.setAlignment(Pos.CENTER);
+        Label payloadLabel = new Label("Malicious Payload:");
+        payloadLabel.setStyle("-fx-text-fill: #a6adc8; -fx-font-weight: bold;");
+        TextField payloadField = new TextField(server.getMaliciousPayload());
+        payloadField.setPrefWidth(150);
+        payloadField.setStyle("-fx-background-color: #313244; -fx-text-fill: #cdd6f4; -fx-prompt-text-fill: #585b70;");
+        payloadField.textProperty().addListener((obs, oldVal, newVal) -> {
+            try {
+                server.setMaliciousPayload(newVal);
+                payloadField.setStyle("-fx-background-color: #313244; -fx-text-fill: #cdd6f4; -fx-prompt-text-fill: #585b70;");
+                updateStatusText();
+            } catch (IllegalArgumentException ex) {
+                payloadField.setStyle("-fx-background-color: #313244; -fx-text-fill: #f38ba8; -fx-prompt-text-fill: #585b70; -fx-border-color: #f38ba8; -fx-border-width: 1px;");
+                statusLabel.setText("Error: Invalid payload format!");
+                statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
+            }
+        });
+        payloadBox.getChildren().addAll(payloadLabel, payloadField);
+
         statusLabel = new Label();
         updateStatusText();
 
-        root.getChildren().addAll(titleLabel, grid, maliciousCheck, statusLabel);
+        root.getChildren().addAll(titleLabel, grid, maliciousCheck, payloadBox, statusLabel);
 
         Scene scene = new Scene(root, 400, 300);
         primaryStage.setScene(scene);
@@ -167,7 +195,7 @@ public class RecommenderServerApplication extends Application {
 
     private void updateStatusText() {
         if (server.isMalicious()) {
-            statusLabel.setText("Status: ACTIVE - RUNNING IN MALICIOUS MODE (Returns faked space)");
+            statusLabel.setText("Status: ACTIVE - MALICIOUS MODE (" + server.getMaliciousPayload() + ")");
             statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
         } else {
             statusLabel.setText("Status: ACTIVE - RUNNING IN NORMAL MODE");
@@ -185,7 +213,8 @@ public class RecommenderServerApplication extends Application {
 
             while (true) {
                 System.out.println("\nNode Mode: " + (server.isMalicious() ? "MALICIOUS" : "NORMAL"));
-                System.out.println("Options: [m] Toggle Malicious Mode, [q] Quit Node");
+                System.out.println("Malicious Payload: " + server.getMaliciousPayload());
+                System.out.println("Options: [m] Toggle Malicious Mode, [p] Change Malicious Payload, [q] Quit Node");
                 System.out.print("Select: ");
                 
                 if (!scanner.hasNextLine()) {
@@ -210,6 +239,17 @@ public class RecommenderServerApplication extends Application {
                     boolean nextState = !server.isMalicious();
                     server.setMalicious(nextState);
                     System.out.println("SUCCESS: Toggled malicious mode to: " + nextState);
+                } else if ("p".equals(input)) {
+                    System.out.print("Enter new malicious payload (e.g. 999;999): ");
+                    if (scanner.hasNextLine()) {
+                        String newPayload = scanner.nextLine().trim();
+                        try {
+                            server.setMaliciousPayload(newPayload);
+                            System.out.println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
+                        } catch (IllegalArgumentException ex) {
+                            System.out.println("ERROR: " + ex.getMessage());
+                        }
+                    }
                 } else {
                     System.out.println("Invalid option.");
                 }

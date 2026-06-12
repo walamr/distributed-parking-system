@@ -108,7 +108,15 @@ public class RecommenderServerTest {
     @Test
     public void maliciousModeReturnsFakedResult() {
         server.setMalicious(true);
-        assertTrue(server.calculateLocalRecommendation("3").startsWith("Request: Space 3\nResult: Space 999;999"));
+        assertTrue(server.calculateLocalRecommendation("3").contains("Result: Space 999;999"));
+    }
+
+    @Test
+    public void testCustomMaliciousPayload() {
+        server.setMalicious(true);
+        server.setMaliciousPayload("123;123");
+        assertEquals("123;123", server.getMaliciousPayload());
+        assertTrue(server.calculateLocalRecommendation("3").contains("Result: Space 123;123"));
     }
 
     @Test

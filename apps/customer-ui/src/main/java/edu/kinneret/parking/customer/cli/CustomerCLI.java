@@ -155,15 +155,24 @@ public class CustomerCLI {
                                 }
                                 break;
                             }
-                            System.out.print("Select Recommender Node (1: port 8091, 2: port 8092, 3: port 8093) [Default 1]: ");
-                            String nodeChoice = scanner.nextLine().trim();
-                            int port = 8091;
-                            if ("2".equals(nodeChoice)) {
-                                port = 8092;
-                            } else if ("3".equals(nodeChoice)) {
-                                port = 8093;
+                            List<ClusterNode> recNodes = config.getRecommenderNodes();
+                            System.out.println("Select Recommender Node:");
+                            for (int i = 0; i < recNodes.size(); i++) {
+                                System.out.println(" [" + (i + 1) + "] " + recNodes.get(i).getDisplayName() + " (" + recNodes.get(i).toAddress() + ")");
                             }
-                            queryRecommender(spaceIdRec, port, config, signer);
+                            System.out.print("Select [Default 1]: ");
+                            String nodeChoice = scanner.nextLine().trim();
+                            int selectedIdx = 0;
+                            try {
+                                if (!nodeChoice.isEmpty()) {
+                                    selectedIdx = Integer.parseInt(nodeChoice) - 1;
+                                }
+                            } catch (NumberFormatException ignored) {}
+                            if (selectedIdx < 0 || selectedIdx >= recNodes.size()) {
+                                selectedIdx = 0;
+                            }
+                            ClusterNode selectedNode = recNodes.get(selectedIdx);
+                            queryRecommender(spaceIdRec, selectedNode.getHost(), selectedNode.getPort(), config, signer);
                             break;
                         case "5":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
@@ -254,11 +263,12 @@ public class CustomerCLI {
      * Sends a signed TLS recommendation query from the CLI.
      *
      * @param spaceId requested numeric parking space number
+     * @param host recommender node host address
      * @param port recommender node TLS port
      * @param config application TLS configuration
      * @param signer HMAC-SHA256 signer
      */
-    private static void queryRecommender(String spaceId, int port, AppConfig config, SecureMessageSigner signer) {
+    private static void queryRecommender(String spaceId, String host, int port, AppConfig config, SecureMessageSigner signer) {
         if (spaceId == null || spaceId.isBlank()) {
             System.out.println("ERROR: Space ID cannot be empty.");
             return;
@@ -294,7 +304,7 @@ public class CustomerCLI {
                     config.getTlsKeystorePassword());
             try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
             socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
-            socket.connect(new java.net.InetSocketAddress("localhost", port), 3000);
+            socket.connect(new java.net.InetSocketAddress(host, port), 3000);
             socket.startHandshake();
             try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
                  java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
@@ -317,7 +327,7 @@ public class CustomerCLI {
             }
             }
         } catch (Exception e) {
-            logger.warn("Could not query recommender node on port {}", port, e);
+            logger.warn("Could not query recommender node at {}:{}", host, port, e);
             System.out.println("ERROR: Recommendation service temporarily unavailable.");
         }
     }

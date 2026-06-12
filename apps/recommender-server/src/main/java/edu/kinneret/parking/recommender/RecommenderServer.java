@@ -64,6 +64,7 @@ public class RecommenderServer implements AutoCloseable {
     private final int leaderPort;
     private final boolean isLeader;
     private volatile boolean isMalicious;
+    private volatile String maliciousPayload;
     private final List<NodeEndpoint> clusterNodes;
     private final AppConfig appConfig;
     private final SecureMessageSigner signer;
@@ -99,6 +100,14 @@ public class RecommenderServer implements AutoCloseable {
         this.leaderPort = ValidationUtils.requirePositive(leaderPort, "leaderPort");
         this.isLeader = isLeader;
         this.isMalicious = isMalicious;
+        String suffix = "999;999";
+        if (nodeId != null) {
+            String digits = nodeId.replaceAll("\\D+", "");
+            if (!digits.isEmpty()) {
+                suffix = "99" + digits + ";99" + digits;
+            }
+        }
+        this.maliciousPayload = "Space " + suffix;
         this.clusterNodes = parseClusterNodes(clusterNodes);
         this.appConfig = appConfig;
         this.signer = new SecureMessageSigner(appConfig.getHmacSecret());
@@ -354,13 +363,39 @@ public class RecommenderServer implements AutoCloseable {
         JsonObject response = createSignedMessage("CLIENT_RESPONSE", spaceId, correlationId, nodeId);
         if (consensus != null) {
             response.addProperty("status", "SUCCESS");
-            response.addProperty("result", consensus);
+            String finalResult;
+            if (consensus.startsWith("Request:")) {
+                finalResult = consensus;
+            } else {
+                long requestedCitations = getLocalCitationsCount(spaceId);
+                String consensusList = consensus;
+                if (!consensusList.startsWith("Space ") && !consensusList.equals("NONE")) {
+                    consensusList = "Space " + consensusList;
+                }
+                finalResult = "Request: Space " + spaceId + " (" + requestedCitations + " Citations)\nResult: " + consensusList;
+            }
+            response.addProperty("result", finalResult);
         } else {
             response.addProperty("status", "FAILURE");
             response.addProperty("reason", "No majority consensus reached in cluster.");
         }
         signMessage(response, signer);
         writer.println(response);
+    }
+
+    private long getLocalCitationsCount(String spaceId) {
+        try (ParkingRepository repository = new ParkingRepository(appConfig)) {
+            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                return repository.getDatabase().getCollection("citations")
+                        .countDocuments(com.mongodb.client.model.Filters.or(
+                                com.mongodb.client.model.Filters.eq("payload.spaceId", spaceId),
+                                com.mongodb.client.model.Filters.eq("spaceId", spaceId)
+                        ));
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to get local citation count for space " + spaceId, e);
+        }
+        return 0;
     }
 
     private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
@@ -408,9 +443,15 @@ public class RecommenderServer implements AutoCloseable {
                 }));
             }
 
+            long endTime = System.currentTimeMillis() + TIMEOUT_MS + 200;
             for (Future<Void> fut : futures) {
                 try {
-                    fut.get(TIMEOUT_MS + 200, TimeUnit.MILLISECONDS);
+                    long remaining = endTime - System.currentTimeMillis();
+                    if (remaining > 0) {
+                        fut.get(remaining, TimeUnit.MILLISECONDS);
+                    } else {
+                        fut.cancel(true);
+                    }
                 } catch (Exception ignored) {
                 }
             }
@@ -449,7 +490,14 @@ public class RecommenderServer implements AutoCloseable {
         Map<String, Integer> counts = new HashMap<>();
         for (String vote : votes.values()) {
             if (vote != null && !vote.isBlank()) {
-                counts.put(vote, counts.getOrDefault(vote, 0) + 1);
+                String recommendation = extractRecommendationList(vote);
+                String cleanRec = recommendation;
+                if (cleanRec.startsWith("Space ")) {
+                    cleanRec = cleanRec.substring(6).trim();
+                }
+                if (recommendation.equals("NONE") || cleanRec.matches("\\d+;\\d+(,\\s*(Space\\s*)?\\d+;\\d+)*")) {
+                    counts.put(recommendation, counts.getOrDefault(recommendation, 0) + 1);
+                }
             }
         }
         String consensus = null;
@@ -461,6 +509,17 @@ public class RecommenderServer implements AutoCloseable {
             }
         }
         return maxVotes >= majorityThreshold ? consensus : null;
+    }
+
+    public static String extractRecommendationList(String vote) {
+        if (vote == null) {
+            return "";
+        }
+        if (vote.contains("Result:")) {
+            int index = vote.indexOf("Result:");
+            return vote.substring(index + "Result:".length()).trim();
+        }
+        return vote.trim();
     }
 
     /**
@@ -484,7 +543,14 @@ public class RecommenderServer implements AutoCloseable {
      */
     public String calculateLocalRecommendation(String desiredSpaceId, ParkingRepository repository) {
         if (isMalicious) {
-            return "Request: Space " + desiredSpaceId + "\nResult: Space 999;999";
+            String payload = maliciousPayload;
+            if (payload == null || payload.isBlank()) {
+                payload = "Space 999;999";
+            }
+            if (!payload.startsWith("Space ") && !payload.equals("NONE")) {
+                payload = "Space " + payload;
+            }
+            return "Request: Space " + desiredSpaceId + "\nResult: " + payload;
         }
 
         String safeSpaceId = requireValidRecommenderSpace(desiredSpaceId);
@@ -831,6 +897,51 @@ public class RecommenderServer implements AutoCloseable {
      */
     public boolean isMalicious() {
         return isMalicious;
+    }
+
+    /**
+     * Validates if the malicious payload format matches the expected pattern.
+     *
+     * @param payload the payload to validate
+     * @return true if the format is valid, false otherwise
+     */
+    public static boolean isValidMaliciousPayload(String payload) {
+        if (payload == null) {
+            return false;
+        }
+        String clean = payload.trim();
+        if (clean.equals("NONE")) {
+            return true;
+        }
+        if (clean.startsWith("Space ")) {
+            clean = clean.substring(6).trim();
+        }
+        return clean.matches("\\d+;\\d+(,\\s*(Space\\s*)?\\d+;\\d+)*");
+    }
+
+    /**
+     * Sets the custom malicious payload to return.
+     *
+     * @param payload the fake result payload, e.g. "999;999" or "Space 999;999"
+     */
+    public void setMaliciousPayload(String payload) {
+        if (payload != null && !payload.trim().isEmpty()) {
+            String trimmed = payload.trim();
+            if (!isValidMaliciousPayload(trimmed)) {
+                throw new IllegalArgumentException("Invalid payload format. Must be 'NONE' or match space pattern (e.g. '999;999' or 'Space 999;999').");
+            }
+            this.maliciousPayload = trimmed;
+            logger.info("Node '" + nodeId + "' set maliciousPayload=" + this.maliciousPayload);
+        }
+    }
+
+    /**
+     * Gets the custom malicious payload.
+     *
+     * @return the current fake result payload
+     */
+    public String getMaliciousPayload() {
+        return maliciousPayload;
     }
 
     /**
