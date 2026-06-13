@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
 
 TLS_ARGS=(
   --tls
@@ -51,7 +51,7 @@ elif mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >
   echo "Old demo admin password detected; rotating users to current demo credentials."
   mongosh "$OLD_ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 else
-  mongosh "${TLS_RS_ARGS[@]}" --eval "$EVAL_USERS" /docker/mongodb/init-users-fresh.js
+  mongosh "${TLS_ARGS[@]}" --eval "$EVAL_USERS" /docker/mongodb/init-users-fresh.js
   mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 fi
 

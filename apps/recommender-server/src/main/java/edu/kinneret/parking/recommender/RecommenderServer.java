@@ -703,7 +703,7 @@ public class RecommenderServer implements AutoCloseable {
         List<Document> allSpacesInZone = new ArrayList<>();
         if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
             repository.getDatabase().getCollection("spaces")
-                    .find(com.mongodb.client.model.Filters.eq("zoneName", zoneName))
+                    .find()
                     .into(allSpacesInZone);
         } else {
             for (int i = 1; i <= MAX_SPACE_NUMBER; i++) {
@@ -790,10 +790,6 @@ public class RecommenderServer implements AutoCloseable {
                 continue;
             }
             if (!ParkingRepository.isDbOnline || repository.getDatabase() == null) {
-                String candidateZone = repository.getSpaceZone(spaceId);
-                if (!zoneName.equalsIgnoreCase(candidateZone)) {
-                    continue;
-                }
                 Document lastTx = repository.getLatestTransactionForSpace(spaceId);
                 if (lastTx != null && "start".equalsIgnoreCase(ParkingRepository.readTransactionAction(lastTx))) {
                     continue;
