@@ -49,14 +49,14 @@ Write-Host "━━━━━━━━━━━━━━━━━━━━━━�
 # 1. Initialize Replica Set with real IPs
 Write-Host "--- Step 1: Initialize Replica Set ---"
 $INIT_CMD = "rs.initiate({ _id: 'rs0', members: [ { _id: 0, host: '${MONGO1_IP}:27017' }, { _id: 1, host: '${MONGO2_IP}:27017' }, { _id: 2, host: '${MONGO3_IP}:27017' } ] })"
-docker exec mongo1 mongosh --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$INIT_CMD"
+docker exec mongo1 mongosh --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$INIT_CMD"
 
 # 2. Wait for Primary election
 Write-Host "--- Step 2: Wait for Primary election ---"
 $attempts = 0
 while ($attempts -lt 30) {
     Start-Sleep -Seconds 3
-    $primary = docker exec mongo1 mongosh --quiet --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "db.isMaster().primary" 2>$null
+    $primary = docker exec mongo1 mongosh --quiet --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "db.isMaster().primary" 2>$null
     if ($primary -and $primary -match "\d+\.\d+\.\d+\.\d+:\d+") {
         Write-Host "✅ Primary elected: $primary"
         break
@@ -70,22 +70,22 @@ Write-Host "--- Step 3: Create database users ---"
 # First, create the root admin user using the Localhost Exception
 docker cp ./docker/mongodb/init-users-fresh.js "mongo1:/tmp/init-users-fresh.js"
 $EVAL_USERS = "const dbAdminPass='$dbAdminPass'; const dbStoragePass='$dbStoragePass'; const dbPeoPass='$dbPeoPass'; const dbCustPass='$dbCustPass';"
-docker exec mongo1 mongosh --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$EVAL_USERS" /tmp/init-users-fresh.js
+docker exec mongo1 mongosh --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$EVAL_USERS" /tmp/init-users-fresh.js
 
 # Second, connect using the admin credentials to create the other users and roles
-$ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/admin?tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/admin?tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/init-users.js "mongo1:/tmp/init-users.js"
-docker exec mongo1 mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /tmp/init-users.js
+docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$ADMIN_URI" --eval "$EVAL_USERS" /tmp/init-users.js
 
 # 4. Import test data
 Write-Host "--- Step 4: Import sample data ---"
-$PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/seed-data.js "mongo1:/tmp/seed-data.js"
-docker exec mongo1 mongosh "$PARKING_ADMIN_URI" /tmp/seed-data.js
+docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" /tmp/seed-data.js
 
 # 5. Final check
 Write-Host "--- Step 5: Cluster Status ---"
-docker exec mongo1 mongosh "$PARKING_ADMIN_URI" --eval "rs.status().members.map(m => m.name + ': ' + m.stateStr)"
+docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" --eval "rs.status().members.map(m => m.name + ': ' + m.stateStr)"
 
 Write-Host ""
 Write-Host "✅ MongoDB Replica Set is ready on the network!"
