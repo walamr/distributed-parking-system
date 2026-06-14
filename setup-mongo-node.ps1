@@ -41,8 +41,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Add IP address to lo interface
-docker exec -u root $ContainerName ip addr show dev lo | Select-String $IpAddress >$null
-if ($LASTEXITCODE -ne 0) {
+$hasIp = docker exec -u root $ContainerName ip addr show dev lo | Select-String $IpAddress
+if (-not $hasIp) {
     docker exec -u root $ContainerName ip addr add "$IpAddress/32" dev lo
     Write-Host "Successfully added $IpAddress to lo interface in $ContainerName."
 } else {

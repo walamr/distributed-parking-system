@@ -19,6 +19,23 @@ $MONGO1_IP = $config["MONGO1_IP"]
 $MONGO2_IP = $config["MONGO2_IP"]
 $MONGO3_IP = $config["MONGO3_IP"]
 
+# Load .env to read custom MongoDB passwords
+if (Test-Path ".env") {
+    Get-Content ".env" | Where-Object { $_ -match "^\s*[^#].*=.*" } | ForEach-Object {
+        $parts = $_ -split "=", 2
+        $key = $parts[0].Trim()
+        $val = $parts[1].Trim()
+        if ($val.StartsWith('"') -and $val.EndsWith('"')) { $val = $val.Substring(1, $val.Length - 2) }
+        if ($val.StartsWith("'") -and $val.EndsWith("'")) { $val = $val.Substring(1, $val.Length - 2) }
+        [System.Environment]::SetEnvironmentVariable($key, $val)
+    }
+}
+
+$dbAdminPass = if ($env:MONGO_ADMIN_PASSWORD) { $env:MONGO_ADMIN_PASSWORD } else { "db_pwd_rotated_admin" }
+$dbStoragePass = if ($env:MONGO_STORAGE_PASSWORD) { $env:MONGO_STORAGE_PASSWORD } else { "db_pwd_rotated_storage" }
+$dbPeoPass = if ($env:MONGO_PEO_PASSWORD) { $env:MONGO_PEO_PASSWORD } else { "db_pwd_rotated_peo" }
+$dbCustPass = if ($env:MONGO_CUSTOMER_PASSWORD) { $env:MONGO_CUSTOMER_PASSWORD } else { "db_pwd_rotated_cust" }
+
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 Write-Host "  🍃 Initializing MongoDB Replica Set on the network"
 Write-Host "  mongo1: $MONGO1_IP"
@@ -50,18 +67,25 @@ while ($attempts -lt 30) {
 
 # 3. Create users
 Write-Host "--- Step 3: Create database users ---"
+# First, create the root admin user using the Localhost Exception
+docker cp ./docker/mongodb/init-users-fresh.js "mongo1:/tmp/init-users-fresh.js"
+$EVAL_USERS = "const dbAdminPass='$dbAdminPass'; const dbStoragePass='$dbStoragePass'; const dbPeoPass='$dbPeoPass'; const dbCustPass='$dbCustPass';"
+docker exec mongo1 mongosh --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$EVAL_USERS" /tmp/init-users-fresh.js
+
+# Second, connect using the admin credentials to create the other users and roles
+$ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/admin?tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/init-users.js "mongo1:/tmp/init-users.js"
-docker exec mongo1 mongosh --tls --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 /tmp/init-users.js
+docker exec mongo1 mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /tmp/init-users.js
 
 # 4. Import test data
 Write-Host "--- Step 4: Import sample data ---"
-$ADMIN_URI = "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/seed-data.js "mongo1:/tmp/seed-data.js"
-docker exec mongo1 mongosh "$ADMIN_URI" /tmp/seed-data.js
+docker exec mongo1 mongosh "$PARKING_ADMIN_URI" /tmp/seed-data.js
 
 # 5. Final check
 Write-Host "--- Step 5: Cluster Status ---"
-docker exec mongo1 mongosh "$ADMIN_URI" --eval "rs.status().members.map(m => m.name + ': ' + m.stateStr)"
+docker exec mongo1 mongosh "$PARKING_ADMIN_URI" --eval "rs.status().members.map(m => m.name + ': ' + m.stateStr)"
 
 Write-Host ""
 Write-Host "✅ MongoDB Replica Set is ready on the network!"
