@@ -26,7 +26,7 @@ services:
       - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
-      - ./docker/rabbitmq/enabled_plugins_secondary:/etc/rabbitmq/enabled_plugins:ro
+      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     networks:
       - parking-net
     healthcheck:
