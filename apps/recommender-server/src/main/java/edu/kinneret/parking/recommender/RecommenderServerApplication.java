@@ -17,7 +17,8 @@ import java.util.*;
 
 /**
  * Main application launcher for the Recommender Server.
- * Supports running in either JavaFX GUI mode (default) or CLI mode (via --cli flag).
+ * Supports running in either JavaFX GUI mode (default) or CLI mode (via --cli
+ * flag).
  */
 public class RecommenderServerApplication extends Application {
     private static RecommenderServer server;
@@ -101,7 +102,8 @@ public class RecommenderServerApplication extends Application {
         AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.QUEUE_SERVER);
 
         try {
-            server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes, appConfig);
+            server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes,
+                    appConfig);
             if (maliciousPayload != null) {
                 server.setMaliciousPayload(maliciousPayload);
             }
@@ -159,10 +161,12 @@ public class RecommenderServerApplication extends Application {
         payloadField.textProperty().addListener((obs, oldVal, newVal) -> {
             try {
                 server.setMaliciousPayload(newVal);
-                payloadField.setStyle("-fx-background-color: #313244; -fx-text-fill: #cdd6f4; -fx-prompt-text-fill: #585b70;");
+                payloadField.setStyle(
+                        "-fx-background-color: #313244; -fx-text-fill: #cdd6f4; -fx-prompt-text-fill: #585b70;");
                 updateStatusText();
             } catch (IllegalArgumentException ex) {
-                payloadField.setStyle("-fx-background-color: #313244; -fx-text-fill: #f38ba8; -fx-prompt-text-fill: #585b70; -fx-border-color: #f38ba8; -fx-border-width: 1px;");
+                payloadField.setStyle(
+                        "-fx-background-color: #313244; -fx-text-fill: #f38ba8; -fx-prompt-text-fill: #585b70; -fx-border-color: #f38ba8; -fx-border-width: 1px;");
                 statusLabel.setText("Error: Invalid payload format!");
                 statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
             }
@@ -231,7 +235,7 @@ public class RecommenderServerApplication extends Application {
                 System.out.println("Malicious Payload: " + server.getMaliciousPayload());
                 System.out.println("Options: [m] Toggle Malicious Mode, [p] Change Malicious Payload, [q] Quit Node");
                 System.out.print("Select: ");
-                
+
                 if (!scanner.hasNextLine()) {
                     // Keep the process alive in non-interactive environment (e.g. Docker)
                     while (true) {
@@ -243,7 +247,7 @@ public class RecommenderServerApplication extends Application {
                     }
                     break;
                 }
-                
+
                 String input = scanner.nextLine().trim().toLowerCase();
 
                 if ("q".equals(input)) {
@@ -260,7 +264,8 @@ public class RecommenderServerApplication extends Application {
                         String newPayload = scanner.nextLine().trim();
                         try {
                             server.setMaliciousPayload(newPayload);
-                            System.out.println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
+                            System.out
+                                    .println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
                         } catch (IllegalArgumentException ex) {
                             System.out.println("ERROR: " + ex.getMessage());
                         }

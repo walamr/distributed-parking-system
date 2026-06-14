@@ -24,15 +24,19 @@ $MONGO3_IP  = $config["MONGO3_IP"]
 $RABBIT1_IP = $config["RABBIT1_IP"]
 $RABBIT2_IP = $config["RABBIT2_IP"]
 $RABBIT3_IP = $config["RABBIT3_IP"]
+$RECOMMENDER1_IP = $config["RECOMMENDER1_IP"]
+$RECOMMENDER2_IP = $config["RECOMMENDER2_IP"]
+$RECOMMENDER3_IP = $config["RECOMMENDER3_IP"]
 
 Write-Host "=================================================="
 Write-Host "  Distributed Setup Configuration"
 Write-Host "=================================================="
 Write-Host "MongoDB  : $MONGO1_IP, $MONGO2_IP, $MONGO3_IP"
 Write-Host "RabbitMQ : $RABBIT1_IP, $RABBIT2_IP, $RABBIT3_IP"
+Write-Host "Recommender : $RECOMMENDER1_IP, $RECOMMENDER2_IP, $RECOMMENDER3_IP"
 Write-Host "=================================================="
 
-$required = @("MONGO1_IP","MONGO2_IP","MONGO3_IP","RABBIT1_IP","RABBIT2_IP","RABBIT3_IP")
+$required = @("MONGO1_IP","MONGO2_IP","MONGO3_IP","RABBIT1_IP","RABBIT2_IP","RABBIT3_IP","RECOMMENDER1_IP","RECOMMENDER2_IP","RECOMMENDER3_IP")
 foreach ($key in $required) {
     if (-not $config[$key] -or $config[$key] -match "^192\.168\.1\.(10[1-9]|110)$") {
         Write-Warning "Warning: $key = $($config[$key]) - This might be a placeholder"
@@ -86,6 +90,8 @@ MONGO_PASSWORD=${mongoPass}
 
 HMAC_SECRET=$DYNAMIC_HMAC_SECRET
 NONCE_TTL_SECONDS=60
+
+RECOMMENDER_NODES=${RECOMMENDER1_IP}:8091,${RECOMMENDER2_IP}:8092,${RECOMMENDER3_IP}:8093
 
 # Rotated MongoDB user passwords for dynamic script consumption
 MONGO_ADMIN_PASSWORD=db_pwd_rotated_admin
@@ -180,6 +186,10 @@ MONGO3_IP=${MONGO3_IP}
 CUSTOMER_IP=${CUSTOMER_IP}
 PEO_IP=${PEO_IP}
 MO_IP=${MO_IP}
+RECOMMENDER1_IP=${RECOMMENDER1_IP}
+RECOMMENDER2_IP=${RECOMMENDER2_IP}
+RECOMMENDER3_IP=${RECOMMENDER3_IP}
+RECOMMENDER_NODES=${RECOMMENDER1_IP}:8091,${RECOMMENDER2_IP}:8092,${RECOMMENDER3_IP}:8093
 RABBITMQ_ERLANG_COOKIE=$DYNAMIC_ERLANG_COOKIE
 "@
 $mainEnv | Out-File -FilePath ".env" -Encoding utf8
