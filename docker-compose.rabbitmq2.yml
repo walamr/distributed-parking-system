@@ -12,6 +12,7 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq2
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
+      HOME: /tmp
     extra_hosts:
       - "rabbitmq1:${RABBIT1_IP}"
       - "rabbitmq3:${RABBIT3_IP}"
@@ -26,7 +27,7 @@ services:
       - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
       - ./docker/rabbitmq/certs:/etc/rabbitmq/certs:ro
       - ./docker/rabbitmq/inter_node_tls.config:/etc/rabbitmq/inter_node_tls.config:ro
-      - ./docker/rabbitmq/enabled_plugins_secondary:/etc/rabbitmq/enabled_plugins:ro
+      - ./docker/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
     networks:
       - parking-net
     healthcheck:
