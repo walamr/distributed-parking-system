@@ -26,6 +26,9 @@ Write-Host "  mongo2: $MONGO2_IP"
 Write-Host "  mongo3: $MONGO3_IP"
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Pre-step: Ensure local container loopback IP alias is configured (workaround for non-admin hosts)
+& "$PSScriptRoot/setup-mongo-node.ps1" -ContainerName "mongo1" -IpAddress $MONGO1_IP
+
 # 1. Initialize Replica Set with real IPs
 Write-Host "--- Step 1: Initialize Replica Set ---"
 $INIT_CMD = "rs.initiate({ _id: 'rs0', members: [ { _id: 0, host: '${MONGO1_IP}:27017' }, { _id: 1, host: '${MONGO2_IP}:27017' }, { _id: 2, host: '${MONGO3_IP}:27017' } ] })"
