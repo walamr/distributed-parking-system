@@ -703,11 +703,14 @@ public class RecommenderServer implements AutoCloseable {
         List<Document> allSpacesInZone = new ArrayList<>();
         if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
             repository.getDatabase().getCollection("spaces")
-                    .find()
+                    .find(com.mongodb.client.model.Filters.eq("zoneName", zoneName))
                     .into(allSpacesInZone);
         } else {
             for (int i = 1; i <= MAX_SPACE_NUMBER; i++) {
-                allSpacesInZone.add(new Document("spaceId", String.valueOf(i)));
+                String spaceIdStr = String.valueOf(i);
+                if (zoneName.equalsIgnoreCase(repository.getSpaceZone(spaceIdStr))) {
+                    allSpacesInZone.add(new Document("spaceId", spaceIdStr));
+                }
             }
         }
 

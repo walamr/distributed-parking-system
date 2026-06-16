@@ -183,7 +183,7 @@ public class RecommenderServerTest {
             }
         }) {
             String result = server.calculateLocalRecommendation("13", occupiedRepo);
-            assertTrue(result.contains("Result: Space 12;0, Space 14;0"), "Expected recommendation to be Space 12;0, Space 14;0 but was: " + result);
+            assertTrue(result.contains("Result: Space 3;0, Space 23;0"), "Expected recommendation to be Space 3;0, Space 23;0 but was: " + result);
         }
     }
     /**

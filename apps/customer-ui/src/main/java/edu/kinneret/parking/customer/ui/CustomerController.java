@@ -1398,19 +1398,16 @@ public class CustomerController {
 
     private Label requestLabel;
     private Label resultLabel;
-    private TextField recommendationSpaceField;
 
     /**
      * Attaches the recommendation panel controls.
      *
      * @param requestLabel the recommendation request output label
      * @param resultLabel the recommendation result output label
-     * @param recommendationSpaceField the space ID input field for recommendation
      */
-    public void attachRecommender(Label requestLabel, Label resultLabel, TextField recommendationSpaceField) {
+    public void attachRecommender(Label requestLabel, Label resultLabel) {
         this.requestLabel = requestLabel;
         this.resultLabel = resultLabel;
-        this.recommendationSpaceField = recommendationSpaceField;
     }
 
 /**
@@ -1453,8 +1450,8 @@ public class CustomerController {
      * @return no return value
      */
     private void handleRecommendParking() {
-        String spaceId = recommendationSpaceField == null || recommendationSpaceField.getText() == null
-                ? "" : recommendationSpaceField.getText().trim();
+        String spaceId = spaceNumberField == null || spaceNumberField.getText() == null
+                ? "" : spaceNumberField.getText().trim();
         if (spaceId.isEmpty()) {
             setStatus("Error: Parking space number is required.", true);
             requestLabel.setText("-");
