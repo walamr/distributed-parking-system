@@ -19,13 +19,13 @@ gradle-bin/
 logs/
 .gradle/
 
-# Security - do not distribute private keys
-docker/rabbitmq/certs/*-key.pem
-docker/rabbitmq/certs/*.jks
-docker/rabbitmq/certs/*.p12
-docker/mongodb/certs/mongo*.pem
-docker/mongodb/certs/mongodb-keyfile
+# Security - do not distribute private keys (Commented out to allow Git sync across team PCs)
+# docker/rabbitmq/certs/*-key.pem
+# docker/rabbitmq/certs/*.jks
+# docker/rabbitmq/certs/*.p12
+# docker/mongodb/certs/mongo*.pem
+# docker/mongodb/certs/mongodb-keyfile
 
 # Ignore environment config containing actual secrets
-.env
+# .env
 
