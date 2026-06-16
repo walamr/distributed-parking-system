@@ -47,12 +47,6 @@ EVAL_USERS="const dbAdminPass='${MONGO_ADMIN_PASSWORD:-db_pwd_rotated_admin}'; c
 
 if mongosh "$ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
   mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
-elif mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
-  echo "Old demo admin password detected; rotating users to current demo credentials."
-  mongosh "$OLD_ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
-else
-  mongosh "${TLS_ARGS[@]}" --eval "$EVAL_USERS" /docker/mongodb/init-users-fresh.js
-  mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
 fi
 
 echo "--- Importing idempotent demo seed data ---"

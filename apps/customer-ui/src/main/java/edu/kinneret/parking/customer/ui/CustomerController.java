@@ -200,6 +200,14 @@ public class CustomerController {
             if (newVal != null && !newVal.isEmpty()) {
                 this.errorLabel.setText("");
             }
+            if (newVal == null || newVal.trim().isEmpty()) {
+                if (this.requestLabel != null) {
+                    this.requestLabel.setText("-");
+                }
+                if (this.resultLabel != null) {
+                    this.resultLabel.setText("-");
+                }
+            }
             fetchRateAndZone(newVal);
         });
     }

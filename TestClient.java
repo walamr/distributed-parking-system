@@ -42,7 +42,7 @@ public class TestClient {
 
         try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
             socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
-            socket.connect(new java.net.InetSocketAddress("localhost", 8091), 3000);
+            socket.connect(new java.net.InetSocketAddress("10.0.201.22", 8091), 3000);
             System.out.println("Socket connected to 8091");
             socket.startHandshake();
             System.out.println("Handshake successful");

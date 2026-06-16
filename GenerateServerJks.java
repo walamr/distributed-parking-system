@@ -10,7 +10,7 @@ public class GenerateServerJks {
         String certPath = "docker/rabbitmq/certs/server-cert.pem";
         String keyPath = "docker/rabbitmq/certs/server-key.pem";
         String jksPath = "docker/rabbitmq/certs/server-keystore.jks";
-        String password = "1A1642F028999D85AF6CB101D4EFD125";
+        String password = "password";
 
         java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
         java.security.cert.Certificate cert;
