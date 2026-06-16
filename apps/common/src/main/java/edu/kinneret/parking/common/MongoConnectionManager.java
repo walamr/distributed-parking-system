@@ -42,8 +42,8 @@ public final class MongoConnectionManager implements AutoCloseable {
                         config.getTlsKeystorePath(),
                         config.getTlsKeystorePassword()
                     ));
-                } catch (Exception ex) {
-                    logger.severe("Could not load certificates for mTLS. TLS context might be invalid: " + ex.getMessage());
+                } catch (Exception e) {
+                    logger.log(java.util.logging.Level.SEVERE, "Could not load certificates for mTLS. TLS context might be invalid: " + e.getMessage(), e);
                 }
             });
         }

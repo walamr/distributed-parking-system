@@ -90,6 +90,13 @@ keytool -importcert -file "$CERTS_DIR/ca-cert.pem" -alias mulligan-ca -keystore 
 # Create Keystore for Java (containing Client Cert)
 keytool -importkeystore -srckeystore "$CERTS_DIR/client.p12" -srcstoretype PKCS12 -srcstorepass "$KEYSTORE_PASS" -destkeystore "$CERTS_DIR/keystore.jks" -deststorepass "$KEYSTORE_PASS"
 
+# Create PKCS12 for the server
+& $OPENSSL pkcs12 -export -in "$CERTS_DIR/server-cert.pem" -inkey "$CERTS_DIR/server-key.pem" -out "$CERTS_DIR/server.p12" -name "parking-server" -passout "pass:$KEYSTORE_PASS"
+
+# Create Keystore for Java (containing Server Cert)
+keytool -importkeystore -srckeystore "$CERTS_DIR/server.p12" -srcstoretype PKCS12 -srcstorepass "$KEYSTORE_PASS" -destkeystore "$CERTS_DIR/server-keystore.jks" -deststorepass "$KEYSTORE_PASS"
+
+
 Write-Host "--- Generating MongoDB Cluster Certificates ---"
 $MONGO_CERTS_DIR = "docker/mongodb/certs"
 if (-not (Test-Path $MONGO_CERTS_DIR)) { New-Item -ItemType Directory -Path $MONGO_CERTS_DIR }

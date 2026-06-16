@@ -673,11 +673,8 @@ public final class AppConfig {
      * @return the resolved configuration value
      */
     private static String readOrDefault(Map<String, String> environment, String key, String defaultValue) {
-        String value = environment.get(key);
-        if (value == null || value.isBlank()) {
-            return defaultValue;
-        }
-        return value.trim();
+        String val = environment.get(key);
+        return (val != null && !val.trim().isEmpty()) ? val.trim() : defaultValue;
     }
 
     /**
