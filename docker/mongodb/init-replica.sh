@@ -47,6 +47,22 @@ EVAL_USERS="const dbAdminPass='${MONGO_ADMIN_PASSWORD:-db_pwd_rotated_admin}'; c
 
 if mongosh "$ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
   mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
+else
+  echo "Failed to authenticate with new credentials. Checking if we can bootstrap using localhost exception..."
+  if mongosh "${TLS_ARGS[@]}" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
+    echo "Bootstrapping fresh admin user..."
+    mongosh "${TLS_ARGS[@]}" --eval "$EVAL_USERS" /docker/mongodb/init-users-fresh.js
+    # Now that admin is created, run init-users.js using ADMIN_URI
+    mongosh "$ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
+  else
+    echo "Could not connect via localhost exception. Attempting to fall back to old credentials..."
+    if mongosh "$OLD_ADMIN_URI" --quiet --eval "db.adminCommand({ ping: 1 }).ok" >/dev/null 2>&1; then
+      mongosh "$OLD_ADMIN_URI" --eval "$EVAL_USERS" /docker/mongodb/init-users.js
+    else
+      echo "Failed to authenticate with admin credentials."
+      exit 1
+    fi
+  fi
 fi
 
 echo "--- Importing idempotent demo seed data ---"
@@ -54,3 +70,4 @@ mongosh "$ADMIN_URI" /docker/mongodb/seed-data.js
 
 echo "--- MongoDB replica set is ready for Mulligan services ---"
 mongosh "$ADMIN_URI" --quiet --eval 'rs.status().members.map(m => m.name + ":" + m.stateStr).join("\n")'
+

@@ -590,3 +590,35 @@
     -fx-scale-y: 1.02;
     -fx-effect: dropshadow(three-pass-box, rgba(74, 144, 226, 0.8), 25, 0, 0, 10);
 }
+
+.button.button-recommend {
+    -fx-background-color: linear-gradient(to bottom right, #8b5cf6, #6366f1) !important;
+    -fx-text-fill: white !important;
+    -fx-font-weight: 900 !important;
+    font-weight: 900 !important;
+    -fx-padding: 0;
+    padding: 0;
+    -fx-font-size: 18px;
+    font-size: 18px;
+    -fx-min-width: 320;
+    min-width: 320;
+    -fx-max-width: 320;
+    max-width: 320;
+    -fx-min-height: 60;
+    min-height: 60;
+    -fx-max-height: 60;
+    max-height: 60;
+    -fx-background-radius: 15;
+    -fx-cursor: hand;
+    cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(139, 92, 246, 0.6), 20, 0, 0, 8);
+    -fx-transition: all 0.3s ease-in-out;
+    transition: all 0.3s ease-in-out;
+}
+
+.button.button-recommend:hover {
+    -fx-background-color: linear-gradient(to bottom right, #a78bfa, #8b5cf6) !important;
+    -fx-scale-x: 1.02;
+    -fx-scale-y: 1.02;
+    -fx-effect: dropshadow(three-pass-box, rgba(139, 92, 246, 0.8), 25, 0, 0, 10);
+}

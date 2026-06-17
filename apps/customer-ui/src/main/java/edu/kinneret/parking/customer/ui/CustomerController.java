@@ -52,6 +52,7 @@ public class CustomerController {
     private javafx.animation.PauseTransition historyStatusTimer;
     private javafx.animation.PauseTransition dashboardStatusTimer;
     private javafx.scene.layout.VBox infoCard;
+    private HBox resultItem;
 
     private final ObservableList<Document> historyItems = FXCollections.observableArrayList();
     private final java.util.Map<String, Document> spaceCache = new java.util.concurrent.ConcurrentHashMap<>();
@@ -182,6 +183,10 @@ public class CustomerController {
             this.errorCard.setManaged(visible);
         });
 
+        this.spaceNumberField.textProperty().addListener((obs, oldVal, newVal) -> {
+            clearRecommendation();
+        });
+
         this.historyTable.setItems(historyItems);
 
         javafx.beans.binding.IntegerBinding sizeBinding = javafx.beans.binding.Bindings.size(historyItems);
@@ -264,6 +269,7 @@ public class CustomerController {
             HBox costItem, Separator cardDivider, HBox requestItem, HBox resultItem, Separator recDivider, Label requestLabel) {
         this.timerCostLabel = timerCostLabel;
         this.infoCard = infoCard;
+        this.resultItem = resultItem;
 
         timeline = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), e -> {
             if (parkingStartTime != null) {
@@ -1406,16 +1412,22 @@ public class CustomerController {
 
     private Label requestLabel;
     private Label resultLabel;
+    private Label resultHeader;
 
     /**
      * Attaches the recommendation panel controls.
      *
      * @param requestLabel the recommendation request output label
      * @param resultLabel the recommendation result output label
+     * @param resultHeader the recommendation header label
      */
-    public void attachRecommender(Label requestLabel, Label resultLabel) {
+    public void attachRecommender(Label requestLabel, Label resultLabel, Label resultHeader) {
         this.requestLabel = requestLabel;
         this.resultLabel = resultLabel;
+        this.resultHeader = resultHeader;
+        if (resultLabel != null) {
+            resultLabel.setWrapText(true);
+        }
     }
 
 /**
@@ -1445,7 +1457,7 @@ public class CustomerController {
                 formatted.append(recommendationParts[i]);
             }
             if (i < recommendationParts.length - 1) {
-                formatted.append(", ");
+                formatted.append("\n");
             }
         }
         return formatted.toString();
@@ -1560,17 +1572,90 @@ public class CustomerController {
                     if (parts.length >= 2) {
                         requestLabel.setText(parts[0].replace("Request:", "").trim());
                         String rawResult = parts[1].replace("Result:", "").trim();
-                        resultLabel.setText(formatRecommendationResult(rawResult));
+                        
+                        // Check if the user's chosen spaceId matches one of the recommended spaces
+                        boolean choseBest = false;
+                        if (!"NONE".equalsIgnoreCase(rawResult)) {
+                            String[] recommendationParts = rawResult.split(", ");
+                            for (String part : recommendationParts) {
+                                String cleanPart = part.replace("Space ", "").trim();
+                                String[] spaceAndCitations = cleanPart.split(";");
+                                if (spaceAndCitations.length >= 1 && spaceAndCitations[0].trim().equals(spaceId.trim())) {
+                                    choseBest = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        String formattedRec = formatRecommendationResult(rawResult);
+                        if (choseBest) {
+                            formattedRec = "You chose the best space! 🎉";
+                            resultLabel.getStyleClass().remove("dashboard-value-primary");
+                            resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-font-size: 16px; -fx-alignment: center;");
+                            resultLabel.setMaxWidth(Double.MAX_VALUE);
+                            if (resultHeader != null) {
+                                resultHeader.setVisible(false);
+                                resultHeader.setManaged(false);
+                            }
+                            if (resultItem != null) {
+                                resultItem.setAlignment(javafx.geometry.Pos.CENTER);
+                            }
+                        } else {
+                            if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                                resultLabel.getStyleClass().add("dashboard-value-primary");
+                            }
+                            resultLabel.setStyle(""); // Default style
+                            resultLabel.setMaxWidth(Double.MAX_VALUE);
+                            if (resultHeader != null) {
+                                resultHeader.setVisible(true);
+                                resultHeader.setManaged(true);
+                            }
+                            if (resultItem != null) {
+                                resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                            }
+                        }
+                        resultLabel.setText(formattedRec);
                     }
                 } else {
                     String reason = response.has("reason") ? response.get("reason").getAsString() : "Consensus failed.";
                     requestLabel.setText("Failed");
                     resultLabel.setText(reason);
+                    if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                        resultLabel.getStyleClass().add("dashboard-value-primary");
+                    }
+                    resultLabel.setStyle("");
+                    resultLabel.setMaxWidth(Double.MAX_VALUE);
+                    if (resultHeader != null) {
+                        resultHeader.setVisible(true);
+                        resultHeader.setManaged(true);
+                    }
+                    if (resultItem != null) {
+                        resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                    }
                 }
             } catch (Exception ex) {
                 requestLabel.setText("Failed");
                 resultLabel.setText("Invalid response");
+                if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                    resultLabel.getStyleClass().add("dashboard-value-primary");
+                }
+                resultLabel.setStyle("");
+                resultLabel.setMaxWidth(Double.MAX_VALUE);
+                if (resultHeader != null) {
+                    resultHeader.setVisible(true);
+                    resultHeader.setManaged(true);
+                }
+                if (resultItem != null) {
+                    resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                }
             }
+            javafx.application.Platform.runLater(() -> {
+                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(5));
+                pause.setOnFinished(evt -> {
+                    clearRecommendation();
+                });
+                pause.play();
+            });
         });
 
         task.setOnFailed(e -> {
@@ -1579,8 +1664,48 @@ public class CustomerController {
             }
             requestLabel.setText("Failed");
             resultLabel.setText("Node unreachable");
+            if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                resultLabel.getStyleClass().add("dashboard-value-primary");
+            }
+            resultLabel.setStyle("");
+            resultLabel.setMaxWidth(Double.MAX_VALUE);
+            if (resultHeader != null) {
+                resultHeader.setVisible(true);
+                resultHeader.setManaged(true);
+            }
+            if (resultItem != null) {
+                resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            }
+            javafx.application.Platform.runLater(() -> {
+                javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(5));
+                pause.setOnFinished(evt -> {
+                    clearRecommendation();
+                });
+                pause.play();
+            });
         });
 
         new Thread(task).start();
+    }
+
+    private void clearRecommendation() {
+        if (requestLabel != null) {
+            requestLabel.setText("-");
+        }
+        if (resultLabel != null) {
+            if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                resultLabel.getStyleClass().add("dashboard-value-primary");
+            }
+            resultLabel.setText("-");
+            resultLabel.setStyle("");
+            resultLabel.setMaxWidth(Double.MAX_VALUE);
+        }
+        if (resultHeader != null) {
+            resultHeader.setVisible(true);
+            resultHeader.setManaged(true);
+        }
+        if (resultItem != null) {
+            resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        }
     }
 }

@@ -187,11 +187,11 @@ public class CustomerApp extends Application {
         Button startButton = new Button("🚗 Start Parking");
         startButton.getStyleClass().add("button-start");
         
-        Button stopButton = new Button("■ Stop Parking");
+        Button stopButton = new Button("🛑 Stop Parking");
         stopButton.getStyleClass().add("button-stop");
 
-        Button recommendButton = new Button("Recommend Parking");
-        recommendButton.getStyleClass().add("button-history-toggle");
+        Button recommendButton = new Button("💡 Recommend Parking");
+        recommendButton.getStyleClass().add("button-recommend");
 
         Label timerLabel = new Label("00:00:00");
         timerLabel.getStyleClass().add("dashboard-value-secondary");
@@ -535,7 +535,7 @@ public class CustomerApp extends Application {
         controller.attachButtons(startButton, stopButton, fetchHistoryBtn, recommendButton);
         controller.attachTimer(infoCard, timerLabel, timerCostLabel, rateItem, timeItem, costItem, cardDivider, requestItem, resultItem, recDivider, requestLabel);
         controller.attachHistoryStatus(historyStatusLabel);
-        controller.attachRecommender(requestLabel, resultLabel);
+        controller.attachRecommender(requestLabel, resultLabel, resultHeader);
 
         // Restore persisted local transactions from disk (fix: stop operations survive app restarts)
         controller.loadPersistedTransactions(associatedVin);
