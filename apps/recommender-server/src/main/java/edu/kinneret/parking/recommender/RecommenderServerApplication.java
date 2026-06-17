@@ -54,7 +54,7 @@ public class RecommenderServerApplication extends Application {
             if (arg.equals("--cli")) {
                 runCli = true;
             } else if (arg.contains("=")) {
-                String[] parts = arg.split("=");
+                String[] parts = arg.split("=", 2);
                 String key = parts[0].trim();
                 String value = parts[1].trim();
                 switch (key) {
