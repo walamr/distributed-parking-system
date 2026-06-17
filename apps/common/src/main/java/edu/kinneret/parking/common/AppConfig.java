@@ -223,18 +223,10 @@ public final class AppConfig {
      *
      * @param env the mutable map to populate with values found in the file
      */
-    private static void loadDotEnv(Map<String, String> env) {
-        String[] pathsToTry = { ".env", "../.env", "../../.env" };
-        java.io.File envFile = null;
-        for (String path : pathsToTry) {
-            java.io.File f = new java.io.File(path);
-            if (f.exists()) {
-                envFile = f;
-                break;
-            }
-        }
-        if (envFile != null) {
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+    private static void loadEnvFile(String path, Map<String, String> env) {
+        java.io.File file = new java.io.File(path);
+        if (file.exists()) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
@@ -250,13 +242,68 @@ public final class AppConfig {
                         } else if (value.startsWith("'") && value.endsWith("'") && value.length() >= 2) {
                             value = value.substring(1, value.length() - 1);
                         }
-                        env.putIfAbsent(key, value);
+                        env.put(key, value);
                     }
                 }
             } catch (java.io.IOException e) {
                 // Silently ignore configuration loading exceptions
             }
         }
+    }
+
+    private static void overrideWithNetworkIps(Map<String, String> env) {
+        String mongo1 = env.get("MONGO1_IP");
+        String mongo2 = env.get("MONGO2_IP");
+        String mongo3 = env.get("MONGO3_IP");
+        String rabbit1 = env.get("RABBIT1_IP");
+        String rabbit2 = env.get("RABBIT2_IP");
+        String rabbit3 = env.get("RABBIT3_IP");
+        String recommender1 = env.get("RECOMMENDER1_IP");
+        String recommender2 = env.get("RECOMMENDER2_IP");
+        String recommender3 = env.get("RECOMMENDER3_IP");
+
+        if (mongo1 != null && mongo2 != null && mongo3 != null &&
+            rabbit1 != null && rabbit2 != null && rabbit3 != null &&
+            recommender1 != null && recommender2 != null && recommender3 != null) {
+            
+            boolean isLocal = mongo1.equals(mongo2);
+            String r1p, r2p, r3p;
+            String m1p, m2p, m3p;
+            if (isLocal) {
+                r1p = "5671"; r2p = "5673"; r3p = "5674";
+                m1p = "27017"; m2p = "27018"; m3p = "27019";
+            } else {
+                r1p = "5671"; r2p = "5671"; r3p = "5671";
+                m1p = "27017"; m2p = "27017"; m3p = "27017";
+            }
+
+            env.put("RABBITMQ_NODES", rabbit1 + ":" + r1p + "," + rabbit2 + ":" + r2p + "," + rabbit3 + ":" + r3p);
+            env.put("RECOMMENDER_NODES", recommender1 + ":8091," + recommender2 + ":8092," + recommender3 + ":8093");
+            env.put("MONGO_URI", "mongodb://dummy:dummy@" + mongo1 + ":" + m1p + "," + mongo2 + ":" + m2p + "," + mongo3 + ":" + m3p + "/parking_db?replicaSet=rs0&authSource=admin");
+        }
+    }
+
+    /**
+     * Loads key-value pairs from a {@code .env} file into the supplied map.
+     * Searches for the file in the working directory and two parent directories.
+     *
+     * @param env the mutable map to populate with values found in the file
+     */
+    private static void loadDotEnv(Map<String, String> env) {
+        // First load network-ips.env to populate IPs
+        String[] configPaths = { "network-ips.env", "../network-ips.env", "../../network-ips.env" };
+        for (String path : configPaths) {
+            loadEnvFile(path, env);
+        }
+
+        // Then load .env
+        String[] pathsToTry = { ".env", "../.env", "../../.env" };
+        for (String path : pathsToTry) {
+            loadEnvFile(path, env);
+        }
+
+        // Dynamically override variables using loaded network IPs
+        overrideWithNetworkIps(env);
     }
 
     /**

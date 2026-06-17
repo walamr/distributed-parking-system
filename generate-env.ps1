@@ -103,6 +103,57 @@ MONGO_CUSTOMER_PASSWORD=db_pwd_rotated_cust
 
 New-Item -ItemType Directory -Force -Path "env-configs" | Out-Null
 
+$uiTemplateEnv = @"
+# =============================================================
+#  Environment file for UI machines (Customer / PEO / MO)
+#  Copy this file to .env on the Customer, Officer, and Municipality machines
+#  Then replace the IP addresses with the real machine IP addresses
+# =============================================================
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  🔴 Put the real IP addresses of your machines here
+#     Replace with the real IP addresses of your machines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# RabbitMQ Machine IP Addresses
+RABBIT1_IP=${RABBIT1_IP}
+RABBIT2_IP=${RABBIT2_IP}
+RABBIT3_IP=${RABBIT3_IP}
+
+# MongoDB Machine IP Addresses
+MONGO1_IP=${MONGO1_IP}
+MONGO2_IP=${MONGO2_IP}
+MONGO3_IP=${MONGO3_IP}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  ⚙️  RabbitMQ Settings - Do not change these lines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RABBITMQ_VHOST=/parking
+RABBITMQ_TLS_ENABLED=true
+RABBITMQ_TRUSTSTORE_PATH=docker/rabbitmq/certs/truststore.jks
+RABBITMQ_TRUSTSTORE_PASSWORD=password
+RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
+RABBITMQ_KEYSTORE_PASSWORD=password
+RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
+RABBITMQ_CONNECTION_TIMEOUT_MS=5000
+RABBITMQ_RECOVERY_INTERVAL_MS=5000
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  ⚙️  MongoDB Settings - Do not change these lines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MONGO_TLS_ENABLED=true
+MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
+MONGO_TLS_ALLOW_INVALID_HOSTNAMES=true
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  🔐 Security Key - Must be the same value on all machines
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HMAC_SECRET=$DYNAMIC_HMAC_SECRET
+NONCE_TTL_SECONDS=60
+"@
+$uiTemplateEnv | Out-File -FilePath "env-configs/.env.ui-template" -Encoding utf8
+Write-Host "Created: env-configs/.env.ui-template"
+
 $customerEnv = @"
 RABBITMQ_USERNAME=customer
 RABBITMQ_PASSWORD=customer_pwd_rotated
