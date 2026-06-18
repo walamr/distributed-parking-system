@@ -102,6 +102,9 @@ public class RecommenderServerApplication extends Application {
         if (System.getProperty("malicious") != null) {
             isMalicious = Boolean.parseBoolean(System.getProperty("malicious"));
         }
+        if (System.getProperty("cli") != null) {
+            runCli = Boolean.parseBoolean(System.getProperty("cli"));
+        }
         
         maliciousPayload = System.getProperty("maliciousPayload", maliciousPayload);
         if (System.getProperty("nodes") != null) {
@@ -173,7 +176,8 @@ public class RecommenderServerApplication extends Application {
             }
             server.start();
         } catch (IOException e) {
-            System.err.println("Fatal: Could not start recommender server. See server logs for details.");
+            System.err.println("Fatal: Could not start recommender server. Error: " + e.getMessage());
+            e.printStackTrace();
             System.exit(1);
         }
 
