@@ -171,8 +171,7 @@ public class CustomerCLI {
                             if (selectedIdx < 0 || selectedIdx >= recNodes.size()) {
                                 selectedIdx = 0;
                             }
-                            ClusterNode selectedNode = recNodes.get(selectedIdx);
-                            queryRecommender(spaceIdRec, selectedNode.getHost(), selectedNode.getPort(), config, signer);
+                            queryRecommender(spaceIdRec, recNodes, selectedIdx, config, signer);
                             break;
                         case "5":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
@@ -331,7 +330,7 @@ public class CustomerCLI {
      * @param config application TLS configuration
      * @param signer HMAC-SHA256 signer
      */
-    private static void queryRecommender(String spaceId, String host, int port, AppConfig config, SecureMessageSigner signer) {
+    private static void queryRecommender(String spaceId, List<ClusterNode> recNodes, int selectedIdx, AppConfig config, SecureMessageSigner signer) {
         if (spaceId == null || spaceId.isBlank()) {
             System.out.println("ERROR: Space ID cannot be empty.");
             return;
@@ -359,38 +358,59 @@ public class CustomerCLI {
                 "customer-cli",
                 signer);
 
+        javax.net.ssl.SSLContext sslContext = null;
         try {
-            javax.net.ssl.SSLContext sslContext = TlsUtils.createSslContext(
+            sslContext = TlsUtils.createSslContext(
                     config.getTlsTruststorePath(),
                     config.getTlsTruststorePassword(),
                     config.getTlsKeystorePath(),
                     config.getTlsKeystorePassword());
-            try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
-            socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
-            socket.connect(new java.net.InetSocketAddress(host, port), 3000);
-            socket.startHandshake();
-            try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
-                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
-                
-                writer.println(request.toString());
-                String responseLine = reader.readLine();
-                if (responseLine != null) {
-                    com.google.gson.JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
-                    String status = response.get("status").getAsString();
-                    if ("SUCCESS".equalsIgnoreCase(status)) {
-                        String result = response.get("result").getAsString();
-                        System.out.println("RECOMMENDATION SUCCESS: Recommended spaces: " + result);
-                    } else {
-                        String reason = response.has("reason") ? response.get("reason").getAsString() : "Unknown error";
-                        System.out.println("RECOMMENDATION FAILURE: " + reason);
-                    }
-                } else {
-                    System.out.println("ERROR: Received empty response from recommender node.");
-                }
-            }
-            }
         } catch (Exception e) {
-            logger.warn("Could not query recommender node at {}:{}", host, port, e);
+            logger.warn("Could not create SSL Context: {}", e.getMessage());
+            System.out.println("ERROR: TLS configuration issue.");
+            return;
+        }
+
+        boolean success = false;
+        Exception lastEx = null;
+        int numNodes = recNodes.size();
+
+        for (int i = 0; i < numNodes; i++) {
+            int currentIdx = (selectedIdx + i) % numNodes;
+            ClusterNode node = recNodes.get(currentIdx);
+            try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
+                socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
+                socket.connect(new java.net.InetSocketAddress(node.getHost(), node.getPort()), 3000);
+                socket.startHandshake();
+                try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
+                     java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
+                    
+                    writer.println(request.toString());
+                    String responseLine = reader.readLine();
+                    if (responseLine != null) {
+                        com.google.gson.JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
+                        String status = response.get("status").getAsString();
+                        if ("SUCCESS".equalsIgnoreCase(status)) {
+                            String result = response.get("result").getAsString();
+                            System.out.println("RECOMMENDATION SUCCESS: Recommended spaces: " + result);
+                        } else {
+                            String reason = response.has("reason") ? response.get("reason").getAsString() : "Unknown error";
+                            System.out.println("RECOMMENDATION FAILURE: " + reason);
+                        }
+                        success = true;
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to query recommender node " + node.getDisplayName() + " at " + node.toAddress() + ": " + e.getMessage());
+                lastEx = e;
+            }
+        }
+
+        if (!success) {
+            if (lastEx != null) {
+                logger.warn("All recommender nodes failed. Last error: ", lastEx);
+            }
             System.out.println("ERROR: Recommendation service temporarily unavailable.");
         }
     }

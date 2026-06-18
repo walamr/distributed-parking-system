@@ -78,6 +78,7 @@ public class RecommenderServer implements AutoCloseable {
 
     private final Map<String, List<Long>> ipRequestTimestamps = new ConcurrentHashMap<>();
     private static final int MAX_REQUESTS_PER_MINUTE = 60;
+    private final Map<String, Long> lastNodeFailureTimes = new ConcurrentHashMap<>();
 
     /**
      * Creates a recommender server node.
@@ -286,44 +287,53 @@ public class RecommenderServer implements AutoCloseable {
                 return;
             }
 
-            String localResult = calculateLocalRecommendation(spaceId);
-            JsonObject forwardRequest = createSignedMessage("FORWARD_QUERY", spaceId, correlationId, nodeId);
-            forwardRequest.addProperty("localResult", localResult);
-            if (!"-".equals(vehicleId)) {
-                forwardRequest.addProperty("vehicleId", vehicleId);
-            }
-            signMessage(forwardRequest, signer);
+            long lastLeaderFail = lastNodeFailureTimes.getOrDefault("leader", 0L);
+            boolean skipLeader = (System.currentTimeMillis() - lastLeaderFail < 10000);
 
-            try (SSLSocket leaderSocket = openTlsSocket(leaderHost, leaderPort)) {
-                try (PrintWriter leaderWriter = new PrintWriter(leaderSocket.getOutputStream(), true);
-                     BufferedReader leaderReader = new BufferedReader(new InputStreamReader(leaderSocket.getInputStream()))) {
-                    leaderWriter.println(forwardRequest);
-                    String reply = leaderReader.readLine();
-                    if (reply == null) {
-                        sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
-                        return;
-                    }
-                    JsonObject signedReply = parseAndValidateResponse(reply, leaderHost + ":" + leaderPort);
-                    clientWriter.println(signedReply);
-                    try {
-                        if (signedReply.has("status") && "SUCCESS".equals(signedReply.get("status").getAsString())) {
-                            String result = signedReply.get("result").getAsString();
-                            String[] parts = result.split("\n");
-                            if (parts.length >= 2) {
-                                String finalRec = parts[1].replace("Result:", "").trim();
-                                logger.info("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + finalRec + ")");
-                                RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, finalRec);
-                            }
-                        } else {
-                            logger.warning("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: FAILURE (Forward failed)");
-                            RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, "Forward Failed");
-                        }
-                    } catch (NoClassDefFoundError | Exception ignored) {}
+            if (!skipLeader) {
+                String localResult = calculateLocalRecommendation(spaceId);
+                JsonObject forwardRequest = createSignedMessage("FORWARD_QUERY", spaceId, correlationId, nodeId);
+                forwardRequest.addProperty("localResult", localResult);
+                if (!"-".equals(vehicleId)) {
+                    forwardRequest.addProperty("vehicleId", vehicleId);
                 }
-            } catch (Exception e) {
-                logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach configured leader.", e);
-                logSecurity("CONSENSUS_FALLBACK", leaderHost + ":" + leaderPort, "follower could not reach leader, stepping up");
-                logger.info("Leader unreachable. Node '" + nodeId + "' is stepping up to execute consensus locally.");
+                signMessage(forwardRequest, signer);
+
+                try (SSLSocket leaderSocket = openTlsSocket(leaderHost, leaderPort)) {
+                    try (PrintWriter leaderWriter = new PrintWriter(leaderSocket.getOutputStream(), true);
+                         BufferedReader leaderReader = new BufferedReader(new InputStreamReader(leaderSocket.getInputStream()))) {
+                        leaderWriter.println(forwardRequest);
+                        String reply = leaderReader.readLine();
+                        if (reply == null) {
+                            sendSignedFailure(clientWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
+                            return;
+                        }
+                        JsonObject signedReply = parseAndValidateResponse(reply, leaderHost + ":" + leaderPort);
+                        clientWriter.println(signedReply);
+                        try {
+                            if (signedReply.has("status") && "SUCCESS".equals(signedReply.get("status").getAsString())) {
+                                String result = signedReply.get("result").getAsString();
+                                String[] parts = result.split("\n");
+                                if (parts.length >= 2) {
+                                    String finalRec = parts[1].replace("Result:", "").trim();
+                                    logger.info("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + finalRec + ")");
+                                    RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, finalRec);
+                                }
+                            } else {
+                                logger.warning("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: FAILURE (Forward failed)");
+                                RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, "Forward Failed");
+                            }
+                        } catch (NoClassDefFoundError | Exception ignored) {}
+                    }
+                } catch (Exception e) {
+                    lastNodeFailureTimes.put("leader", System.currentTimeMillis());
+                    logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach configured leader.", e);
+                    logSecurity("CONSENSUS_FALLBACK", leaderHost + ":" + leaderPort, "follower could not reach leader, stepping up");
+                    logger.info("Leader unreachable. Node '" + nodeId + "' is stepping up to execute consensus locally.");
+                    sendConsensusResponse(spaceId, correlationId, vehicleId, clientWriter);
+                }
+            } else {
+                logger.info("Leader has failed recently. Skipping leader connection attempt and executing consensus locally.");
                 sendConsensusResponse(spaceId, correlationId, vehicleId, clientWriter);
             }
         } catch (Exception e) {
@@ -495,6 +505,12 @@ public class RecommenderServer implements AutoCloseable {
                     continue;
                 }
 
+                long lastFail = lastNodeFailureTimes.getOrDefault(endpoint.nodeId(), 0L);
+                if (System.currentTimeMillis() - lastFail < 10000) {
+                    logger.fine("Skipping offline node: " + endpoint.nodeId());
+                    continue;
+                }
+
                 futures.add(collectExecutor.submit(() -> {
                     try (SSLSocket collectSocket = openTlsSocket(endpoint.host(), endpoint.port())) {
                         try (PrintWriter collectWriter = new PrintWriter(collectSocket.getOutputStream(), true);
@@ -519,6 +535,7 @@ public class RecommenderServer implements AutoCloseable {
                             }
                         }
                     } catch (Exception e) {
+                        lastNodeFailureTimes.put(endpoint.nodeId(), System.currentTimeMillis());
                         logger.log(Level.WARNING, "Leader node '" + nodeId + "' failed to collect result from "
                                 + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port() + ". Error: " + e.getMessage(), e);
                     }
