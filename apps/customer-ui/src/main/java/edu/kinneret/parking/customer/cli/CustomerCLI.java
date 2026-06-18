@@ -419,6 +419,37 @@ public class CustomerCLI {
 
     /**
      * Converts a recommender protocol response into the concise CLI display.
+     * Overloaded to maintain backward compatibility with tests.
+     *
+     * @param responseLine one JSON response line, or null for a missing response
+     * @return user-facing CLI text
+     */
+    static String formatRecommendationResponse(String responseLine) {
+        if (responseLine == null || responseLine.isBlank()) {
+            return "RECOMMENDATION FAILURE: No response from recommender node.";
+        }
+        try {
+            JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
+            if (!response.has("status")) {
+                return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+            }
+            if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
+                if (!response.has("result") || response.get("result").getAsString().isBlank()) {
+                    return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+                }
+                return response.get("result").getAsString();
+            }
+            String reason = response.has("reason")
+                    ? response.get("reason").getAsString()
+                    : "Recommendation failed.";
+            return "RECOMMENDATION FAILURE: " + reason;
+        } catch (RuntimeException e) {
+            return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+        }
+    }
+
+    /**
+     * Converts a recommender protocol response into the concise CLI display.
      *
      * @param responseLine one JSON response line, or null for a missing response
      * @param spaceId the user's chosen space number to check
