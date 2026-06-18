@@ -1,0 +1,1 @@
+db.zones.find().pretty()
