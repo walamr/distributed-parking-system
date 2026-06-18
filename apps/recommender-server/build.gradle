@@ -60,6 +60,7 @@ tasks.register('runRecommenderServer', JavaExec) {
     mainClass = 'edu.kinneret.parking.recommender.Launcher'
     javaLauncher = java21Launcher
     workingDir = rootProject.projectDir
+    standardInput = System.in
     
     // Allow passing system properties/arguments
     systemProperties = System.getProperties()
