@@ -290,15 +290,15 @@ public final class AppConfig {
      * @param env the mutable map to populate with values found in the file
      */
     private static void loadDotEnv(Map<String, String> env) {
-        // First load network-ips.env to populate IPs
-        String[] configPaths = { "network-ips.env", "../network-ips.env", "../../network-ips.env" };
-        for (String path : configPaths) {
+        // First load .env
+        String[] pathsToTry = { ".env", "../.env", "../../.env" };
+        for (String path : pathsToTry) {
             loadEnvFile(path, env);
         }
 
-        // Then load .env
-        String[] pathsToTry = { ".env", "../.env", "../../.env" };
-        for (String path : pathsToTry) {
+        // Then load network-ips.env to override values
+        String[] configPaths = { "network-ips.env", "../network-ips.env", "../../network-ips.env" };
+        for (String path : configPaths) {
             loadEnvFile(path, env);
         }
 

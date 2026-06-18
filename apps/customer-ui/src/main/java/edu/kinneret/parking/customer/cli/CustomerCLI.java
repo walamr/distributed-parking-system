@@ -142,23 +142,9 @@ public class CustomerCLI {
                                 }
                                 break;
                             }
-                            List<ClusterNode> recNodes = config.getRecommenderNodes();
-                            System.out.println("Select Recommender Node:");
-                            for (int i = 0; i < recNodes.size(); i++) {
-                                System.out.println(" [" + (i + 1) + "] " + recNodes.get(i).getDisplayName() + " (" + recNodes.get(i).toAddress() + ")");
-                            }
-                            System.out.print("Select [Default 1]: ");
-                            String nodeChoice = scanner.nextLine().trim();
-                            int selectedIdx = 0;
-                            try {
-                                if (!nodeChoice.isEmpty()) {
-                                    selectedIdx = Integer.parseInt(nodeChoice) - 1;
-                                }
-                            } catch (NumberFormatException ignored) {}
-                            if (selectedIdx < 0 || selectedIdx >= recNodes.size()) {
-                                selectedIdx = 0;
-                            }
-                            queryRecommender(spaceIdRec, recNodes, selectedIdx, config, signer);
+                            List<ClusterNode> recNodes = new java.util.ArrayList<>(config.getRecommenderNodes());
+                            java.util.Collections.shuffle(recNodes);
+                            queryRecommender(spaceIdRec, recNodes, 0, config, signer);
                             break;
                         case "5":
                             System.out.println("Logging out customer '" + loggedInUser + "'.");
@@ -360,13 +346,13 @@ public class CustomerCLI {
                 try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
                      java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
                     
-                    writer.println(request.toString());
-                    String responseLine = reader.readLine();
-                    if (responseLine != null) {
-                        System.out.println(formatRecommendationResponse(responseLine));
-                        success = true;
-                        break;
-                    }
+                     writer.println(request.toString());
+                     String responseLine = reader.readLine();
+                     if (responseLine != null) {
+                         System.out.println(formatRecommendationResponse(responseLine, spaceId));
+                         success = true;
+                         break;
+                     }
                 }
             } catch (Exception e) {
                 logger.warn("Failed to query recommender node " + node.getDisplayName() + " at " + node.toAddress() + ": " + e.getMessage());
@@ -408,9 +394,10 @@ public class CustomerCLI {
      * Converts a recommender protocol response into the concise CLI display.
      *
      * @param responseLine one JSON response line, or null for a missing response
+     * @param spaceId the user's chosen space number to check
      * @return user-facing CLI text
      */
-    static String formatRecommendationResponse(String responseLine) {
+    static String formatRecommendationResponse(String responseLine, String spaceId) {
         if (responseLine == null || responseLine.isBlank()) {
             return "RECOMMENDATION FAILURE: No response from recommender node.";
         }
@@ -422,6 +409,50 @@ public class CustomerCLI {
             if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
                 if (!response.has("result") || response.get("result").getAsString().isBlank()) {
                     return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+                }
+                String result = response.get("result").getAsString();
+                String[] parts = result.split("\n");
+                if (parts.length >= 2) {
+                    String rawResult = parts[1].replace("Result:", "").trim();
+                    
+                    // Check if the user's chosen spaceId matches one of the recommended spaces
+                    boolean choseBest = false;
+                    if (!"NONE".equalsIgnoreCase(rawResult)) {
+                        String[] recommendationParts = rawResult.split(", ");
+                        for (String part : recommendationParts) {
+                            String cleanPart = part.replace("Space ", "").trim();
+                            String[] spaceAndCitations = cleanPart.split(";");
+                            if (spaceAndCitations.length >= 1 && spaceAndCitations[0].trim().equals(spaceId.trim())) {
+                                choseBest = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Format recommendation results
+                    if ("NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
+                        return "No recommendations available.";
+                    }
+                    String[] recommendationParts = rawResult.split(", ");
+                    StringBuilder formatted = new StringBuilder();
+                    if (choseBest) {
+                        formatted.append("You chose the best space! [Excellent Choice]\n");
+                    }
+                    formatted.append("Recommendations:\n");
+                    for (int i = 0; i < recommendationParts.length; i++) {
+                        String part = recommendationParts[i].replace("Space ", "").trim();
+                        String[] spaceAndCitations = part.split(";");
+                        if (spaceAndCitations.length >= 2) {
+                            formatted.append(" - Space ").append(spaceAndCitations[0])
+                                     .append(" (").append(spaceAndCitations[1]).append(" Citations)");
+                        } else {
+                            formatted.append(" - ").append(recommendationParts[i]);
+                        }
+                        if (i < recommendationParts.length - 1) {
+                            formatted.append("\n");
+                        }
+                    }
+                    return formatted.toString();
                 }
                 return response.get("result").getAsString();
             }
