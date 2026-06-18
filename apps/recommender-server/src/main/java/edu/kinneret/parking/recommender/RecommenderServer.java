@@ -315,6 +315,7 @@ public class RecommenderServer implements AutoCloseable {
 
             if (!skipLeader) {
                 String localResult = calculateLocalRecommendation(spaceId);
+                displayLocalRecommendation(spaceId, vehicleId, localResult);
                 JsonObject forwardRequest = createSignedMessage("FORWARD_QUERY", spaceId, correlationId, nodeId);
                 forwardRequest.addProperty("localResult", localResult);
                 if (!"-".equals(vehicleId)) {
@@ -397,6 +398,7 @@ public class RecommenderServer implements AutoCloseable {
     private void handleCollectRequest(String spaceId, String correlationId, PrintWriter writer) {
         try {
             String localResult = calculateLocalRecommendation(spaceId);
+            displayLocalRecommendation(spaceId, "-", localResult);
             JsonObject response = createSignedMessage("COLLECT_RESPONSE", spaceId, correlationId, nodeId);
             response.addProperty("localResult", localResult);
             signMessage(response, signer);
@@ -490,7 +492,9 @@ public class RecommenderServer implements AutoCloseable {
 
     private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
         Map<String, String> votes = new ConcurrentHashMap<>();
-        votes.put(nodeId, calculateLocalRecommendation(spaceId));
+        String localResult = calculateLocalRecommendation(spaceId);
+        displayLocalRecommendation(spaceId, "-", localResult);
+        votes.put(nodeId, localResult);
         votes.putAll(explicitVotes);
 
         ExecutorService collectExecutor = Executors.newFixedThreadPool(10);
@@ -574,6 +578,28 @@ public class RecommenderServer implements AutoCloseable {
             logSecurity("CONSENSUS_FAILURE", "cluster", "no exact-list majority");
         }
         return consensus;
+    }
+
+    /**
+     * Displays the recommendation calculated by this node before majority voting.
+     * Every recommender therefore exposes its own vote in both CLI logs and the GUI.
+     *
+     * @param spaceId requested parking space
+     * @param vehicleId requesting vehicle, or "-" for an internal collect request
+     * @param localResult formatted local recommendation
+     */
+    private void displayLocalRecommendation(String spaceId, String vehicleId, String localResult) {
+        String recommendation = extractRecommendationList(localResult);
+        logger.info("[LOCAL-RECOMMENDATION] Node: " + nodeId + " requested Space: " + spaceId
+                + " -> Vote: " + recommendation);
+        System.out.println(System.lineSeparator() + "[" + nodeId + " LOCAL RECOMMENDATION]"
+                + System.lineSeparator() + "Request: Space " + spaceId
+                + System.lineSeparator() + "Result: " + recommendation);
+        try {
+            RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, recommendation);
+        } catch (NoClassDefFoundError | Exception ignored) {
+            // The headless CLI does not require JavaFX state.
+        }
     }
 
     /**
