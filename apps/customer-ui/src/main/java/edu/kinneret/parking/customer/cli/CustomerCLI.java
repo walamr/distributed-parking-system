@@ -43,18 +43,22 @@ public class CustomerCLI {
         RabbitMqConnectionManager rabbitManager = new RabbitMqConnectionManager(config);
         SecureMessageSigner signer = new SecureMessageSigner(config.getHmacSecret());
 
-        System.out.println("==========================================");
-        System.out.println("   MULLIGAN PARKING - CUSTOMER CLUSTER CLI");
-        System.out.println("==========================================");
+        System.out.println("\n+--------------------------------------------------+");
+        System.out.println("|     MULLIGAN PARKING - CUSTOMER CLUSTER CLI      |");
+        System.out.println("+--------------------------------------------------+");
 
         try (ParkingRepository repository = new ParkingRepository(config);
              Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 if (loggedInUser == null) {
-                    System.out.println("\nStatus: NOT LOGGED IN");
-                    System.out.println("Options: [1] Login, [2] Exit");
-                    System.out.print("Select: ");
-                    String choice = scanner.nextLine();
+                    System.out.println("\n==================================================");
+                    System.out.println("  STATUS: NOT LOGGED IN");
+                    System.out.println("==================================================");
+                    System.out.println("  [1] Authenticate (Login via VIN)");
+                    System.out.println("  [2] Exit CLI");
+                    System.out.println("--------------------------------------------------");
+                    System.out.print("Select Option > ");
+                    String choice = scanner.nextLine().trim();
 
                     if ("2".equals(choice)) break;
 
@@ -68,7 +72,7 @@ public class CustomerCLI {
                         }
 
                         if (vin.isEmpty()) {
-                            System.out.println("ERROR: Vehicle VIN cannot be empty.");
+                            System.out.println("\n>>> ERROR: Vehicle VIN cannot be empty.");
                             continue;
                         }
 
@@ -87,77 +91,100 @@ public class CustomerCLI {
                                 }
                                 loggedInUser = ownerName;
                                 loggedInVin = vin;
-                                // repository.registerUser(ownerName, vin, "customer", vin); // Bypassed to avoid database permission warnings for low-privilege customer role
-                                System.out.println("SUCCESS: Authenticated with vehicle VIN '" + vin + "' (Owner: " + ownerName + ").");
+                                System.out.println("\n>>> SUCCESS: Authenticated successfully!");
+                                System.out.println("    Owner: " + ownerName + " | VIN: " + vin);
                             } else {
-                                System.out.println("ERROR: Authentication failed. VIN '" + vin + "' is not registered.");
+                                System.out.println("\n>>> ERROR: Authentication failed. VIN '" + vin + "' is not registered.");
                             }
                         } catch (Exception e) {
-                            System.err.println("ERROR: Unable to connect to the database cluster for login. Please try again.");
+                            System.err.println("\n>>> ERROR: Unable to connect to the database cluster for login. Please try again.");
                         }
                     } else {
-                        System.out.println("Invalid choice.");
+                        System.out.println("\n>>> ERROR: Invalid choice.");
                     }
                 } else {
-                    System.out.println("\nStatus: LOGGED IN as '" + loggedInUser + "' (Vehicle VIN: '" + loggedInVin + "')");
-                    System.out.println("Options: [1] Start Parking, [2] Stop Parking, [3] List Parking Events (History), [4] Recommend Parking, [5] Logout, [6] Exit");
-                    System.out.print("Select: ");
-                    String choice = scanner.nextLine();
+                    System.out.println("\n==================================================");
+                    System.out.println("  LOGGED IN AS : " + loggedInUser);
+                    System.out.println("  VEHICLE VIN  : " + loggedInVin);
+                    System.out.println("==================================================");
+                    System.out.println("  [1] Start Parking Session");
+                    System.out.println("  [2] Stop Parking Session");
+                    System.out.println("  [3] View Parking History");
+                    System.out.println("  [4] Get Parking Recommendation");
+                    System.out.println("  [5] Log Out");
+                    System.out.println("  [6] Exit CLI");
+                    System.out.println("--------------------------------------------------");
+                    System.out.print("Select Option > ");
+                    String choice = scanner.nextLine().trim();
 
                     if ("6".equals(choice)) break;
 
                     switch (choice) {
                         case "1":
-                            System.out.print("Enter Space ID: ");
-                            String spaceId = scanner.nextLine();
+                            System.out.print("Enter Target Space ID: ");
+                            String spaceId = scanner.nextLine().trim();
+                            System.out.println();
                             publishMessage(rabbitManager, config, signer, loggedInVin, spaceId, "start", repository);
                             break;
                         case "2":
-                            System.out.print("Enter Space ID: ");
-                            String stopSpaceId = scanner.nextLine();
+                            System.out.print("Enter Active Space ID: ");
+                            String stopSpaceId = scanner.nextLine().trim();
+                            System.out.println();
                             publishMessage(rabbitManager, config, signer, loggedInVin, stopSpaceId, "stop", repository);
                             break;
                         case "3":
                             try {
                                 List<Document> history = repository.getVehicleHistory(loggedInVin);
-                                System.out.println("History for " + loggedInVin + " (" + history.size() + " records):");
-                                for (Document doc : history) {
-                                    System.out.println(" - " + doc.get("type") + " at " + doc.get("timestamp") + " in space " + ParkingRepository.readPayloadField(doc, "spaceId"));
+                                System.out.println("\n+--------------------------------------------------+");
+                                System.out.println("|        PARKING HISTORY FOR " + String.format("%-17s", loggedInVin) + "     |");
+                                System.out.println("+--------------------------------------------------+");
+                                if (history.isEmpty()) {
+                                    System.out.println("|  No records found.                               |");
+                                } else {
+                                    for (Document doc : history) {
+                                        String type = doc.getString("type");
+                                        String action = type != null && type.endsWith(".stop") ? "STOP " : "START";
+                                        String space = ParkingRepository.readPayloadField(doc, "spaceId");
+                                        Object ts = doc.get("timestamp");
+                                        System.out.println(String.format("|  %s | Space: %-3s | Timestamp: %-15s |", action, space, ts != null ? ts.toString() : "-"));
+                                    }
                                 }
+                                System.out.println("+--------------------------------------------------+");
                             } catch (Exception e) {
                                 logger.warn("Failed to retrieve history for VIN: {}", safeForLog(loggedInVin));
-                                System.err.println("ERROR: Unable to connect to the database cluster. Please try again later.");
+                                System.err.println("\n>>> ERROR: Unable to connect to the database cluster. Please try again later.");
                             }
                             break;
                         case "4":
                             String spaceIdRec = "";
                             while (true) {
-                                System.out.print("Enter Space ID to base recommendation on: ");
+                                System.out.print("\nEnter Space ID to check: ");
                                 spaceIdRec = scanner.nextLine().trim();
                                 try {
                                     spaceIdRec = validateRecommendationSpaceId(spaceIdRec);
                                 } catch (IllegalArgumentException e) {
-                                    System.out.println("ERROR: " + e.getMessage());
+                                    System.out.println(">>> ERROR: " + e.getMessage());
                                     continue;
                                 }
                                 break;
                             }
                             List<ClusterNode> recNodes = new java.util.ArrayList<>(config.getRecommenderNodes());
                             java.util.Collections.shuffle(recNodes);
+                            System.out.println("\nQuerying recommender nodes...");
                             queryRecommender(spaceIdRec, recNodes, 0, config, signer);
                             break;
                         case "5":
-                            System.out.println("Logging out customer '" + loggedInUser + "'.");
+                            System.out.println("\n>>> Logging out customer '" + loggedInUser + "'.");
                             loggedInUser = null;
                             loggedInVin = null;
                             break;
                         default:
-                            System.out.println("Invalid choice.");
+                            System.out.println("\n>>> ERROR: Invalid choice.");
                     }
                 }
             }
         }
-        System.out.println("Exiting CLI.");
+        System.out.println("\nExiting CLI.");
     }
 
 /**
@@ -431,27 +458,34 @@ public class CustomerCLI {
                     
                     // Format recommendation results
                     if ("NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
-                        return "No recommendations available.";
+                        return "+--------------------------------------------------+\n" +
+                               "|  No recommendations available.                   |\n" +
+                               "+--------------------------------------------------+";
                     }
                     String[] recommendationParts = rawResult.split(", ");
                     StringBuilder formatted = new StringBuilder();
+                    formatted.append("+--------------------------------------------------+\n");
+                    formatted.append("|              RECOMMENDATION RESULTS              |\n");
+                    formatted.append("+--------------------------------------------------+\n");
                     if (choseBest) {
-                        formatted.append("You chose the best space! [Excellent Choice]\n");
+                        formatted.append("|  You chose the best space! [Excellent Choice]    |\n");
                     }
-                    formatted.append("Recommendations:\n");
+                    formatted.append("|  Recommendations:                                |\n");
                     for (int i = 0; i < recommendationParts.length; i++) {
                         String part = recommendationParts[i].replace("Space ", "").trim();
                         String[] spaceAndCitations = part.split(";");
                         if (spaceAndCitations.length >= 2) {
-                            formatted.append(" - Space ").append(spaceAndCitations[0])
-                                     .append(" (").append(spaceAndCitations[1]).append(" Citations)");
+                            String item = String.format("   - Space %-3s (%s Citations)", spaceAndCitations[0], spaceAndCitations[1]);
+                            formatted.append(String.format("|  %-46s  |", item));
                         } else {
-                            formatted.append(" - ").append(recommendationParts[i]);
+                            String item = "   - " + recommendationParts[i];
+                            formatted.append(String.format("|  %-46s  |", item));
                         }
                         if (i < recommendationParts.length - 1) {
                             formatted.append("\n");
                         }
                     }
+                    formatted.append("\n+--------------------------------------------------+");
                     return formatted.toString();
                 }
                 return response.get("result").getAsString();
