@@ -43,20 +43,47 @@ foreach ($key in $required) {
     }
 }
 
-# Dynamically generate a 256-bit cryptographically secure random key
-$bytes = New-Object Byte[] 32
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-$DYNAMIC_HMAC_SECRET = [System.BitConverter]::ToString($bytes) -replace '-'
+# Check if .env already exists to preserve existing secrets/cookies
+$EXISTING_HMAC_SECRET = $null
+$EXISTING_ERLANG_COOKIE = $null
+$EXISTING_KEYSTORE_PASSWORD = $null
+if (Test-Path ".env") {
+    Get-Content ".env" | Where-Object { $_ -match "^\s*[^#].*=.*" } | ForEach-Object {
+        $parts = $_ -split "=", 2
+        $key = $parts[0].Trim()
+        $val = $parts[1].Trim()
+        if ($key -eq "HMAC_SECRET") { $EXISTING_HMAC_SECRET = $val }
+        elseif ($key -eq "RABBITMQ_ERLANG_COOKIE") { $EXISTING_ERLANG_COOKIE = $val }
+        elseif ($key -eq "RABBITMQ_KEYSTORE_PASSWORD") { $EXISTING_KEYSTORE_PASSWORD = $val }
+    }
+}
 
-# Dynamically generate a cryptographically secure random Erlang cookie
-$cookieBytes = New-Object Byte[] 24
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($cookieBytes)
-$DYNAMIC_ERLANG_COOKIE = [System.BitConverter]::ToString($cookieBytes) -replace '-'
+# Dynamically generate a 256-bit cryptographically secure random key if not already present
+if ($EXISTING_HMAC_SECRET) {
+    $DYNAMIC_HMAC_SECRET = $EXISTING_HMAC_SECRET
+} else {
+    $bytes = New-Object Byte[] 32
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $DYNAMIC_HMAC_SECRET = [System.BitConverter]::ToString($bytes) -replace '-'
+}
 
-# Dynamically generate a cryptographically secure random keystore/truststore password
-$keystoreBytes = New-Object Byte[] 16
-[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keystoreBytes)
-$DYNAMIC_KEYSTORE_PASSWORD = [System.BitConverter]::ToString($keystoreBytes) -replace '-'
+# Dynamically generate a cryptographically secure random Erlang cookie if not already present
+if ($EXISTING_ERLANG_COOKIE) {
+    $DYNAMIC_ERLANG_COOKIE = $EXISTING_ERLANG_COOKIE
+} else {
+    $cookieBytes = New-Object Byte[] 24
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($cookieBytes)
+    $DYNAMIC_ERLANG_COOKIE = [System.BitConverter]::ToString($cookieBytes) -replace '-'
+}
+
+# Dynamically generate a cryptographically secure random keystore/truststore password if not already present
+if ($EXISTING_KEYSTORE_PASSWORD) {
+    $DYNAMIC_KEYSTORE_PASSWORD = $EXISTING_KEYSTORE_PASSWORD
+} else {
+    $keystoreBytes = New-Object Byte[] 16
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keystoreBytes)
+    $DYNAMIC_KEYSTORE_PASSWORD = [System.BitConverter]::ToString($keystoreBytes) -replace '-'
+}
 
 function Get-CommonEnvContent {
     param([string]$mongoUser, [string]$mongoPass)
