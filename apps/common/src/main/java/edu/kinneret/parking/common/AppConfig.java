@@ -229,6 +229,9 @@ public final class AppConfig {
             try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("\uFEFF")) {
+                        line = line.substring(1);
+                    }
                     line = line.trim();
                     if (line.isEmpty() || line.startsWith("#")) {
                         continue;
@@ -261,6 +264,19 @@ public final class AppConfig {
         String recommender1 = env.get("RECOMMENDER1_IP");
         String recommender2 = env.get("RECOMMENDER2_IP");
         String recommender3 = env.get("RECOMMENDER3_IP");
+
+        // Permanent Fix: Automatically override distributed IPs with localhost
+        // when running natively on a developer machine (Windows or Mac).
+        // This ensures local UI apps can successfully reach the Docker Desktop
+        // containers regardless of what is committed in network-ips.env.
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win") || os.contains("mac")) {
+            mongo1 = "127.0.0.1"; mongo2 = "127.0.0.1"; mongo3 = "127.0.0.1";
+            rabbit1 = "127.0.0.1"; rabbit2 = "127.0.0.1"; rabbit3 = "127.0.0.1";
+            recommender1 = "127.0.0.1"; recommender2 = "127.0.0.1"; recommender3 = "127.0.0.1";
+            env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+            env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+        }
 
         if (mongo1 != null && mongo2 != null && mongo3 != null &&
             rabbit1 != null && rabbit2 != null && rabbit3 != null &&
@@ -326,6 +342,26 @@ public final class AppConfig {
     public static AppConfig fromEnvironment(ApplicationProfile profile) {
         Map<String, String> env = new java.util.HashMap<>(System.getenv());
         loadDotEnv(env);
+        
+        // Dynamically load profile-specific configs for unified local testing
+        if (profile != null) {
+            String profileEnvFile = null;
+            switch (profile) {
+                case CUSTOMER_UI: profileEnvFile = "env-configs/customer.env"; break;
+                case PEO_UI: profileEnvFile = "env-configs/peo.env"; break;
+                case MO_UI: profileEnvFile = "env-configs/mo.env"; break;
+                case QUEUE_SERVER: profileEnvFile = "env-configs/queue-server.env"; break;
+                case STORAGE_SERVER: profileEnvFile = "env-configs/storage-server.env"; break;
+            }
+            if (profileEnvFile != null) {
+                loadEnvFile(profileEnvFile, env);
+                loadEnvFile("../" + profileEnvFile, env);
+                loadEnvFile("../../" + profileEnvFile, env);
+            }
+            // Re-apply network IPs to ensure localhost overrides are kept
+            overrideWithNetworkIps(env);
+        }
+        
         return fromEnvironment(profile, env);
     }
 

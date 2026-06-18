@@ -375,15 +375,19 @@ public class RecommenderServerApplication extends Application {
                     server.setMalicious(nextState);
                     System.out.println("SUCCESS: Toggled malicious mode to: " + nextState);
                 } else if ("p".equals(input)) {
-                    System.out.print("Enter new malicious payload (e.g. 999;999): ");
+                    System.out.print("Enter the fake Lot ID (e.g. 5): ");
                     if (scanner.hasNextLine()) {
-                        String newPayload = scanner.nextLine().trim();
-                        try {
-                            server.setMaliciousPayload(newPayload);
-                            System.out
-                                    .println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
-                        } catch (IllegalArgumentException ex) {
-                            System.out.println("ERROR: " + ex.getMessage());
+                        String fakeLot = scanner.nextLine().trim();
+                        System.out.print("Enter the fake Space ID (e.g. 1): ");
+                        if (scanner.hasNextLine()) {
+                            String fakeSpace = scanner.nextLine().trim();
+                            String newPayload = fakeLot + ";" + fakeSpace;
+                            try {
+                                server.setMaliciousPayload(newPayload);
+                                System.out.println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
+                            } catch (IllegalArgumentException ex) {
+                                System.out.println("ERROR: " + ex.getMessage());
+                            }
                         }
                     }
                 } else {
