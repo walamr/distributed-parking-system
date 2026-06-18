@@ -91,8 +91,14 @@ public class RecommenderServerApplication extends Application {
         port = Integer.getInteger("port", port);
         leaderHost = System.getProperty("leaderHost", leaderHost);
         leaderPort = Integer.getInteger("leaderPort", leaderPort);
-        isLeader = Boolean.getBoolean("isLeader") || isLeader;
-        isMalicious = Boolean.getBoolean("malicious") || isMalicious;
+        
+        if (System.getProperty("isLeader") != null) {
+            isLeader = Boolean.parseBoolean(System.getProperty("isLeader"));
+        }
+        if (System.getProperty("malicious") != null) {
+            isMalicious = Boolean.parseBoolean(System.getProperty("malicious"));
+        }
+        
         maliciousPayload = System.getProperty("maliciousPayload", maliciousPayload);
         if (System.getProperty("nodes") != null) {
             clusterNodes = Arrays.asList(System.getProperty("nodes").split(","));
@@ -100,6 +106,60 @@ public class RecommenderServerApplication extends Application {
 
         SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/recommender-security.log"));
         AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.QUEUE_SERVER);
+
+        // Fallback to AppConfig for recommender nodes if not explicitly configured in system property or CLI arguments
+        boolean hasNodesOverride = false;
+        for (String arg : args) {
+            if (arg.contains("nodes=")) {
+                hasNodesOverride = true;
+                break;
+            }
+        }
+        if (System.getProperty("nodes") != null) {
+            hasNodesOverride = true;
+        }
+
+        if (!hasNodesOverride && appConfig.getRecommenderNodes() != null && !appConfig.getRecommenderNodes().isEmpty()) {
+            List<String> nodesFromConfig = new ArrayList<>();
+            for (edu.kinneret.parking.common.ClusterNode node : appConfig.getRecommenderNodes()) {
+                nodesFromConfig.add(node.getDisplayName() + "=" + node.getHost() + ":" + node.getPort());
+            }
+            clusterNodes = nodesFromConfig;
+        }
+
+        // Fallback for leaderHost/leaderPort if not explicitly configured
+        boolean hasLeaderOverride = false;
+        for (String arg : args) {
+            if (arg.contains("leaderHost=") || arg.contains("leaderPort=")) {
+                hasLeaderOverride = true;
+                break;
+            }
+        }
+        if (System.getProperty("leaderHost") != null || System.getProperty("leaderPort") != null) {
+            hasLeaderOverride = true;
+        }
+
+        if (!hasLeaderOverride && appConfig.getRecommenderNodes() != null && !appConfig.getRecommenderNodes().isEmpty()) {
+            // Find recommender1 if exists, otherwise first node
+            edu.kinneret.parking.common.ClusterNode leaderNode = appConfig.getRecommenderNodes().get(0);
+            for (edu.kinneret.parking.common.ClusterNode node : appConfig.getRecommenderNodes()) {
+                if ("recommender1".equals(node.getDisplayName())) {
+                    leaderNode = node;
+                    break;
+                }
+            }
+            leaderHost = leaderNode.getHost();
+            leaderPort = leaderNode.getPort();
+        }
+
+        System.out.println("=================================================================");
+        System.out.println("Recommender Server Startup Parameters:");
+        System.out.println("  - Node ID: " + nodeId);
+        System.out.println("  - Listen Port: " + port);
+        System.out.println("  - Is Leader: " + isLeader);
+        System.out.println("  - Leader Address: " + leaderHost + ":" + leaderPort);
+        System.out.println("  - Cluster Nodes: " + clusterNodes);
+        System.out.println("=================================================================");
 
         try {
             server = new RecommenderServer(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes,

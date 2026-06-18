@@ -498,8 +498,8 @@ public class RecommenderServer implements AutoCloseable {
                             }
                         }
                     } catch (Exception e) {
-                        logger.warning("Leader node '" + nodeId + "' failed to collect result from "
-                                + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port());
+                        logger.log(Level.WARNING, "Leader node '" + nodeId + "' failed to collect result from "
+                                + endpoint.nodeId() + " at " + endpoint.host() + ":" + endpoint.port() + ". Error: " + e.getMessage(), e);
                     }
                     return null;
                 }));
