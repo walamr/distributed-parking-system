@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,6 +96,28 @@ public class RecommenderServer implements AutoCloseable {
     public RecommenderServer(String nodeId, int port, String leaderHost, int leaderPort,
                              boolean isLeader, boolean isMalicious, List<String> clusterNodes,
                              AppConfig appConfig) {
+        this(nodeId, port, leaderHost, leaderPort, isLeader, isMalicious, clusterNodes,
+                appConfig, new NonceStore(appConfig));
+    }
+
+    /**
+     * Creates a recommender server with an explicitly supplied nonce store.
+     * This keeps the production constructor Mongo-backed while allowing unit tests
+     * to use the secure in-memory implementation without requiring infrastructure.
+     *
+     * @param nodeId unique identifier for this node
+     * @param port port to listen on
+     * @param leaderHost host address of the cluster leader
+     * @param leaderPort port of the cluster leader
+     * @param isLeader flag indicating if this node is the leader
+     * @param isMalicious flag indicating if this node should behave maliciously
+     * @param clusterNodes list of all cluster nodes
+     * @param appConfig application configuration
+     * @param nonceStore nonce store used for replay protection
+     */
+    RecommenderServer(String nodeId, int port, String leaderHost, int leaderPort,
+                      boolean isLeader, boolean isMalicious, List<String> clusterNodes,
+                      AppConfig appConfig, NonceStore nonceStore) {
         this.nodeId = ValidationUtils.requireValidMessageType(nodeId, "nodeId");
         this.port = ValidationUtils.requirePositive(port, "port");
         this.leaderHost = ValidationUtils.requireNonEmpty(leaderHost, "leaderHost");
@@ -112,7 +135,7 @@ public class RecommenderServer implements AutoCloseable {
         this.clusterNodes = parseClusterNodes(clusterNodes);
         this.appConfig = appConfig;
         this.signer = new SecureMessageSigner(appConfig.getHmacSecret());
-        this.nonceStore = new NonceStore(appConfig);
+        this.nonceStore = Objects.requireNonNull(nonceStore, "nonceStore");
         javax.net.ssl.SSLContext cCtx = null;
         javax.net.ssl.SSLContext sCtx = null;
         try {
@@ -428,12 +451,11 @@ public class RecommenderServer implements AutoCloseable {
             if (consensus.startsWith("Request:")) {
                 finalResult = consensus;
             } else {
-                long requestedCitations = getLocalCitationsCount(spaceId);
                 String consensusList = consensus;
-                if (!consensusList.startsWith("Space ") && !consensusList.equals("NONE")) {
+                if (!consensusList.startsWith("Space ") && !consensusList.equals("Empty List")) {
                     consensusList = "Space " + consensusList;
                 }
-                finalResult = "Request: Space " + spaceId + " (" + requestedCitations + " Citations)\nResult: " + consensusList;
+                finalResult = "Request: Space " + spaceId + "\nResult: " + consensusList;
             }
             response.addProperty("result", finalResult);
             logger.info("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + consensus + ")");
@@ -450,31 +472,6 @@ public class RecommenderServer implements AutoCloseable {
         }
         signMessage(response, signer);
         writer.println(response);
-    }
-
-/**
-
- * Get local citations count.
-
- * @param spaceId the spaceId
-
- * @return the long
-
- */
-
-    private long getLocalCitationsCount(String spaceId) {
-        try (ParkingRepository repository = new ParkingRepository(appConfig)) {
-            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                return repository.getDatabase().getCollection("citations")
-                        .countDocuments(com.mongodb.client.model.Filters.or(
-                                com.mongodb.client.model.Filters.eq("payload.spaceId", spaceId),
-                                com.mongodb.client.model.Filters.eq("spaceId", spaceId)
-                        ));
-            }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to get local citation count for space " + spaceId, e);
-        }
-        return 0;
     }
 
 /**
@@ -700,19 +697,10 @@ public class RecommenderServer implements AutoCloseable {
                 throw new IllegalArgumentException("Zone could not be identified for requested space.");
             }
 
-            long requestedCitations = 0;
-            if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
-                requestedCitations = repository.getDatabase().getCollection("citations")
-                        .countDocuments(com.mongodb.client.model.Filters.or(
-                                com.mongodb.client.model.Filters.eq("payload.spaceId", safeSpaceId),
-                                com.mongodb.client.model.Filters.eq("spaceId", safeSpaceId)
-                        ));
-            }
-
             List<SpaceCandidate> candidates = loadAvailableCandidates(safeSpaceId, zoneName, repository);
             List<RecommendationResult> results = recommendFromSpaceCandidates(safeSpaceId, candidates);
-            String resultPart = results.isEmpty() ? "NONE" : "Space " + serializeResults(results);
-            return "Request: Space " + safeSpaceId + " (" + requestedCitations + " Citations)\nResult: " + resultPart;
+            String resultPart = results.isEmpty() ? "Empty List" : "Space " + serializeResults(results);
+            return "Request: Space " + safeSpaceId + "\nResult: " + resultPart;
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {

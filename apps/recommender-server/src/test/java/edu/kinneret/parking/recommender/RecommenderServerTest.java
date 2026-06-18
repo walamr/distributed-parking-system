@@ -4,6 +4,7 @@ import edu.kinneret.parking.common.AppConfig;
 import edu.kinneret.parking.common.ParkingRepository;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -40,8 +41,15 @@ public class RecommenderServerTest {
                 true,
                 false,
                 List.of("recommender1=localhost:8091", "recommender2=localhost:8092", "recommender3=localhost:8093"),
-                appConfig
+                appConfig,
+                new edu.kinneret.parking.common.NonceStore(60)
         );
+    }
+
+    /** Closes test-owned resources after every test. */
+    @AfterEach
+    public void tearDown() {
+        server.close();
     }
     /**
      * Test serialization.
@@ -124,6 +132,89 @@ public class RecommenderServerTest {
     @Test
     public void noAvailableSpacesReturnsEmptyList() {
         assertTrue(RecommenderServer.recommendFromCandidates("3", List.of()).isEmpty());
+    }
+
+    /** PDF image example 1: requested space is the unique minimum. */
+    @Test
+    public void pdfExample01() {
+        assertEquals("3;1", serialize("3", available(new long[]{10, 5, 1, 5, 3, 3}, new int[]{})));
+    }
+
+    /** PDF image example 2: requested space wins a minimum-citation tie. */
+    @Test
+    public void pdfExample02() {
+        assertEquals("3;3", serialize("3", available(new long[]{10, 5, 3, 5, 3, 3}, new int[]{})));
+    }
+
+    /** PDF image example 3: nearest minimum is space 5. */
+    @Test
+    public void pdfExample03() {
+        assertEquals("5;3", serialize("3", available(new long[]{10, 5, 7, 5, 3, 3}, new int[]{})));
+    }
+
+    /** PDF image example 4: equally near minimum spaces are both returned. */
+    @Test
+    public void pdfExample04() {
+        assertEquals("2;3, Space 4;3", serialize("3", available(new long[]{10, 3, 7, 3, 5, 3}, new int[]{})));
+    }
+
+    /** PDF image example 5: requested space wins the tie. */
+    @Test
+    public void pdfExample05() {
+        assertEquals("3;3", serialize("3", available(new long[]{10, 3, 3, 3, 5, 3}, new int[]{})));
+    }
+
+    /**
+     * PDF image example 6. The slide prints 3;3 even though its table gives
+     * space 3 zero citations; the algorithm and citation-display requirement
+     * therefore produce the internally consistent result 3;0.
+     */
+    @Test
+    public void pdfExample06() {
+        assertEquals("3;0", serialize("3", available(new long[]{0, 0, 0, 0, 0, 0}, new int[]{})));
+    }
+
+    /** PDF image example 7: nearest zero-citation spaces bracket the request. */
+    @Test
+    public void pdfExample07() {
+        assertEquals("2;0, Space 4;0", serialize("3", available(new long[]{0, 0, 1, 0, 0, 0}, new int[]{})));
+    }
+
+    /** PDF image example 8: the nearest unique minimum is space 2. */
+    @Test
+    public void pdfExample08() {
+        assertEquals("2;1", serialize("3", available(new long[]{2, 1, 2, 2, 2, 3}, new int[]{})));
+    }
+
+    /** PDF image example 9: busy space 2 leaves requested space 3 as best. */
+    @Test
+    public void pdfExample09() {
+        assertEquals("3;2", serialize("3", available(new long[]{2, 1, 2, 2, 2, 3}, new int[]{2})));
+    }
+
+    /** PDF image example 10: busy spaces 2 and 3 make space 4 nearest. */
+    @Test
+    public void pdfExample10() {
+        assertEquals("4;2", serialize("3", available(new long[]{2, 1, 2, 2, 2, 3}, new int[]{2, 3})));
+    }
+
+    /** PDF image example 11: equally near available spaces 1 and 5 are returned. */
+    @Test
+    public void pdfExample11() {
+        assertEquals("1;2, Space 5;2", serialize("3", available(new long[]{2, 1, 2, 2, 2, 3}, new int[]{2, 3, 4})));
+    }
+
+    /** PDF image example 12: only space 1 remains available. */
+    @Test
+    public void pdfExample12() {
+        assertEquals("1;10", serialize("3", available(new long[]{10, 1, 2, 2, 2, 3}, new int[]{2, 3, 4, 5, 6})));
+    }
+
+    /** PDF image example 13: no available spaces yields an empty list. */
+    @Test
+    public void pdfExample13() {
+        assertTrue(RecommenderServer.recommendFromCandidates("3",
+                available(new long[]{2, 1, 2, 2, 2, 3}, new int[]{1, 2, 3, 4, 5, 6})).isEmpty());
     }
     /**
      * Multiple spaces with same minimum citations returns closest subset.
@@ -273,6 +364,28 @@ public class RecommenderServerTest {
         java.util.ArrayList<RecommendationResult> results = new java.util.ArrayList<>();
         for (int i = 0; i < citations.length; i++) {
             results.add(new RecommendationResult(String.valueOf(i + 1), citations[i]));
+        }
+        return results;
+    }
+
+    /**
+     * Builds the available candidate list from a PDF citation row and its busy spaces.
+     *
+     * @param citations citation count for spaces 1 through n
+     * @param busySpaces one-based space numbers marked busy
+     * @return candidates not marked busy
+     */
+    private static List<RecommendationResult> available(long[] citations, int[] busySpaces) {
+        java.util.Set<Integer> busy = new java.util.HashSet<>();
+        for (int space : busySpaces) {
+            busy.add(space);
+        }
+        java.util.ArrayList<RecommendationResult> results = new java.util.ArrayList<>();
+        for (int i = 0; i < citations.length; i++) {
+            int space = i + 1;
+            if (!busy.contains(space)) {
+                results.add(new RecommendationResult(String.valueOf(space), citations[i]));
+            }
         }
         return results;
     }

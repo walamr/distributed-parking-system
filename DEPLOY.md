@@ -477,4 +477,4 @@ To run a node on the host, execute the Gradle task with node parameters:
 .\gradlew.bat :recommender-server:runRecommenderServer -Dport=8093 -DnodeId=recommender3 -DisLeader=false
 ```
 
-Once running, verify using the updated **Customer CLI** (option `[5] Recommend Parking`) or **Customer GUI** (select node and click `💡 Get Recommendation`).
+Once running, verify using the updated **Customer CLI** (option `[4] Recommend Parking`) or **Customer GUI** (select node and click `💡 Get Recommendation`).

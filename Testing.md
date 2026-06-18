@@ -404,7 +404,7 @@ Expected GUI/CLI evidence:
 - Customer GUI shows a visible `Recommend Parking` button
 - the customer enters a parking space number and retries invalid input without crashing
 - recommendation output displays recommended spaces with citation counts
-- Customer CLI option `[5] Recommend Parking` rejects blank, non-numeric, and out-of-range spaces before sending
+- Customer CLI option `[4] Recommend Parking` rejects blank, non-numeric, and out-of-range spaces before sending
 
 RabbitMQ/Mongo hardening evidence to include in the final submission:
 

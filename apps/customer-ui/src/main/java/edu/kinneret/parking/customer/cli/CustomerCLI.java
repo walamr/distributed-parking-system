@@ -134,23 +134,10 @@ public class CustomerCLI {
                             while (true) {
                                 System.out.print("Enter Space ID to base recommendation on: ");
                                 spaceIdRec = scanner.nextLine().trim();
-                                if (spaceIdRec.isEmpty()) {
-                                    System.out.println("ERROR: Space ID cannot be empty.");
-                                    continue;
-                                }
-                                if (!spaceIdRec.matches("\\d+")) {
-                                    System.out.println("ERROR: Space ID must be numeric.");
-                                    continue;
-                                }
                                 try {
-                                    ValidationUtils.requireValidSpaceId(spaceIdRec);
-                                    int numericSpace = Integer.parseInt(spaceIdRec);
-                                    if (numericSpace < 1 || numericSpace > 100) {
-                                        System.out.println("ERROR: Space ID must be between 1 and 100.");
-                                        continue;
-                                    }
+                                    spaceIdRec = validateRecommendationSpaceId(spaceIdRec);
                                 } catch (IllegalArgumentException e) {
-                                    System.out.println("ERROR: Invalid space ID format.");
+                                    System.out.println("ERROR: " + e.getMessage());
                                     continue;
                                 }
                                 break;
@@ -325,29 +312,16 @@ public class CustomerCLI {
      * Sends a signed TLS recommendation query from the CLI.
      *
      * @param spaceId requested numeric parking space number
-     * @param host recommender node host address
-     * @param port recommender node TLS port
+     * @param recNodes configured recommender nodes, beginning with the selected node
+     * @param selectedIdx index of the node selected by the customer
      * @param config application TLS configuration
      * @param signer HMAC-SHA256 signer
      */
-    private static void queryRecommender(String spaceId, List<ClusterNode> recNodes, int selectedIdx, AppConfig config, SecureMessageSigner signer) {
-        if (spaceId == null || spaceId.isBlank()) {
-            System.out.println("ERROR: Space ID cannot be empty.");
-            return;
-        }
-        if (!spaceId.matches("\\d+")) {
-            System.out.println("ERROR: Space ID must be numeric.");
-            return;
-        }
+    static void queryRecommender(String spaceId, List<ClusterNode> recNodes, int selectedIdx, AppConfig config, SecureMessageSigner signer) {
         try {
-            ValidationUtils.requireValidSpaceId(spaceId);
-            int numericSpace = Integer.parseInt(spaceId);
-            if (numericSpace < 1 || numericSpace > 100) {
-                System.out.println("ERROR: Space ID must be between 1 and 100.");
-                return;
-            }
+            spaceId = validateRecommendationSpaceId(spaceId);
         } catch (IllegalArgumentException e) {
-            System.out.println("ERROR: Invalid space ID format.");
+            System.out.println("ERROR: " + e.getMessage());
             return;
         }
 
@@ -381,6 +355,7 @@ public class CustomerCLI {
             try (SSLSocket socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
                 socket.setEnabledProtocols(new String[] {"TLSv1.3", "TLSv1.2"});
                 socket.connect(new java.net.InetSocketAddress(node.getHost(), node.getPort()), 3000);
+                socket.setSoTimeout(3000);
                 socket.startHandshake();
                 try (java.io.PrintWriter writer = new java.io.PrintWriter(socket.getOutputStream(), true);
                      java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()))) {
@@ -388,15 +363,7 @@ public class CustomerCLI {
                     writer.println(request.toString());
                     String responseLine = reader.readLine();
                     if (responseLine != null) {
-                        com.google.gson.JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
-                        String status = response.get("status").getAsString();
-                        if ("SUCCESS".equalsIgnoreCase(status)) {
-                            String result = response.get("result").getAsString();
-                            System.out.println("RECOMMENDATION SUCCESS: Recommended spaces: " + result);
-                        } else {
-                            String reason = response.has("reason") ? response.get("reason").getAsString() : "Unknown error";
-                            System.out.println("RECOMMENDATION FAILURE: " + reason);
-                        }
+                        System.out.println(formatRecommendationResponse(responseLine));
                         success = true;
                         break;
                     }
@@ -412,6 +379,58 @@ public class CustomerCLI {
                 logger.warn("All recommender nodes failed. Last error: ", lastEx);
             }
             System.out.println("ERROR: Recommendation service temporarily unavailable.");
+        }
+    }
+
+    /**
+     * Validates the parking-space number accepted by the recommendation use case.
+     *
+     * @param spaceId raw CLI input
+     * @return trimmed numeric space identifier
+     */
+    static String validateRecommendationSpaceId(String spaceId) {
+        if (spaceId == null || spaceId.isBlank()) {
+            throw new IllegalArgumentException("Space ID cannot be empty.");
+        }
+        String trimmed = spaceId.trim();
+        if (!trimmed.matches("\\d+")) {
+            throw new IllegalArgumentException("Space ID must be numeric.");
+        }
+        ValidationUtils.requireValidSpaceId(trimmed);
+        int numericSpace = Integer.parseInt(trimmed);
+        if (numericSpace < 1 || numericSpace > 100) {
+            throw new IllegalArgumentException("Space ID must be between 1 and 100.");
+        }
+        return trimmed;
+    }
+
+    /**
+     * Converts a recommender protocol response into the concise CLI display.
+     *
+     * @param responseLine one JSON response line, or null for a missing response
+     * @return user-facing CLI text
+     */
+    static String formatRecommendationResponse(String responseLine) {
+        if (responseLine == null || responseLine.isBlank()) {
+            return "RECOMMENDATION FAILURE: No response from recommender node.";
+        }
+        try {
+            JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
+            if (!response.has("status")) {
+                return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+            }
+            if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
+                if (!response.has("result") || response.get("result").getAsString().isBlank()) {
+                    return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+                }
+                return response.get("result").getAsString();
+            }
+            String reason = response.has("reason")
+                    ? response.get("reason").getAsString()
+                    : "Recommendation failed.";
+            return "RECOMMENDATION FAILURE: " + reason;
+        } catch (RuntimeException e) {
+            return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
         }
     }
 
