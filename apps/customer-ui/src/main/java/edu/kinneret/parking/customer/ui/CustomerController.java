@@ -1521,11 +1521,13 @@ public class CustomerController {
         Task<String> task = new Task<>() {
             @Override
             protected String call() throws Exception {
+                String vin = vinField != null && vinField.getText() != null ? vinField.getText().trim() : "";
                 JsonObject request = RecommenderRequestSigner.createSignedRequest(
                         "CLIENT_QUERY",
                         spaceId.trim(),
                         UUID.randomUUID().toString(),
                         "customer-ui",
+                        vin,
                         signer);
 
                 javax.net.ssl.SSLContext sslContext = TlsUtils.createSslContext(

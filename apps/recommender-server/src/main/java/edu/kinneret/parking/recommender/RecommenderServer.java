@@ -56,7 +56,7 @@ public class RecommenderServer implements AutoCloseable {
     private static final Set<String> REQUEST_TYPES = Set.of("CLIENT_QUERY", "FORWARD_QUERY", "COLLECT_REQUEST");
     private static final Set<String> RESPONSE_TYPES = Set.of("CLIENT_RESPONSE", "COLLECT_RESPONSE");
     private static final Set<String> SIGNED_FIELDS = Set.of(
-            "type", "spaceId", "correlationId", "timestamp", "nonce", "nodeId", "localResult", "status", "result", "reason");
+            "type", "spaceId", "correlationId", "timestamp", "nonce", "nodeId", "localResult", "status", "result", "reason", "vehicleId");
 
     private final String nodeId;
     private final int port;
@@ -252,9 +252,10 @@ public class RecommenderServer implements AutoCloseable {
             String type = request.get("type").getAsString();
             String spaceId = request.get("spaceId").getAsString();
             String correlationId = request.get("correlationId").getAsString();
+            String vehicleId = request.has("vehicleId") ? request.get("vehicleId").getAsString() : "-";
 
             switch (type) {
-                case "CLIENT_QUERY" -> handleClientQuery(spaceId, correlationId, writer);
+                case "CLIENT_QUERY" -> handleClientQuery(spaceId, correlationId, vehicleId, writer);
                 case "FORWARD_QUERY" -> handleForwardQuery(request, writer);
                 case "COLLECT_REQUEST" -> handleCollectRequest(spaceId, correlationId, writer);
                 default -> throw new IllegalArgumentException("Unsupported recommender message type.");
@@ -274,19 +275,23 @@ public class RecommenderServer implements AutoCloseable {
      *
      * @param spaceId validated numeric parking space number
      * @param correlationId request correlation identifier
+     * @param vehicleId vehicle identification number (vin)
      * @param clientWriter writer used to return the signed client response
      * @return no return value
      */
-    private void handleClientQuery(String spaceId, String correlationId, PrintWriter clientWriter) {
+    private void handleClientQuery(String spaceId, String correlationId, String vehicleId, PrintWriter clientWriter) {
         try {
             if (isLeader) {
-                sendConsensusResponse(spaceId, correlationId, clientWriter);
+                sendConsensusResponse(spaceId, correlationId, vehicleId, clientWriter);
                 return;
             }
 
             String localResult = calculateLocalRecommendation(spaceId);
             JsonObject forwardRequest = createSignedMessage("FORWARD_QUERY", spaceId, correlationId, nodeId);
             forwardRequest.addProperty("localResult", localResult);
+            if (!"-".equals(vehicleId)) {
+                forwardRequest.addProperty("vehicleId", vehicleId);
+            }
             signMessage(forwardRequest, signer);
 
             try (SSLSocket leaderSocket = openTlsSocket(leaderHost, leaderPort)) {
@@ -300,12 +305,26 @@ public class RecommenderServer implements AutoCloseable {
                     }
                     JsonObject signedReply = parseAndValidateResponse(reply, leaderHost + ":" + leaderPort);
                     clientWriter.println(signedReply);
+                    try {
+                        if (signedReply.has("status") && "SUCCESS".equals(signedReply.get("status").getAsString())) {
+                            String result = signedReply.get("result").getAsString();
+                            String[] parts = result.split("\n");
+                            if (parts.length >= 2) {
+                                String finalRec = parts[1].replace("Result:", "").trim();
+                                logger.info("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + finalRec + ")");
+                                RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, finalRec);
+                            }
+                        } else {
+                            logger.warning("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: FAILURE (Forward failed)");
+                            RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, "Forward Failed");
+                        }
+                    } catch (NoClassDefFoundError | Exception ignored) {}
                 }
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Node '" + nodeId + "' failed to reach configured leader.", e);
                 logSecurity("CONSENSUS_FALLBACK", leaderHost + ":" + leaderPort, "follower could not reach leader, stepping up");
                 logger.info("Leader unreachable. Node '" + nodeId + "' is stepping up to execute consensus locally.");
-                sendConsensusResponse(spaceId, correlationId, clientWriter);
+                sendConsensusResponse(spaceId, correlationId, vehicleId, clientWriter);
             }
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleClientQuery on node " + nodeId, e);
@@ -313,13 +332,6 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
-    /**
-     * Handles a follower-forwarded vote on the leader and returns the majority result.
-     *
-     * @param forwardRequest signed request containing the follower's local vote
-     * @param leaderWriter writer used to return the signed leader response
-     * @return no return value
-     */
     private void handleForwardQuery(JsonObject forwardRequest, PrintWriter leaderWriter) {
         if (!isLeader) {
             logger.info("Non-leader node '" + nodeId + "' received FORWARD_QUERY. Executing consensus dynamically as fallback leader.");
@@ -330,10 +342,11 @@ public class RecommenderServer implements AutoCloseable {
             String spaceId = forwardRequest.get("spaceId").getAsString();
             String followerResult = forwardRequest.get("localResult").getAsString();
             String followerId = forwardRequest.get("nodeId").getAsString();
+            String vehicleId = forwardRequest.has("vehicleId") ? forwardRequest.get("vehicleId").getAsString() : "-";
 
             Map<String, String> explicitVotes = new HashMap<>();
             explicitVotes.put(followerId, followerResult);
-            sendConsensusResponse(spaceId, correlationId, leaderWriter, explicitVotes);
+            sendConsensusResponse(spaceId, correlationId, vehicleId, leaderWriter, explicitVotes);
         } catch (Exception e) {
             logger.log(Level.WARNING, "Error in handleForwardQuery on leader", e);
             sendSignedFailure(leaderWriter, "CLIENT_RESPONSE", correlationId, SAFE_CLIENT_FAILURE);
@@ -376,8 +389,8 @@ public class RecommenderServer implements AutoCloseable {
 
  */
 
-    private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer) {
-        sendConsensusResponse(spaceId, correlationId, writer, Collections.emptyMap());
+    private void sendConsensusResponse(String spaceId, String correlationId, String vehicleId, PrintWriter writer) {
+        sendConsensusResponse(spaceId, correlationId, vehicleId, writer, Collections.emptyMap());
     }
 
 /**
@@ -396,7 +409,7 @@ public class RecommenderServer implements AutoCloseable {
 
  */
 
-    private void sendConsensusResponse(String spaceId, String correlationId, PrintWriter writer, Map<String, String> explicitVotes) {
+    private void sendConsensusResponse(String spaceId, String correlationId, String vehicleId, PrintWriter writer, Map<String, String> explicitVotes) {
         String consensus = executeLeaderConsensus(spaceId, explicitVotes);
         JsonObject response = createSignedMessage("CLIENT_RESPONSE", spaceId, correlationId, nodeId);
         if (consensus != null) {
@@ -413,9 +426,17 @@ public class RecommenderServer implements AutoCloseable {
                 finalResult = "Request: Space " + spaceId + " (" + requestedCitations + " Citations)\nResult: " + consensusList;
             }
             response.addProperty("result", finalResult);
+            logger.info("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + consensus + ")");
+            try {
+                RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, consensus);
+            } catch (NoClassDefFoundError | Exception ignored) {}
         } else {
             response.addProperty("status", "FAILURE");
             response.addProperty("reason", "No majority consensus reached in cluster.");
+            logger.warning("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: FAILURE (No consensus)");
+            try {
+                RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, "Consensus Failed");
+            } catch (NoClassDefFoundError | Exception ignored) {}
         }
         signMessage(response, signer);
         writer.println(response);

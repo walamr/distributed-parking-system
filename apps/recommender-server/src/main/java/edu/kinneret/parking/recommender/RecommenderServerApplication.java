@@ -32,6 +32,10 @@ public class RecommenderServerApplication extends Application {
     private static List<String> clusterNodes = Arrays.asList("localhost:8091", "localhost:8092", "localhost:8093");
     private static boolean runCli = false;
 
+    private static Label latestRequestLabel;
+    private static Label latestResultLabel;
+    private static Label latestVehicleLabel;
+
     private CheckBox maliciousCheck;
     private Label statusLabel;
 
@@ -236,9 +240,31 @@ public class RecommenderServerApplication extends Application {
         statusLabel = new Label();
         updateStatusText();
 
-        root.getChildren().addAll(titleLabel, grid, maliciousCheck, payloadBox, statusLabel);
+        Separator separator = new Separator();
+        separator.setStyle("-fx-background-color: #313244;");
 
-        Scene scene = new Scene(root, 400, 300);
+        Label recTitleLabel = new Label("Latest Recommendation");
+        recTitleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #a6e3a1;");
+
+        GridPane recGrid = new GridPane();
+        recGrid.setHgap(10);
+        recGrid.setVgap(10);
+        recGrid.setAlignment(Pos.CENTER);
+
+        latestRequestLabel = new Label("-");
+        latestRequestLabel.setStyle("-fx-text-fill: #f9e2af; -fx-font-weight: bold;");
+        latestResultLabel = new Label("-");
+        latestResultLabel.setStyle("-fx-text-fill: #a6e3a1; -fx-font-weight: bold;");
+        latestVehicleLabel = new Label("-");
+        latestVehicleLabel.setStyle("-fx-text-fill: #89b4fa; -fx-font-weight: bold;");
+
+        addGridRowWithLabel(recGrid, 0, "Requested Space:", latestRequestLabel);
+        addGridRowWithLabel(recGrid, 1, "Vehicle ID:", latestVehicleLabel);
+        addGridRowWithLabel(recGrid, 2, "Recommended Space:", latestResultLabel);
+
+        root.getChildren().addAll(titleLabel, grid, maliciousCheck, payloadBox, statusLabel, separator, recTitleLabel, recGrid);
+
+        Scene scene = new Scene(root, 400, 450);
         primaryStage.setScene(scene);
         primaryStage.setOnCloseRequest(e -> {
             server.close();
@@ -246,6 +272,32 @@ public class RecommenderServerApplication extends Application {
             System.exit(0);
         });
         primaryStage.show();
+    }
+
+    private void addGridRowWithLabel(GridPane grid, int row, String label, Label valLabel) {
+        Label lbl = new Label(label);
+        lbl.setStyle("-fx-text-fill: #a6adc8; -fx-font-weight: bold;");
+        grid.add(lbl, 0, row);
+        grid.add(valLabel, 1, row);
+    }
+
+    public static void updateLatestQuery(String requestedSpace, String vehicleId, String recommendedSpace) {
+        if (latestRequestLabel != null && latestResultLabel != null && latestVehicleLabel != null) {
+            Platform.runLater(() -> {
+                latestRequestLabel.setText("Space " + requestedSpace);
+                latestVehicleLabel.setText(vehicleId != null ? vehicleId : "-");
+                if (recommendedSpace == null || recommendedSpace.isBlank()) {
+                    latestResultLabel.setText("None");
+                } else {
+                    String clean = recommendedSpace.replace("Result:", "").replace("Space ", "").trim();
+                    latestResultLabel.setText(clean);
+                }
+            });
+        }
+    }
+
+    public static void updateLatestQuery(String requestedSpace, String recommendedSpace) {
+        updateLatestQuery(requestedSpace, "-", recommendedSpace);
     }
 
     /**
