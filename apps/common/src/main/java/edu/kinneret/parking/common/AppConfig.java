@@ -52,6 +52,9 @@ public final class AppConfig {
     private final long nonceTtlSeconds;
     private final double maxAllowedAmount;
     private final List<ClusterNode> recommenderNodes;
+    private final String mongo1Ip;
+    private final String mongo2Ip;
+    private final String mongo3Ip;
 
     /**
      * Application-specific defaults used to keep least-privilege credentials aligned
@@ -190,7 +193,10 @@ public final class AppConfig {
             String hmacSecret,
             long nonceTtlSeconds,
             double maxAllowedAmount,
-            List<ClusterNode> recommenderNodes) {
+            List<ClusterNode> recommenderNodes,
+            String mongo1Ip,
+            String mongo2Ip,
+            String mongo3Ip) {
         this.rabbitMqNodes = List.copyOf(rabbitMqNodes);
         this.rabbitMqUsername = rabbitMqUsername;
         this.rabbitMqPassword = rabbitMqPassword;
@@ -215,6 +221,9 @@ public final class AppConfig {
         this.nonceTtlSeconds = nonceTtlSeconds;
         this.maxAllowedAmount = maxAllowedAmount;
         this.recommenderNodes = List.copyOf(recommenderNodes);
+        this.mongo1Ip = mongo1Ip;
+        this.mongo2Ip = mongo2Ip;
+        this.mongo3Ip = mongo3Ip;
     }
 
     /**
@@ -265,15 +274,9 @@ public final class AppConfig {
         String recommender2 = env.get("RECOMMENDER2_IP");
         String recommender3 = env.get("RECOMMENDER3_IP");
 
-        // Permanent Fix: Automatically override distributed IPs with localhost
-        // when running natively on a developer machine (Windows or Mac).
-        // This ensures local UI apps can successfully reach the Docker Desktop
-        // containers regardless of what is committed in network-ips.env.
+        // Keep configuration from network-ips.env exactly as defined
         String os = System.getProperty("os.name", "").toLowerCase();
         if (os.contains("win") || os.contains("mac")) {
-            mongo1 = "127.0.0.1"; mongo2 = "127.0.0.1"; mongo3 = "127.0.0.1";
-            rabbit1 = "127.0.0.1"; rabbit2 = "127.0.0.1"; rabbit3 = "127.0.0.1";
-            recommender1 = "127.0.0.1"; recommender2 = "127.0.0.1"; recommender3 = "127.0.0.1";
             env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
             env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
         }
@@ -478,6 +481,10 @@ public final class AppConfig {
 
         List<ClusterNode> recommenderNodes = parseRecommenderNodes(readOrDefault(environment, "RECOMMENDER_NODES", "localhost:8091,localhost:8092,localhost:8093"));
 
+        String m1Ip = readOrDefault(environment, "MONGO1_IP", "127.0.0.1");
+        String m2Ip = readOrDefault(environment, "MONGO2_IP", "127.0.0.1");
+        String m3Ip = readOrDefault(environment, "MONGO3_IP", "127.0.0.1");
+
         return new AppConfig(
                 nodes,
                 username,
@@ -502,7 +509,10 @@ public final class AppConfig {
                 hmacSecret,
                 nonceTtlSeconds,
                 maxAllowedAmount,
-                recommenderNodes);
+                recommenderNodes,
+                m1Ip,
+                m2Ip,
+                m3Ip);
 
     }
 
@@ -513,6 +523,18 @@ public final class AppConfig {
      */
     public List<ClusterNode> getRecommenderNodes() {
         return recommenderNodes;
+    }
+
+    public String getMongo1Ip() {
+        return mongo1Ip;
+    }
+
+    public String getMongo2Ip() {
+        return mongo2Ip;
+    }
+
+    public String getMongo3Ip() {
+        return mongo3Ip;
     }
 
     /**

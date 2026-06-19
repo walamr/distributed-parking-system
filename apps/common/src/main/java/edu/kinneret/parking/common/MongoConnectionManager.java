@@ -56,13 +56,32 @@ public final class MongoConnectionManager implements AutoCloseable {
         settingsBuilder.readPreference(ReadPreference.primaryPreferred());
 
         // Keep startup tolerant enough for a freshly initialized Docker replica set.
-        settingsBuilder.applyToClusterSettings(builder -> 
+        settingsBuilder.applyToClusterSettings(builder ->
             builder.serverSelectionTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
         );
         settingsBuilder.applyToSocketSettings(builder ->
             builder.connectTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
                    .readTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
         );
+
+        // For developers running apps locally on Windows/Mac without hosts modification:
+        // Map container hostnames 'mongo1', 'mongo2', 'mongo3' to the IPs configured in network-ips.env.
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win") || os.contains("mac")) {
+            settingsBuilder.inetAddressResolver(new com.mongodb.spi.dns.InetAddressResolver() {
+                @Override
+                public java.util.List<java.net.InetAddress> lookupByName(String host) throws java.net.UnknownHostException {
+                    if ("mongo1".equalsIgnoreCase(host)) {
+                        return java.util.Arrays.asList(java.net.InetAddress.getByName(config.getMongo1Ip()));
+                    } else if ("mongo2".equalsIgnoreCase(host)) {
+                        return java.util.Arrays.asList(java.net.InetAddress.getByName(config.getMongo2Ip()));
+                    } else if ("mongo3".equalsIgnoreCase(host)) {
+                        return java.util.Arrays.asList(java.net.InetAddress.getByName(config.getMongo3Ip()));
+                    }
+                    return java.util.Arrays.asList(java.net.InetAddress.getAllByName(host));
+                }
+            });
+        }
 
         com.mongodb.client.MongoClient clientTemp = null;
         try {

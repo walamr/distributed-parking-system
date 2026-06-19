@@ -349,7 +349,7 @@ public class RecommenderServerApplication extends Application {
             while (true) {
                 System.out.println("\nNode Mode: " + (server.isMalicious() ? "MALICIOUS" : "NORMAL"));
                 System.out.println("Malicious Payload: " + server.getMaliciousPayload());
-                System.out.println("Options: [m] Toggle Malicious Mode, [p] Change Malicious Payload, [q] Quit Node");
+                System.out.println("Options: [p] Change Malicious Payload, [m] Toggle Malicious Mode, [q] Quit Node");
                 System.out.print("Select: ");
 
                 if (!scanner.hasNextLine()) {
