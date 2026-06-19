@@ -275,30 +275,72 @@ public final class AppConfig {
         String recommender3 = env.get("RECOMMENDER3_IP");
 
         // Keep configuration from network-ips.env exactly as defined
-        String os = System.getProperty("os.name", "").toLowerCase();
-        if (os.contains("win") || os.contains("mac")) {
-            env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
-            env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
-        }
-
         if (mongo1 != null && mongo2 != null && mongo3 != null &&
             rabbit1 != null && rabbit2 != null && rabbit3 != null &&
             recommender1 != null && recommender2 != null && recommender3 != null) {
             
-            boolean isLocal = mongo1.equals(mongo2);
+            String os = System.getProperty("os.name", "").toLowerCase();
+            boolean isWindowsOrMac = os.contains("win") || os.contains("mac");
+            
             String r1p, r2p, r3p;
             String m1p, m2p, m3p;
-            if (isLocal) {
+            
+            if (isWindowsOrMac) {
+                // On Windows/Mac, Docker Desktop exposes ports on localhost.
+                // We must tell TLS to allow invalid hostnames since we connect via localhost
+                // but the certificates only contain the internal 10.x IPs or container names.
+                env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+                env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+                
+                // RabbitMQ and Recommender don't have custom DNS resolvers in our code,
+                // so we MUST connect to them directly via 127.0.0.1 and their exposed ports.
+                rabbit1 = "127.0.0.1"; rabbit2 = "127.0.0.1"; rabbit3 = "127.0.0.1";
+                recommender1 = "127.0.0.1"; recommender2 = "127.0.0.1"; recommender3 = "127.0.0.1";
                 r1p = "5671"; r2p = "5673"; r3p = "5674";
                 m1p = "27017"; m2p = "27018"; m3p = "27019";
+                
+                // MongoDB requires us to connect using the exact hostnames (mongo1, mongo2, mongo3)
+                // for its replica set validation to pass. However, our MongoConnectionManager has a custom 
+                // InetAddressResolver that intercepts 'mongo1' and routes it to the IP defined in MONGO1_IP.
+                // So we override MONGO_IPs to localhost!
+                env.put("MONGO1_IP", "127.0.0.1");
+                env.put("MONGO2_IP", "127.0.0.1");
+                env.put("MONGO3_IP", "127.0.0.1");
             } else {
                 r1p = "5671"; r2p = "5671"; r3p = "5671";
                 m1p = "27017"; m2p = "27017"; m3p = "27017";
+                env.put("MONGO1_IP", mongo1);
+                env.put("MONGO2_IP", mongo2);
+                env.put("MONGO3_IP", mongo3);
             }
 
             env.put("RABBITMQ_NODES", rabbit1 + ":" + r1p + "," + rabbit2 + ":" + r2p + "," + rabbit3 + ":" + r3p);
+            // CRITICAL: Notice that MONGO_URI always uses the original container names (mongo1, mongo2, mongo3)
+            // even if we are on Windows! This is because MongoDB strictly validates hostnames in the replica set config.
+            // The custom InetAddressResolver in MongoConnectionManager uses MONGO1_IP to perform the actual routing.
+            env.put("MONGO_URI", "mongodb://dummy:dummy@mongo1:" + m1p + ",mongo2:" + m2p + ",mongo3:" + m3p + "/parking_db?replicaSet=rs0&authSource=admin");
             env.put("RECOMMENDER_NODES", recommender1 + ":8091," + recommender2 + ":8092," + recommender3 + ":8093");
-            env.put("MONGO_URI", "mongodb://dummy:dummy@" + mongo1 + ":" + m1p + "," + mongo2 + ":" + m2p + "," + mongo3 + ":" + m3p + "/parking_db?replicaSet=rs0&authSource=admin");
+        }
+    }
+
+    /**
+     * Returns true if the IP address is in a private Docker-assigned subnet
+     * (typically 10.0.x.x, 172.17-31.x.x, or 192.168.x.x).
+     */
+    private static boolean isPrivateDockerSubnet(String ip) {
+        if (ip == null) return false;
+        return ip.startsWith("10.") || ip.startsWith("192.168.") ||
+               (ip.startsWith("172.") && isInRange172(ip));
+    }
+
+    private static boolean isInRange172(String ip) {
+        try {
+            String[] parts = ip.split("\\.");
+            if (parts.length < 2) return false;
+            int second = Integer.parseInt(parts[1]);
+            return second >= 16 && second <= 31;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 
@@ -348,6 +390,12 @@ public final class AppConfig {
         
         // Dynamically load profile-specific configs for unified local testing
         if (profile != null) {
+            // Always clear the username/password loaded from the shared .env so that
+            // readOrDefault below will fall back to the correct per-profile credentials.
+            // The profile-specific env file (if found) can still override these.
+            env.remove("RABBITMQ_USERNAME");
+            env.remove("RABBITMQ_PASSWORD");
+
             String profileEnvFile = null;
             switch (profile) {
                 case CUSTOMER_UI: profileEnvFile = "env-configs/customer.env"; break;
