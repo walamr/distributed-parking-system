@@ -39,6 +39,7 @@ public final class QueueServerApplication {
             RabbitMqTopologyInitializer topologyInitializer = new RabbitMqTopologyInitializer(appConfig, connectionManager);
             healthChecker.requireHealthyNode();
             topologyInitializer.initialize();
+            waitForStorageConsumers(connectionManager, appConfig);
             System.out.println("Queue server topology initialization completed successfully. "
                     + "Queue consumption and MongoDB persistence are owned exclusively by "
                     + PERSISTENCE_OWNER + ".");
@@ -60,5 +61,32 @@ public final class QueueServerApplication {
             System.err.println("Queue server startup failed. See server logs for details.");
             System.exit(1);
         }
+    }
+
+    private static void waitForStorageConsumers(
+            RabbitMqConnectionManager connectionManager,
+            AppConfig appConfig) throws InterruptedException {
+        final int maximumAttempts = 60;
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++) {
+            boolean[] consumersReady = {false};
+            try {
+                connectionManager.withChannel((channel, node) -> {
+                    long transactionConsumers = channel.consumerCount(appConfig.getTransactionsQueueName());
+                    long citationConsumers = channel.consumerCount(appConfig.getCitationsQueueName());
+                    consumersReady[0] = transactionConsumers > 0 && citationConsumers > 0;
+                });
+            } catch (RuntimeException exception) {
+                logger.log(Level.FINE, "Storage consumer readiness check failed", exception);
+            }
+            if (consumersReady[0]) {
+                System.out.println("Storage Server consumers are connected; MongoDB persistence is active.");
+                return;
+            }
+            System.out.println("Waiting for Storage Server consumers... attempt "
+                    + attempt + " of " + maximumAttempts);
+            Thread.sleep(2_000L);
+        }
+        throw new IllegalStateException(
+                "Storage Server did not connect to both RabbitMQ queues within 120 seconds.");
     }
 }

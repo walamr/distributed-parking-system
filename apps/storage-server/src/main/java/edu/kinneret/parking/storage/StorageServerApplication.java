@@ -78,6 +78,8 @@ public class StorageServerApplication {
             try { host = InetAddress.getLocalHost().getHostAddress(); } catch (Exception ignored) {}
             SecurityLogger.logSecurityEvent("CRITICAL ERROR: " + e.toString() + " | Host: " + host);
             logger.severe("Storage Server terminated with a protected error path. See logs/security.log for details.");
+            System.err.println("Storage Server stopped before MongoDB persistence became available.");
+            System.exit(1);
         }
     }
 
