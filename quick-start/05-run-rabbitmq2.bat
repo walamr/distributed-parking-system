@@ -1,7 +1,7 @@
 @echo off
 cd %~dp0..
 echo Starting RabbitMQ Node 2 container...
-docker compose -f docker-compose.rabbitmq2.yml up -d
+docker compose --env-file network-ips.env -f docker-compose.rabbitmq2.yml up -d
 echo Waiting for RabbitMQ service to initialize...
 
 :wait_loop

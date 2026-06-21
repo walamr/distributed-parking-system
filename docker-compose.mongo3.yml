@@ -1,5 +1,5 @@
 # docker-compose for mongo3 host only
-# Run with: docker compose -f docker-compose.mongo3.yml up -d
+# Run with: docker compose --env-file network-ips.env -f docker-compose.mongo3.yml up -d
 services:
   mongo3:
     image: mongo:7.0

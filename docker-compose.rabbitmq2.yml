@@ -1,5 +1,5 @@
 # docker-compose for rabbitmq2 host only
-# Run with: docker compose -f docker-compose.rabbitmq2.yml up -d
+# Run with: docker compose --env-file network-ips.env -f docker-compose.rabbitmq2.yml up -d
 services:
   rabbitmq2:
     image: rabbitmq:3.13-management
