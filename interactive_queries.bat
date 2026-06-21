@@ -63,7 +63,7 @@ echo 0. Return to Node selection
 echo =========================================================
 set /p choice="Enter the query number (0-9): "
 
-set "MONGO_CMD=docker exec -it %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin^&tls=true^&tlsAllowInvalidHostnames=true^&tlsCAFile=/etc/mongo/certs/ca-cert.pem^&tlsCertificateKeyFile=/etc/mongo/certs/%MONGO_NODE%.pem" --quiet --eval"
+set "MONGO_CMD=docker exec -i %MONGO_NODE% mongosh --host localhost --port 27017 -u mulligan_db_admin -p db_pwd_rotated_admin --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem parking_db --quiet --eval"
 set "READ_PREF=db.getMongo().setReadPref('secondaryPreferred'); "
 
 if "%choice%"=="9" goto EXIT_SCRIPT
@@ -83,20 +83,23 @@ goto MENU
 
 :Q1
 echo Fetching data from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% db.transactions.find().sort({timestamp: 1}).pretty()"
+%MONGO_CMD% "%READ_PREF% printjson(db.transactions.find().sort({timestamp: 1}).toArray())"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above and verify the replica set, credentials, and TLS files.
 pause
 goto MENU
 
 :Q2
 echo Fetching data from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% db.citations.find().sort({timestamp: 1}).pretty()"
+%MONGO_CMD% "%READ_PREF% printjson(db.citations.find().sort({timestamp: 1}).toArray())"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above and verify the replica set, credentials, and TLS files.
 pause
 goto MENU
 
 :Q3
 set /p VEHICLE_ID="Enter vehicle plate number (e.g. 682-14-762): "
 echo Fetching data for vehicle %VEHICLE_ID% from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% db.transactions.find({ $or: [ { 'payload.vehicleId': '%VEHICLE_ID%' }, { vehicleId: '%VEHICLE_ID%' } ] }).sort({timestamp: 1}).pretty()"
+%MONGO_CMD% "%READ_PREF% printjson(db.transactions.find({ $or: [ { 'payload.vehicleId': '%VEHICLE_ID%' }, { vehicleId: '%VEHICLE_ID%' } ] }).sort({timestamp: 1}).toArray())"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
@@ -105,6 +108,7 @@ set /p SPACE_ID="Enter space ID (e.g. 1): "
 echo Fetching zone spaces for space %SPACE_ID% from %MONGO_NODE%...
 set "AGG_Q=%READ_PREF% (function(searchId) { const spaceIdStr = searchId.toString(); const space = db.spaces.findOne({ spaceId: spaceIdStr }); if (!space) { print('Error: Parking space not found'); return; } print('Space ' + spaceIdStr + ' is in zone: ' + space.zoneName); const results = db.spaces.aggregate([{ $match: { zoneName: space.zoneName } }, { $lookup: { from: 'citations', let: { sid: '$spaceId' }, pipeline: [{ $match: { $expr: { $or: [{ $eq: ['$payload.spaceId', '$$sid'] }, { $eq: ['$spaceId', '$$sid'] }] } } }], as: 'citationsList' } }, { $project: { _id: 0, 'Space Number': '$spaceId', 'Citations Count': { $size: '$citationsList' } } }]).toArray(); console.table(results); })('%SPACE_ID%')"
 %MONGO_CMD% "%AGG_Q%"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
@@ -113,6 +117,7 @@ set /p SPACE_ID="Enter space ID for recommendation (e.g. 10): "
 echo Fetching recommendations for space %SPACE_ID% from %MONGO_NODE%...
 set "REC_CMD=%READ_PREF% function recommendSpace(searchId) { const spaceIdStr = searchId.toString(); const space = db.spaces.findOne({ spaceId: spaceIdStr }); if (!space) { print('Error: Parking space not found'); return; } const zoneName = space.zoneName; const spaces = db.spaces.find({ zoneName: zoneName }).toArray(); const spaceDetails = spaces.map(sp => { const sid = sp.spaceId; const citationCount = db.citations.countDocuments({ $or: [ { 'payload.spaceId': sid }, { 'spaceId': sid } ] }); const latestTx = db.transactions.find({ $or: [ { 'payload.spaceId': sid }, { 'spaceId': sid } ] }).sort({ timestamp: -1, storedAt: -1 }).limit(1).toArray()[0]; const isOccupied = latestTx && ((latestTx.payload && latestTx.payload.type === 'start') || latestTx.type === 'transaction.start'); return { spaceId: sid, citationCount: citationCount, isOccupied: !!isOccupied }; }); const freeSpaces = spaceDetails.filter(sd => !sd.isOccupied); let recommendedIds = []; if (freeSpaces.length > 0) { const minCitations = Math.min(...freeSpaces.map(fs => fs.citationCount)); const searchedSpaceDetail = spaceDetails.find(sd => sd.spaceId === spaceIdStr); if (searchedSpaceDetail && !searchedSpaceDetail.isOccupied && searchedSpaceDetail.citationCount === minCitations) { recommendedIds.push(spaceIdStr); } else { const bestCandidates = freeSpaces.filter(fs => fs.citationCount === minCitations); const targetNum = parseInt(spaceIdStr, 10); let minDistance = Infinity; bestCandidates.forEach(cand => { const candNum = parseInt(cand.spaceId, 10); const dist = Math.abs(candNum - targetNum); if (dist < minDistance) minDistance = dist; }); bestCandidates.forEach(cand => { const candNum = parseInt(cand.spaceId, 10); const dist = Math.abs(candNum - targetNum); if (dist === minDistance) recommendedIds.push(cand.spaceId); }); } } const tableRows = spaceDetails.map(sd => { let recMark = ''; if (recommendedIds.includes(sd.spaceId)) { recMark = 'RECOMMENDED'; } else if (sd.spaceId === spaceIdStr) { recMark = '(Your Choice)'; } return { 'Space Number': sd.spaceId, 'Status': sd.isOccupied ? 'Occupied' : 'Free', 'Citations Count': sd.citationCount, 'Highlight': recMark }; }); tableRows.sort((a, b) => parseInt(a['Space Number']) - parseInt(b['Space Number'])); console.table(tableRows); } recommendSpace('%SPACE_ID%');"
 %MONGO_CMD% "%REC_CMD%"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
@@ -121,18 +126,21 @@ set /p ZONE_NAME="Enter zone name (e.g. Magnolia Way): "
 echo Fetching citations for zone '%ZONE_NAME%' from %MONGO_NODE%...
 set "AGG_Q=%READ_PREF% db.spaces.aggregate([{ $match: { zoneName: '%ZONE_NAME%' } }, { $lookup: { from: 'citations', let: { sid: '$spaceId' }, pipeline: [{ $match: { $expr: { $or: [{ $eq: ['$payload.spaceId', '$$sid'] }, { $eq: ['$spaceId', '$$sid'] }] } } }], as: 'citationsList' } }, { $project: { _id: 0, 'Space Number': '$spaceId', 'Citations Count': { $size: '$citationsList' } } }]).toArray()"
 %MONGO_CMD% "%AGG_Q%"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
 :Q7
 echo Fetching users and vehicles from %MONGO_NODE%...
 %MONGO_CMD% "%READ_PREF% print('--- USERS ---'); printjson(db.users.find().pretty().toArray()); print('--- VEHICLES ---'); printjson(db.vehicles.find().pretty().toArray());"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
 :Q8
 echo Fetching available zones and rates from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% db.zones.find().pretty()"
+%MONGO_CMD% "%READ_PREF% printjson(db.spaces.aggregate([{ $group: { _id: '$zoneName', hourlyRates: { $addToSet: '$hourlyRate' } } }, { $sort: { _id: 1 } }]).toArray())"
+if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above.
 pause
 goto MENU
 
