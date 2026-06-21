@@ -85,7 +85,7 @@ services:
   mongo1:
     image: mongo:7.0
     container_name: mongo1
-    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/keyfile"
+    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/keyfile"
     ports:
       - "127.0.0.1:27017:27017"
     networks:
@@ -97,7 +97,7 @@ services:
   mongo2:
     image: mongo:7.0
     container_name: mongo2
-    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/keyfile"
+    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --port 27018 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo2.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/keyfile"
     ports:
       - "127.0.0.1:27018:27018"
     networks:
@@ -109,7 +109,7 @@ services:
   mongo3:
     image: mongo:7.0
     container_name: mongo3
-    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --keyFile /tmp/keyfile"
+    command: bash -c "cp /etc/mongo/certs/mongodb-keyfile /tmp/keyfile && chmod 400 /tmp/keyfile && chown 999 /tmp/keyfile && exec mongod --replSet rs0 --port 27019 --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/mongo/certs/mongo3.pem --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsAllowConnectionsWithoutCertificates --keyFile /tmp/keyfile"
     ports:
       - "127.0.0.1:27019:27019"
     networks:
