@@ -1,40 +1,16 @@
 @echo off
 setlocal
 cd /d "%~dp0.."
-for /f "tokens=1,* delims==" %%A in (network-ips.env) do if "%%A"=="MONGO2_IP" set "MONGO2_IP=%%B"
-if not "%~1"=="" (
-    set "ACTION=%~1"
-    goto PROCESS_ACTION
+for /f "tokens=1,* delims==" %%A in (network-ips.env) do (
+    if "%%A"=="MONGO1_IP" set "MONGO1_IP=%%B"
+    if "%%A"=="MONGO2_IP" set "MONGO2_IP=%%B"
 )
-
-:MENU
-cls
-echo =========================================================
-echo MongoDB Node 2
-echo =========================================================
-echo 1. Clean node data, start, and open query menu
-echo 2. Clean node data, then start (same safe startup)
-echo 3. Clean node data only
-echo 9. Exit
-set /p ACTION="Choose an action: "
-:PROCESS_ACTION
-if "%ACTION%"=="1" goto START
-if "%ACTION%"=="2" goto CLEAN_AND_START
-if "%ACTION%"=="3" goto CLEAN_ONLY
-if "%ACTION%"=="9" exit /b 0
-goto MENU
-
-:CLEAN_AND_START
 goto START
-:CLEAN_ONLY
-call :CLEAN
-pause
-exit /b %ERRORLEVEL%
 :CLEAN
 call :CHECK_DOCKER
 if errorlevel 1 exit /b 1
-echo Cleaning MongoDB Node 2 container and volume...
-docker compose --env-file network-ips.env -f docker-compose.mongo2.yml down -v
+echo Stopping and removing the old MongoDB Node 2 container...
+docker compose --env-file network-ips.env -f docker-compose.mongo2.yml down
 exit /b %ERRORLEVEL%
 
 :START
@@ -44,6 +20,14 @@ if not defined MONGO2_IP (
     echo ERROR: MONGO2_IP is missing from network-ips.env.
     goto FAILED
 )
+if not defined MONGO1_IP (
+    echo ERROR: MONGO1_IP is missing from network-ips.env.
+    goto FAILED
+)
+echo Waiting for MongoDB Node 1 at %MONGO1_IP%:27017 before starting Node 2...
+call :WAIT_PREVIOUS_NODE "%MONGO1_IP%" "MongoDB Node 1"
+if errorlevel 1 goto FAILED
+echo SUCCESS: MongoDB Node 1 is reachable. Starting Node 2 automatically.
 echo Safe startup always removes the old MongoDB Node 2 container and volume first.
 call :CLEAN
 if errorlevel 1 goto FAILED
@@ -77,8 +61,7 @@ if %ATTEMPTS% GEQ 120 (
     echo ERROR: mongo2 is running, but the replica set is not healthy.
     call :SHOW_RS_STATUS mongo2 mongo2.pem
     echo Start all MongoDB PCs and initialize the cluster once from MongoDB Node 1.
-    pause
-    goto MENU
+    goto FAILED
 )
 echo Waiting for MongoDB Node 1 initialization... attempt %ATTEMPTS% of 120
 timeout /t 5 /nobreak >nul
@@ -86,11 +69,18 @@ goto WAIT_RS
 :READY
 echo MongoDB replica set is healthy.
 call ".\interactive_queries.bat" 2
-goto MENU
+if errorlevel 9 goto SHUTDOWN
+goto FAILED
+
+:SHUTDOWN
+echo Exit selected. Stopping MongoDB Node 2...
+docker compose --env-file network-ips.env -f docker-compose.mongo2.yml down
+exit /b %ERRORLEVEL%
 :FAILED
 echo MongoDB Node 2 operation failed.
+echo The MongoDB container was not stopped. Only query-menu option 9 stops it.
 pause
-goto MENU
+exit /b 1
 
 :CHECK_DOCKER
 docker info >nul 2>&1
@@ -108,3 +98,17 @@ if not errorlevel 1 exit /b 0
 echo Authenticated status failed; checking whether the replica set is uninitialized...
 docker exec %~1 mongosh --host localhost --port 27017 --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%~2 --quiet --eval "try{printjson(rs.status());}catch(e){print(e.codeName+': '+e.message);quit(2);}" 2>&1
 exit /b 0
+
+:WAIT_PREVIOUS_NODE
+set /a PREVIOUS_ATTEMPTS=0
+:WAIT_PREVIOUS_NODE_LOOP
+powershell -NoProfile -Command "if (Test-NetConnection -ComputerName '%~1' -Port 27017 -InformationLevel Quiet -WarningAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>&1
+if not errorlevel 1 exit /b 0
+set /a PREVIOUS_ATTEMPTS+=1
+if %PREVIOUS_ATTEMPTS% GEQ 120 (
+    echo ERROR: %~2 was not reachable at %~1:27017 within 600 seconds.
+    exit /b 1
+)
+echo Waiting for %~2... attempt %PREVIOUS_ATTEMPTS% of 120
+timeout /t 5 /nobreak >nul
+goto WAIT_PREVIOUS_NODE_LOOP

@@ -146,4 +146,4 @@ goto MENU
 
 :EXIT_SCRIPT
 endlocal
-exit /b 0
+exit /b 9

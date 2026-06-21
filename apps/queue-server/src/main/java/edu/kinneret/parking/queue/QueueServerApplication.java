@@ -3,6 +3,7 @@ package edu.kinneret.parking.queue;
 import edu.kinneret.parking.common.AppConfig;
 import edu.kinneret.parking.common.RabbitMqConnectionManager;
 import edu.kinneret.parking.common.SecurityLogger;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,6 +42,18 @@ public final class QueueServerApplication {
             System.out.println("Queue server topology initialization completed successfully. "
                     + "Queue consumption and MongoDB persistence are owned exclusively by "
                     + PERSISTENCE_OWNER + ".");
+            System.out.println("Queue Server is running. Press Ctrl+C to stop it.");
+
+            CountDownLatch shutdownLatch = new CountDownLatch(1);
+            Runtime.getRuntime().addShutdownHook(new Thread(
+                    shutdownLatch::countDown,
+                    "queue-server-shutdown"));
+            try {
+                shutdownLatch.await();
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                logger.info("Queue Server shutdown requested.");
+            }
         } catch (Exception e) {
             SecurityLogger.logSecurityEvent("Queue server startup failed: " + e.toString());
             logger.log(Level.SEVERE, "Queue server startup failed", e);

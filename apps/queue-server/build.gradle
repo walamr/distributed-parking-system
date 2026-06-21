@@ -55,6 +55,7 @@ tasks.register('runQueueServer', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'edu.kinneret.parking.queue.QueueServerApplication'
     javaLauncher = java21Launcher
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dsun.stdout.encoding=UTF-8', '-Dsun.stderr.encoding=UTF-8'
     workingDir = rootProject.projectDir
 }
 

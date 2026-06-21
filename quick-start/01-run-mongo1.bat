@@ -6,59 +6,14 @@ for /f "tokens=1,* delims==" %%A in (network-ips.env) do (
     if "%%A"=="MONGO2_IP" set "MONGO2_IP=%%B"
     if "%%A"=="MONGO3_IP" set "MONGO3_IP=%%B"
 )
-if not "%~1"=="" (
-    set "ACTION=%~1"
-    goto PROCESS_ACTION
-)
-
-:MENU
-cls
-echo =========================================================
-echo MongoDB Node 1
-echo =========================================================
-echo 1. Clean node data, start, and open query menu
-echo 2. Clean node data, then start (same safe startup)
-echo 3. Clean node data only
-echo 4. Initialize the three-node replica set (run once on PC 1)
-echo 9. Exit
-set /p ACTION="Choose an action: "
-:PROCESS_ACTION
-if "%ACTION%"=="1" goto START
-if "%ACTION%"=="2" goto CLEAN_AND_START
-if "%ACTION%"=="3" goto CLEAN_ONLY
-if "%ACTION%"=="4" goto INITIALIZE
-if "%ACTION%"=="9" exit /b 0
-goto MENU
-
-:CLEAN_AND_START
 goto START
-
-:CLEAN_ONLY
-call :CLEAN
-pause
-exit /b %ERRORLEVEL%
 
 :CLEAN
 call :CHECK_DOCKER
 if errorlevel 1 exit /b 1
-echo Cleaning MongoDB Node 1 container and volume...
-docker compose --env-file network-ips.env -f docker-compose.mongo1.yml down -v
+echo Stopping and removing the old MongoDB Node 1 container...
+docker compose --env-file network-ips.env -f docker-compose.mongo1.yml down
 exit /b %ERRORLEVEL%
-
-:INITIALIZE
-call :CHECK_DOCKER
-if errorlevel 1 goto FAILED
-call :CHECK_NETWORK_CONFIG
-if errorlevel 1 goto FAILED
-echo Generating environment files from network-ips.env on MongoDB Node 1...
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\generate-env.ps1"
-if errorlevel 1 goto FAILED
-echo Initializing the MongoDB replica set from Node 1...
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\init-mongodb-network.ps1"
-if errorlevel 1 goto FAILED
-echo Replica-set initialization finished.
-pause
-goto MENU
 
 :START
 call :CHECK_DOCKER
@@ -113,9 +68,8 @@ if %ATTEMPTS% GEQ 20 (
     echo.
     echo ERROR: mongo1 is running, but the three-node replica set is not healthy.
     call :SHOW_RS_STATUS mongo1 mongo1.pem
-    echo Start mongo2 and mongo3. If this is a fresh setup, choose option 4 here once.
-    pause
-    goto MENU
+    echo Start mongo2 and mongo3 and verify network-ips.env and Windows Firewall.
+    goto FAILED
 )
 echo Waiting for the replica set... attempt %ATTEMPTS% of 20
 timeout /t 3 >nul
@@ -124,12 +78,19 @@ goto WAIT_RS
 :READY
 echo MongoDB replica set is healthy.
 call ".\interactive_queries.bat" 1
-goto MENU
+if errorlevel 9 goto SHUTDOWN
+goto FAILED
+
+:SHUTDOWN
+echo Exit selected. Stopping MongoDB Node 1...
+docker compose --env-file network-ips.env -f docker-compose.mongo1.yml down
+exit /b %ERRORLEVEL%
 
 :FAILED
 echo MongoDB Node 1 operation failed.
+echo The MongoDB container was not stopped. Only query-menu option 9 stops it.
 pause
-goto MENU
+exit /b 1
 
 :CHECK_DOCKER
 docker info >nul 2>&1
