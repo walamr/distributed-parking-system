@@ -214,14 +214,19 @@ public class CustomerCLI {
             String clientIp = InetAddress.getLocalHost().getHostAddress();
             MessageEnvelope envelope = MessageEnvelope.createUnsigned("transaction." + type, payload, clientIp, correlationId).sign(signer);
             
-            manager.withChannelForQueue(config.getTransactionsQueueName(), (channel, node) -> {
+            manager.withPublisherConfirms((channel, node) -> {
                 channel.basicPublish("", config.getTransactionsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                System.out.println("SUCCESS: Published " + type + " via cluster node: " + node.toAddress());
             });
+            System.out.println(publishSuccessMessage(type));
         } catch (Exception e) {
             logger.warn("Failed to publish customer {} request to the cluster: {}", type, SecurityLogger.sanitize(e.getMessage()));
             System.err.println("ERROR: Request could not be processed. Please try again.");
         }
+    }
+
+    static String publishSuccessMessage(String type) {
+        return "SUCCESS: Parking " + type
+                + " request was accepted by RabbitMQ. MongoDB persistence is pending server-side confirmation/logs.";
     }
 
 /**

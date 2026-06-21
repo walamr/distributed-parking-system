@@ -70,7 +70,7 @@ Current runtime behavior:
 - fresh connection attempts fail over across `5671`, `5673`, and `5674`
 - automatic RabbitMQ connection recovery is enabled
 - topology recovery is enabled
-- long-running consumers log recovery start/completion events after broker disruption
+- the long-running storage-server consumers use RabbitMQ automatic recovery
 
 ## 5. Queue Server Flow
 
@@ -79,13 +79,13 @@ Current runtime behavior:
 1. load runtime configuration
 2. verify at least one RabbitMQ node is reachable
 3. declare the required quorum queues
-4. start secured consumers for both queues
+4. exit successfully after topology initialization; storage-server owns both consumers
 
-`QueueConsumerService`:
+`StorageServerApplication`:
 
 - validates each `MessageEnvelope`
 - performs business payload validation
-- manually acknowledges accepted messages
+- inserts accepted messages into MongoDB and only then acknowledges them
 - rejects invalid messages without requeue
 
 ## 6. Smoke Test

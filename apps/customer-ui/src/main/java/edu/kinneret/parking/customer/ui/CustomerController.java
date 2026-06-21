@@ -647,11 +647,10 @@ public class CustomerController {
 
                 boolean isOffline = false;
                 try {
-                    rabbitManager.withChannel((channel, node) -> {
+                    rabbitManager.withPublisherConfirms((channel, node) -> {
                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                 envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                        logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress()
-                                + " (Queue declared)");
+                        logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress());
                     });
                 } catch (Exception ex) {
                     logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
@@ -671,9 +670,9 @@ public class CustomerController {
                 infoCard.setManaged(true);
             });
             if (isOffline) {
-                setStatus("🚗 Parking Started (Offline Mode)", false);
+                setStatus("Parking request saved locally only; RabbitMQ and MongoDB confirmation are unavailable.", false);
             } else {
-                setStatus("🚗 Parking Started", false);
+                setStatus("Parking request accepted by RabbitMQ; MongoDB persistence is pending server-side logs.", false);
             }
         });
         task.setOnFailed(e -> {

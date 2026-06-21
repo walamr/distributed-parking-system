@@ -85,8 +85,8 @@ public final class MongoConnectionManager implements AutoCloseable {
             logger.severe("Failed to initialize MongoClient: " + SecurityLogger.sanitize(e.getMessage()));
         }
         this.mongoClient = clientTemp;
-        logger.info(
-                "Connected to MongoDB cluster: " + SecurityLogger.sanitize(config.getMongoUri()) + " (TLS=" + config.isMongoTlsEnabled() + ")");
+        logger.info("MongoDB client configured: target=" + SecurityLogger.sanitize(config.getMongoUri())
+                + ", database=" + databaseName + ", TLS=" + config.isMongoTlsEnabled());
     }
 
     /**

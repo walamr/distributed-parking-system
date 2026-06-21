@@ -9,6 +9,7 @@ import java.util.Map;
  * defaults.
  */
 public final class AppConfig {
+    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(AppConfig.class.getName());
     private static final String DEFAULT_VHOST = "/parking";
     private static final String DEFAULT_NODES = "localhost:5671,localhost:5673,localhost:5674";
     private static final String DEFAULT_TRANSACTIONS_QUEUE = "transactions.queue";
@@ -417,6 +418,7 @@ public final class AppConfig {
                 case MO_UI: profileEnvFile = "env-configs/mo.env"; break;
                 case QUEUE_SERVER: profileEnvFile = "env-configs/queue-server.env"; break;
                 case STORAGE_SERVER: profileEnvFile = "env-configs/storage-server.env"; break;
+                case SMOKE_TEST: profileEnvFile = "env-configs/peo.env"; break;
             }
             if (profileEnvFile != null) {
                 loadEnvFile(profileEnvFile, env);
@@ -427,7 +429,12 @@ public final class AppConfig {
             overrideWithNetworkIps(env);
         }
         
-        return fromEnvironment(profile, env);
+        AppConfig resolved = fromEnvironment(profile, env);
+        logger.info("Effective MongoDB target: profile=" + profile
+                + ", uri=" + SecurityLogger.sanitize(resolved.getMongoUri())
+                + ", database=parking_db, TLS=" + resolved.isMongoTlsEnabled()
+                + ", sources=process environment/.env/network-ips/profile env");
+        return resolved;
     }
 
     /**

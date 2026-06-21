@@ -258,6 +258,9 @@ public class ParkingRepository implements AutoCloseable {
                 System.err.println("Error checking vehicle registration: " + e.getMessage());
             }
         }
+        String warning = "WARNING: MongoDB unavailable; using offline VIN validation fallback.";
+        logger.warning(warning);
+        System.err.println(warning);
         return vehicleId != null && vehicleId.matches("^[A-Z0-9-]{1,20}$");
     }
 

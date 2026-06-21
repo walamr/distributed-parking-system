@@ -25,4 +25,10 @@ class RabbitMqTopologyInitializerTest {
         assertEquals("parking.dlx", arguments.get("x-dead-letter-exchange"));
         assertEquals("transactions.dead", arguments.get("x-dead-letter-routing-key"));
     }
+
+    @Test
+    void queueServerDelegatesPersistenceToStorageServer() {
+        assertEquals("storage-server", QueueServerApplication.PERSISTENCE_OWNER);
+        assertEquals(false, QueueConsumerService.PERSISTENCE_CONSUMER_ENABLED);
+    }
 }

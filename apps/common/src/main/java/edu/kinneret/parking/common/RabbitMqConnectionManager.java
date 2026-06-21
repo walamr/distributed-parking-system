@@ -99,17 +99,19 @@ public final class RabbitMqConnectionManager {
      */
     public void withChannelForQueue(String queueName, ChannelConsumer channelConsumer) {
         withChannel((channel, node) -> {
-            // Durable Quorum Queue Declaration with DLX Link (Idempotent)
-            String deadLetterRoutingKey = queueName.replace(".queue", ".dead");
-            channel.queueDeclare(queueName, true, false, false, 
-                java.util.Map.of(
-                    "x-queue-type", "quorum", 
-                    "x-quorum-initial-group-size", 3,
-                    "x-dead-letter-exchange", "parking.dlx",
-                    "x-dead-letter-routing-key", deadLetterRoutingKey
-                ));
+            declareQuorumQueue(channel, queueName);
             channelConsumer.accept(channel, node);
         });
+    }
+
+    private void declareQuorumQueue(Channel channel, String queueName) throws IOException {
+        String deadLetterRoutingKey = queueName.replace(".queue", ".dead");
+        channel.queueDeclare(queueName, true, false, false,
+                java.util.Map.of(
+                        "x-queue-type", "quorum",
+                        "x-quorum-initial-group-size", 3,
+                        "x-dead-letter-exchange", "parking.dlx",
+                        "x-dead-letter-routing-key", deadLetterRoutingKey));
     }
 
     /**

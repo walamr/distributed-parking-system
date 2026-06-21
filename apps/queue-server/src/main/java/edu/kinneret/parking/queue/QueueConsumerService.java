@@ -25,6 +25,7 @@ import java.util.logging.Logger;
  */
 public final class QueueConsumerService {
     private static final Logger logger = Logger.getLogger(QueueConsumerService.class.getName());
+    static final boolean PERSISTENCE_CONSUMER_ENABLED = false;
     private final AppConfig appConfig;
     private final RabbitMqConnectionManager connectionManager;
     private final QueueMessageSecurityValidator validator;
@@ -68,6 +69,10 @@ public final class QueueConsumerService {
      * Starts consuming both required queues and waits until the process is interrupted.
      */
     public void start() {
+        if (!PERSISTENCE_CONSUMER_ENABLED) {
+            throw new UnsupportedOperationException(
+                    "Queue-server persistence consumers are disabled; storage-server is the sole persistence owner.");
+        }
         CountDownLatch shutdownLatch = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(shutdownLatch::countDown, "queue-server-shutdown"));
         try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect();

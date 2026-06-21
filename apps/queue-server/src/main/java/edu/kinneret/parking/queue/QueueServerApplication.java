@@ -11,6 +11,7 @@ import java.util.logging.Logger;
  */
 public final class QueueServerApplication {
     private static final Logger logger = Logger.getLogger(QueueServerApplication.class.getName());
+    static final String PERSISTENCE_OWNER = "storage-server";
 
 /**
 
@@ -35,12 +36,11 @@ public final class QueueServerApplication {
             RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(appConfig);
             QueueHealthChecker healthChecker = new QueueHealthChecker(connectionManager);
             RabbitMqTopologyInitializer topologyInitializer = new RabbitMqTopologyInitializer(appConfig, connectionManager);
-            QueueConsumerService consumerService = new QueueConsumerService(appConfig, connectionManager);
-
             healthChecker.requireHealthyNode();
             topologyInitializer.initialize();
-            System.out.println("Queue server startup completed successfully. Starting secured consumers.");
-            consumerService.start();
+            System.out.println("Queue server topology initialization completed successfully. "
+                    + "Queue consumption and MongoDB persistence are owned exclusively by "
+                    + PERSISTENCE_OWNER + ".");
         } catch (Exception e) {
             SecurityLogger.logSecurityEvent("Queue server startup failed: " + e.toString());
             logger.log(Level.SEVERE, "Queue server startup failed", e);

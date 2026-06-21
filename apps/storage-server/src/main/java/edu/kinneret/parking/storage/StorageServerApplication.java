@@ -20,6 +20,7 @@ import java.util.logging.Logger;
  * Consumes messages from RabbitMQ and persists them to MongoDB.
  */
 public class StorageServerApplication {
+    static final String PERSISTENCE_OWNER = "storage-server";
     /**
      * Default constructor for StorageServerApplication.
      */
@@ -49,7 +50,10 @@ public class StorageServerApplication {
             config.getNonceTtlSeconds()
         );
 
-        MongoStorageService storageService = new MongoStorageService(config, "parking_db");
+        logger.info("Persistence owner=" + PERSISTENCE_OWNER + ", MongoDB target="
+                + SecurityLogger.sanitize(config.getMongoUri()) + ", database="
+                + MongoStorageService.DATABASE_NAME + ", TLS=" + config.isMongoTlsEnabled());
+        MongoStorageService storageService = new MongoStorageService(config, MongoStorageService.DATABASE_NAME);
         RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(config);
 
         try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect();
@@ -105,15 +109,25 @@ public class StorageServerApplication {
                 
                 logger.info("[TRACE: " + envelope.getCorrelationId() + "] Accepted message from " + queueName + " ID: " + envelope.getMessageId());
                 
-                // Save to MongoDB
-                storageService.storeMessage(envelope);
-                
-                // Audit successful storage (Hardening R1-Audit-Logging)
-                SecurityLogger.logAudit("[TRACE: " + envelope.getCorrelationId() + "] Stored " + envelope.getType() + " message | ID: " + envelope.getMessageId() + " | Source: " + envelope.getClientIp());
+                StorageDeliveryProcessor.persistThenAcknowledge(
+                        queueName,
+                        envelope,
+                        SecurityLogger.sanitize(config.getMongoUri()),
+                        storageService::storeMessage,
+                        new StorageDeliveryProcessor.DeliveryAcknowledger() {
+                            @Override
+                            public void ack() throws Exception {
+                                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                                SecurityLogger.logAudit("[TRACE: " + envelope.getCorrelationId()
+                                        + "] Stored and ACKed " + envelope.getType() + " message | ID: "
+                                        + envelope.getMessageId() + " | Source: " + envelope.getClientIp());
+                            }
 
-
-                // Acknowledge the message
-                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                            @Override
+                            public void reject() throws Exception {
+                                channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
+                            }
+                        });
 
             } catch (Exception e) {
                 // LOG ON SERVER SIDE ONLY (Hardening R1-E-01)
@@ -121,6 +135,10 @@ public class StorageServerApplication {
                 
                 // Reject and don't requeue to avoid infinite loops on bad data
                 channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
+                logger.warning("Rejected invalid delivery from queue=" + queueName
+                        + "; decision=REJECT, deadLettered=true, exceptionClass="
+                        + e.getClass().getName() + ", exceptionMessage="
+                        + SecurityLogger.sanitize(e.getMessage()));
             }
         };
 

@@ -43,9 +43,9 @@ The Java queue server reads `RABBITMQ_NODES` as a comma-separated host list. `Cl
 
 1. confirm at least one RabbitMQ node is reachable
 2. declare the required quorum queues
-3. start consumers for `transactions.queue` and `citations.queue`
+3. exit successfully after topology initialization; `storage-server` owns consumption and persistence
 
-`QueueConsumerService` registers a manual-ack consumer on both queues. Each message is parsed as a `MessageEnvelope` and then passed to `QueueMessageSecurityValidator`. RabbitMQ automatic recovery and topology recovery are enabled so long-running consumers can recover from a broker-node loss without restarting the Java process.
+`StorageServerApplication` registers the sole manual-ack consumer on both queues. Each message is parsed as a `MessageEnvelope`, validated, inserted into MongoDB, and only then acknowledged. RabbitMQ automatic recovery and topology recovery are enabled for the long-running storage consumer.
 
 ## Message Security Design
 

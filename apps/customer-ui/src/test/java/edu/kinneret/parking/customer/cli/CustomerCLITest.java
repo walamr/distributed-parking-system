@@ -51,6 +51,14 @@ public class CustomerCLITest {
                 () -> CustomerCLI.buildPayload("604-95-839", "P01", "delete", config));
     }
 
+    @Test
+    public void publishSuccessMessageDoesNotClaimDatabaseSave() {
+        String message = CustomerCLI.publishSuccessMessage("start");
+        assertTrue(message.contains("accepted by RabbitMQ"));
+        assertTrue(message.contains("persistence is pending"));
+        assertFalse(message.toLowerCase().contains("saved to mongodb"));
+    }
+
     /** Recommendation input accepts trimmed numeric space IDs. */
     @Test
     public void recommendationInputAcceptsValidSpace() {

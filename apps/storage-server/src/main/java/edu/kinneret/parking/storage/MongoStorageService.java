@@ -15,6 +15,7 @@ import java.util.logging.Logger;
  * Handles persistence of parking messages to MongoDB.
  */
 public class MongoStorageService {
+    static final String DATABASE_NAME = "parking_db";
     private static final Logger logger = Logger.getLogger(MongoStorageService.class.getName());
     private final MongoConnectionManager connectionManager;
     private final MongoDatabase database;
@@ -58,7 +59,7 @@ public class MongoStorageService {
      * @param envelope the message to store
      */
     public void storeMessage(MessageEnvelope envelope) {
-        String collectionName = envelope.getType().toLowerCase().contains("transaction") ? "transactions" : "citations";
+        String collectionName = collectionNameFor(envelope);
         MongoCollection<Document> collection = database.getCollection(collectionName);
         Object payloadValue = toMongoPayloadValue(envelope.getPayload());
 
@@ -78,6 +79,10 @@ public class MongoStorageService {
                 throw e;
             }
         }
+    }
+
+    static String collectionNameFor(MessageEnvelope envelope) {
+        return envelope.getType().toLowerCase().contains("transaction") ? "transactions" : "citations";
     }
 
     /**
