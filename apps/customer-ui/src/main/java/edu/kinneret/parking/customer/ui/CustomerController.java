@@ -520,7 +520,6 @@ public class CustomerController {
                                 channel.basicPublish("", config.getTransactionsQueueName(), null,
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
-                            awaitTransactionPersistence(stopEnv);
                             localOfflineTransactions.add(0, autoStopDoc);
                             saveLocalTransactions(vin);
                             System.out.println("[CustomerUI] Auto-stopped previous local active session for VIN: " + vin
@@ -603,7 +602,6 @@ public class CustomerController {
                                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
-                                    awaitTransactionPersistence(stopEnv);
                                     localOfflineTransactions.add(0, autoStopDoc);
                                     saveLocalTransactions(vin);
                                     System.out.println("[CustomerUI] Auto-stopped previous active DB session for VIN: "
@@ -654,9 +652,6 @@ public class CustomerController {
                 } catch (Exception ex) {
                     logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
                     isOffline = true;
-                }
-                if (!isOffline) {
-                    awaitTransactionPersistence(envelope);
                 }
                 return isOffline;
             }
@@ -720,8 +715,13 @@ public class CustomerController {
                 String areaName = areaLabel != null ? areaLabel.getText() : "Unknown";
                 String costString = "0.00";
                 try {
-                    costString = timerCostLabel.getText().replace(" NIS", "");
+                    String rawCost = timerCostLabel.getText();
+                    String numericCost = rawCost == null ? "" : rawCost.replaceAll("[^0-9.]", "");
+                    if (!numericCost.isBlank()) {
+                        costString = new BigDecimal(numericCost).setScale(2, java.math.RoundingMode.HALF_UP).toString();
+                    }
                 } catch (Exception ignore) {
+                    costString = "0.00";
                 }
 
                 // SUC 2 Branch A: Check if there is an active parking event
@@ -789,9 +789,6 @@ public class CustomerController {
                     logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
                     isOffline = true;
                 }
-                if (!isOffline) {
-                    awaitTransactionPersistence(envelope);
-                }
                 return isOffline;
             }
 
@@ -813,18 +810,6 @@ public class CustomerController {
             setStatus("Error: " + e.getSource().getException().getMessage(), true);
         });
         new Thread(task).start();
-    }
-
-    private void awaitTransactionPersistence(MessageEnvelope envelope) throws InterruptedException {
-        String messageId = envelope.getMessageId().toString();
-        for (int attempt = 0; attempt < 50; attempt++) {
-            if (repository.isTransactionPersisted(messageId)) {
-                return;
-            }
-            Thread.sleep(100L);
-        }
-        throw new IllegalStateException(
-                "Storage Server did not confirm MongoDB persistence within 5 seconds.");
     }
 
     /**

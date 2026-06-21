@@ -302,23 +302,6 @@ public class ParkingRepository implements AutoCloseable {
     }
 
     /**
-     * Checks the primary for a transaction persisted by the storage server.
-     *
-     * @param messageId the RabbitMQ envelope message identifier
-     * @return true once the matching transaction document is visible on the primary
-     */
-    public boolean isTransactionPersisted(String messageId) {
-        if (database == null || messageId == null || messageId.isBlank()) {
-            return false;
-        }
-        return database.getCollection("transactions")
-                .withReadPreference(ReadPreference.primary())
-                .find(Filters.eq("messageId", messageId))
-                .projection(new Document("_id", 1))
-                .first() != null;
-    }
-
-    /**
      * Retrieves all recorded citations.
      * Reads from the primary so newly persisted citations are immediately visible.
      *
