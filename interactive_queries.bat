@@ -23,9 +23,11 @@ echo =========================================================
 echo 1. mongo1 (Typically the Primary Node)
 echo 2. mongo2 (Secondary Node)
 echo 3. mongo3 (Secondary Node)
+echo 9. Exit / Quit
 echo =========================================================
-set /p node_choice="Enter the node number (1-3): "
+set /p node_choice="Enter the node number (1-3, 9 to quit): "
 
+if "%node_choice%"=="9" goto EXIT_SCRIPT
 if "%node_choice%"=="1" (
     set "MONGO_NODE=mongo1"
     goto MENU
@@ -39,7 +41,7 @@ if "%node_choice%"=="3" (
     goto MENU
 )
 
-echo Invalid choice, please enter 1, 2, or 3.
+echo Invalid choice, please enter 1, 2, 3, or 9.
 pause
 goto CHOOSE_NODE
 
@@ -56,13 +58,15 @@ echo 5. Get parking recommendations based on a specific space (prompts for space
 echo 6. Count citations for a specific zone (prompts for zone name)
 echo 7. Show all registered users and vehicles in the system
 echo 8. Show available parking zones and their hourly rates
+echo 9. Exit / Quit
 echo 0. Return to Node selection
 echo =========================================================
-set /p choice="Enter the query number (0-8): "
+set /p choice="Enter the query number (0-9): "
 
-set "MONGO_CMD=docker exec -it %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/%MONGO_NODE%.pem" --quiet --eval"
+set "MONGO_CMD=docker exec -it %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@localhost:27017/parking_db?authSource=admin^&tls=true^&tlsAllowInvalidHostnames=true^&tlsCAFile=/etc/mongo/certs/ca-cert.pem^&tlsCertificateKeyFile=/etc/mongo/certs/%MONGO_NODE%.pem" --quiet --eval"
 set "READ_PREF=db.getMongo().setReadPref('secondaryPreferred'); "
 
+if "%choice%"=="9" goto EXIT_SCRIPT
 if "%choice%"=="1" goto Q1
 if "%choice%"=="2" goto Q2
 if "%choice%"=="3" goto Q3
@@ -131,3 +135,7 @@ echo Fetching available zones and rates from %MONGO_NODE%...
 %MONGO_CMD% "%READ_PREF% db.zones.find().pretty()"
 pause
 goto MENU
+
+:EXIT_SCRIPT
+endlocal
+exit /b 0
