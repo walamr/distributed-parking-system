@@ -38,7 +38,11 @@ Write-Host "=================================================="
 
 $required = @("MONGO1_IP", "MONGO2_IP", "MONGO3_IP", "RABBIT1_IP", "RABBIT2_IP", "RABBIT3_IP", "RECOMMENDER1_IP", "RECOMMENDER2_IP", "RECOMMENDER3_IP")
 foreach ($key in $required) {
-    if (-not $config[$key] -or $config[$key] -match "^192\.168\.1\.(10[1-9]|110)$") {
+    if (-not $config[$key]) {
+        Write-Error "Required value $key is missing from $ConfigFile"
+        exit 1
+    }
+    if ($config[$key] -match "^192\.168\.1\.(10[1-9]|110)$") {
         Write-Warning "Warning: $key = $($config[$key]) - This might be a placeholder"
     }
 }

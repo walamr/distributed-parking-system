@@ -1,6 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0.."
+for /f "tokens=1,* delims==" %%A in (network-ips.env) do (
+    if "%%A"=="MONGO1_IP" set "MONGO1_IP=%%B"
+    if "%%A"=="MONGO2_IP" set "MONGO2_IP=%%B"
+    if "%%A"=="MONGO3_IP" set "MONGO3_IP=%%B"
+)
 if not "%~1"=="" (
     set "ACTION=%~1"
     goto PROCESS_ACTION
@@ -11,8 +16,8 @@ cls
 echo =========================================================
 echo MongoDB Node 1
 echo =========================================================
-echo 1. Start node and open query menu
-echo 2. Clean node data, then start
+echo 1. Clean node data, start, and open query menu
+echo 2. Clean node data, then start (same safe startup)
 echo 3. Clean node data only
 echo 4. Initialize the three-node replica set (run once on PC 1)
 echo 9. Exit
@@ -26,8 +31,6 @@ if "%ACTION%"=="9" exit /b 0
 goto MENU
 
 :CLEAN_AND_START
-call :CLEAN
-if errorlevel 1 goto FAILED
 goto START
 
 :CLEAN_ONLY
@@ -45,6 +48,11 @@ exit /b %ERRORLEVEL%
 :INITIALIZE
 call :CHECK_DOCKER
 if errorlevel 1 goto FAILED
+call :CHECK_NETWORK_CONFIG
+if errorlevel 1 goto FAILED
+echo Generating environment files from network-ips.env on MongoDB Node 1...
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\generate-env.ps1"
+if errorlevel 1 goto FAILED
 echo Initializing the MongoDB replica set from Node 1...
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\init-mongodb-network.ps1"
 if errorlevel 1 goto FAILED
@@ -54,6 +62,11 @@ goto MENU
 
 :START
 call :CHECK_DOCKER
+if errorlevel 1 goto FAILED
+call :CHECK_NETWORK_CONFIG
+if errorlevel 1 goto FAILED
+echo Safe startup always removes the old MongoDB Node 1 container and volume first.
+call :CLEAN
 if errorlevel 1 goto FAILED
 echo Starting MongoDB Node 1 container...
 docker compose --env-file network-ips.env -f docker-compose.mongo1.yml up -d
@@ -73,15 +86,33 @@ timeout /t 1 >nul
 goto WAIT_START
 
 :LOCAL_READY
-echo MongoDB Node 1 is reachable. Checking replica-set health...
+echo MongoDB Node 1 is reachable.
+echo Waiting for MongoDB Node 2 at %MONGO2_IP%:27017...
+call :WAIT_REMOTE_NODE "%MONGO2_IP%" "MongoDB Node 2"
+if errorlevel 1 goto FAILED
+echo SUCCESS: MongoDB Node 2 is reachable.
+echo Waiting for MongoDB Node 3 at %MONGO3_IP%:27017...
+call :WAIT_REMOTE_NODE "%MONGO3_IP%" "MongoDB Node 3"
+if errorlevel 1 goto FAILED
+echo SUCCESS: MongoDB Node 3 is reachable.
+echo All MongoDB containers are reachable.
+echo Generating environment files from network-ips.env on MongoDB Node 1...
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\generate-env.ps1"
+if errorlevel 1 goto FAILED
+echo Environment files generated successfully.
+echo Initializing the fresh replica set and sample data...
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\init-mongodb-network.ps1"
+if errorlevel 1 goto FAILED
+echo Checking replica-set health...
 set /a ATTEMPTS=0
 :WAIT_RS
-docker exec mongo1 mongosh --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "const s=rs.status(); if (!s.ok || s.members.length ^< 3 || s.members.some(m =^> m.state !== 1 ^&^& m.state !== 2)) { quit(2); }" --quiet >nul 2>&1
+docker exec mongo1 mongosh --host localhost --port 27017 -u mulligan_db_admin -p db_pwd_rotated_admin --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --quiet --eval "const s=rs.status(); const bad=s.members.filter(function(m){return [1,2].indexOf(m.state)===-1;}); if(s.ok===1){if(s.members.length===3){if(bad.length===0){quit(0);}}} quit(2);" >nul 2>&1
 if not errorlevel 1 goto READY
 set /a ATTEMPTS+=1
 if %ATTEMPTS% GEQ 20 (
     echo.
     echo ERROR: mongo1 is running, but the three-node replica set is not healthy.
+    call :SHOW_RS_STATUS mongo1 mongo1.pem
     echo Start mongo2 and mongo3. If this is a fresh setup, choose option 4 here once.
     pause
     goto MENU
@@ -108,3 +139,41 @@ if errorlevel 1 (
     exit /b 1
 )
 exit /b 0
+
+:CHECK_NETWORK_CONFIG
+if not defined MONGO1_IP (
+    echo ERROR: MONGO1_IP is missing from network-ips.env.
+    exit /b 1
+)
+if not defined MONGO2_IP (
+    echo ERROR: MONGO2_IP is missing from network-ips.env.
+    exit /b 1
+)
+if not defined MONGO3_IP (
+    echo ERROR: MONGO3_IP is missing from network-ips.env.
+    exit /b 1
+)
+exit /b 0
+
+:SHOW_RS_STATUS
+echo Current replica-set status:
+docker exec %~1 mongosh --host localhost --port 27017 -u mulligan_db_admin -p db_pwd_rotated_admin --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%~2 --quiet --eval "try{printjson(rs.status().members.map(function(m){return {name:m.name,state:m.stateStr,health:m.health,lastHeartbeatMessage:m.lastHeartbeatMessage};}));}catch(e){print(e.codeName+': '+e.message);quit(2);}" 2>&1
+if not errorlevel 1 exit /b 0
+echo Authenticated status failed; checking whether the replica set is uninitialized...
+docker exec %~1 mongosh --host localhost --port 27017 --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%~2 --quiet --eval "try{printjson(rs.status());}catch(e){print(e.codeName+': '+e.message);quit(2);}" 2>&1
+exit /b 0
+
+:WAIT_REMOTE_NODE
+set /a REMOTE_ATTEMPTS=0
+:WAIT_REMOTE_NODE_LOOP
+powershell -NoProfile -Command "if (Test-NetConnection -ComputerName '%~1' -Port 27017 -InformationLevel Quiet -WarningAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>&1
+if not errorlevel 1 exit /b 0
+set /a REMOTE_ATTEMPTS+=1
+if %REMOTE_ATTEMPTS% GEQ 120 (
+    echo ERROR: %~2 did not become reachable at %~1:27017 within 600 seconds.
+    echo Start its quick-start Mongo script and verify network-ips.env and Windows Firewall.
+    exit /b 1
+)
+echo Waiting for %~2... attempt %REMOTE_ATTEMPTS% of 120
+timeout /t 5 /nobreak >nul
+goto WAIT_REMOTE_NODE_LOOP

@@ -11,8 +11,8 @@ cls
 echo =========================================================
 echo RabbitMQ Node 2
 echo =========================================================
-echo 1. Start node, join Node 1 if needed, and open console
-echo 2. Clean node data, then start and join
+echo 1. Clean node data, start, join Node 1, and open console
+echo 2. Clean node data, then start and join (same safe startup)
 echo 3. Clean node data only
 echo 9. Exit
 set /p ACTION="Choose an action: "
@@ -24,8 +24,6 @@ if "%ACTION%"=="9" exit /b 0
 goto MENU
 
 :CLEAN_AND_START
-call :CLEAN
-if errorlevel 1 goto FAILED
 goto START
 :CLEAN_ONLY
 call :CLEAN
@@ -40,6 +38,9 @@ exit /b %ERRORLEVEL%
 
 :START
 call :CHECK_DOCKER
+if errorlevel 1 goto FAILED
+echo Safe startup always removes the old RabbitMQ Node 2 container and volume first.
+call :CLEAN
 if errorlevel 1 goto FAILED
 echo Starting RabbitMQ Node 2 container...
 docker compose --env-file network-ips.env -f docker-compose.rabbitmq2.yml up -d

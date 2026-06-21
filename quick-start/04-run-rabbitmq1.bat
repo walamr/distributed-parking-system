@@ -11,8 +11,8 @@ cls
 echo =========================================================
 echo RabbitMQ Node 1
 echo =========================================================
-echo 1. Start node and open management console
-echo 2. Clean node data, then start
+echo 1. Clean node data, start, wait for Nodes 2 and 3, then open console
+echo 2. Clean node data, then start (same safe startup)
 echo 3. Clean node data only
 echo 9. Exit
 set /p ACTION="Choose an action: "
@@ -24,8 +24,6 @@ if "%ACTION%"=="9" exit /b 0
 goto MENU
 
 :CLEAN_AND_START
-call :CLEAN
-if errorlevel 1 goto FAILED
 goto START
 :CLEAN_ONLY
 call :CLEAN
@@ -41,12 +39,42 @@ exit /b %ERRORLEVEL%
 :START
 call :CHECK_DOCKER
 if errorlevel 1 goto FAILED
+echo Safe startup always removes the old RabbitMQ Node 1 container and volume first.
+call :CLEAN
+if errorlevel 1 goto FAILED
 echo Starting RabbitMQ Node 1 container...
 docker compose --env-file network-ips.env -f docker-compose.rabbitmq1.yml up -d
 if errorlevel 1 goto FAILED
 call :WAIT_READY rabbitmq1
 if errorlevel 1 goto FAILED
 echo RabbitMQ Node 1 is ready.
+echo.
+echo =========================================================
+echo Waiting for RabbitMQ Node 2 to connect to Node 1...
+echo =========================================================
+docker exec rabbitmq1 rabbitmqctl await_online_nodes 2 --timeout 300
+if errorlevel 1 (
+    echo ERROR: RabbitMQ Node 2 did not connect within 300 seconds.
+    echo Start quick-start\05-run-rabbitmq2.bat on the RabbitMQ Node 2 PC.
+    goto FAILED
+)
+echo SUCCESS: RabbitMQ Node 2 is connected to the cluster.
+echo.
+echo =========================================================
+echo Waiting for RabbitMQ Node 3 to connect...
+echo =========================================================
+docker exec rabbitmq1 rabbitmqctl await_online_nodes 3 --timeout 300
+if errorlevel 1 (
+    echo ERROR: RabbitMQ Node 3 did not connect within 300 seconds.
+    echo Start quick-start\06-run-rabbitmq3.bat on the RabbitMQ Node 3 PC.
+    goto FAILED
+)
+echo SUCCESS: RabbitMQ Node 3 is connected to the cluster.
+echo.
+echo =========================================================
+echo RabbitMQ cluster is complete. All three nodes are online.
+echo =========================================================
+docker exec rabbitmq1 rabbitmqctl cluster_status
 echo Management console: https://localhost:15671
 start "" https://localhost:15671
 pause
