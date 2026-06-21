@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+﻿#!/usr/bin/env sh
 set -eu
 
 rabbitmqadmin declare queue name=transactions durable=true

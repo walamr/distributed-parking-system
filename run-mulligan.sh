@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 echo "=========================================="
 echo "   Mulligan Parking - Distributed Boot"

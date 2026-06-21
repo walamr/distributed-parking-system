@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # LEGACY / ARCHIVED SCRIPT.
 # This file belongs to an older MySQL setup and is not used by the current
 # Stage 2 MongoDB replica-set deployment.
