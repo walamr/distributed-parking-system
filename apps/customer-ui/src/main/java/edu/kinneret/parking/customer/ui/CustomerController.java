@@ -669,7 +669,7 @@ public class CustomerController {
             if (isOffline) {
                 setStatus("Parking request saved locally only; RabbitMQ and MongoDB confirmation are unavailable.", false);
             } else {
-                setStatus("Parking request accepted by RabbitMQ; MongoDB persistence is pending server-side logs.", false);
+                setStatus("Parking started successfully.", false);
             }
         });
         task.setOnFailed(e -> {

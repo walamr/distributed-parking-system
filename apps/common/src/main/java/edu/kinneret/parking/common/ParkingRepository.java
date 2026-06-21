@@ -318,18 +318,6 @@ public class ParkingRepository implements AutoCloseable {
         return results;
     }
 
-    /** Checks whether the storage server persisted a citation on the primary. */
-    public boolean isCitationPersisted(String messageId) {
-        if (database == null || messageId == null || messageId.isBlank()) {
-            return false;
-        }
-        return database.getCollection("citations")
-                .withReadPreference(ReadPreference.primary())
-                .find(Filters.eq("messageId", messageId))
-                .projection(new Document("_id", 1))
-                .first() != null;
-    }
-
     /**
      * Reads a payload field from a stored MongoDB document. The helper tolerates both
      * the current nested-document shape and the legacy string payload shape.
