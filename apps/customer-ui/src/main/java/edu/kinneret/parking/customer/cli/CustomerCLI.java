@@ -343,6 +343,7 @@ public class CustomerCLI {
                 spaceId,
                 UUID.randomUUID().toString(),
                 "customer-cli",
+                loggedInVin,
                 signer);
 
         javax.net.ssl.SSLContext sslContext = null;
