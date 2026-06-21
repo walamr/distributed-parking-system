@@ -137,6 +137,7 @@ public class MOController {
         txBtn.setOnAction(e -> refreshTransactions(true));
         ctBtn.setOnAction(e -> handleCitations());
         startTransactionAutoRefresh();
+        refreshTransactions(true);
     }
 
     private void startTransactionAutoRefresh() {

@@ -523,6 +523,7 @@ public class CustomerController {
                                 channel.basicPublish("", config.getTransactionsQueueName(), null,
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
+                            awaitTransactionPersistence(stopEnv);
                             System.out.println("[CustomerUI] Auto-stopped previous local active session for VIN: " + vin
                                     + " in space " + oldActiveSpace + ", cost: " + costString);
                             logger.info("Auto-stopped previous local active session for VIN: " + vin + " in space "
@@ -606,6 +607,7 @@ public class CustomerController {
                                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
+                                    awaitTransactionPersistence(stopEnv);
                                     System.out.println("[CustomerUI] Auto-stopped previous active DB session for VIN: "
                                             + vin + " in space " + dbSpaceId + ", cost: " + costString);
                                     logger.info("Auto-stopped previous active DB session for VIN: " + vin + " in space "
@@ -655,6 +657,9 @@ public class CustomerController {
                 } catch (Exception ex) {
                     logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
                     isOffline = true;
+                }
+                if (!isOffline) {
+                    awaitTransactionPersistence(envelope);
                 }
                 return isOffline;
             }
@@ -785,6 +790,9 @@ public class CustomerController {
                     logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
                     isOffline = true;
                 }
+                if (!isOffline) {
+                    awaitTransactionPersistence(envelope);
+                }
                 return isOffline;
             }
 
@@ -806,6 +814,18 @@ public class CustomerController {
             setStatus("Error: " + e.getSource().getException().getMessage(), true);
         });
         new Thread(task).start();
+    }
+
+    private void awaitTransactionPersistence(MessageEnvelope envelope) throws InterruptedException {
+        String messageId = envelope.getMessageId().toString();
+        for (int attempt = 0; attempt < 50; attempt++) {
+            if (repository.isTransactionPersisted(messageId)) {
+                return;
+            }
+            Thread.sleep(100L);
+        }
+        throw new IllegalStateException(
+                "Storage Server did not confirm MongoDB persistence within 5 seconds.");
     }
 
     /**

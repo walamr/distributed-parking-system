@@ -10,7 +10,10 @@ import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Coordinates the PEO user interface by validating user actions, querying the
@@ -76,6 +79,7 @@ public class PEOController {
     private TableView<ActivityLogEntry> activityTable;
 
     private final ObservableList<ActivityLogEntry> activityItems = FXCollections.observableArrayList();
+    private final Set<String> observedParkingMessageIds = ConcurrentHashMap.newKeySet();
 
     /**
      * Creates a new PEOController with cluster-aware infrastructure.
@@ -111,6 +115,54 @@ public class PEOController {
         this.citationSection = section;
         this.activityTable = table;
         this.activityTable.setItems(activityItems);
+        startParkingEventMonitor();
+    }
+
+    private void startParkingEventMonitor() {
+        Thread monitor = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    List<org.bson.Document> events = repository.getAllTransactions();
+                    for (int index = events.size() - 1; index >= 0; index--) {
+                        org.bson.Document event = events.get(index);
+                        String id = event.getString("messageId");
+                        if (id == null) {
+                            id = String.valueOf(event.getObjectId("_id"));
+                        }
+                        if (!observedParkingMessageIds.add(id)) {
+                            continue;
+                        }
+                        String type = event.getString("type");
+                        if (!"transaction.start".equals(type) && !"transaction.stop".equals(type)) {
+                            continue;
+                        }
+                        String vehicle = ParkingRepository.readPayloadField(event, "vehicleId");
+                        String space = ParkingRepository.readPayloadField(event, "spaceId");
+                        String action = "transaction.start".equals(type) ? "PARKING START" : "PARKING STOP";
+                        String result = "Space " + space;
+                        Platform.runLater(() -> {
+                            activityItems.add(0, new ActivityLogEntry(action, vehicle, result));
+                            if ("PARKING START".equals(action)) {
+                                setOutput("New parking event: vehicle " + vehicle + " in space " + space, false);
+                            }
+                        });
+                    }
+                    Thread.sleep(500L);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception exception) {
+                    try {
+                        Thread.sleep(1_000L);
+                    } catch (InterruptedException interruptedException) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }, "peo-parking-event-monitor");
+        monitor.setDaemon(true);
+        monitor.start();
     }
 
     /**
