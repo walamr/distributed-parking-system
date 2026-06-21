@@ -81,7 +81,7 @@ goto MENU
 
 :Q1
 echo Fetching data from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% const events=db.transactions.find().sort({timestamp:1,storedAt:1,_id:1}).toArray(); print('Total parking events: '+events.length); printjson(events)"
+%MONGO_CMD% "%READ_PREF% const events=db.transactions.find().sort({timestamp:1,storedAt:1,_id:1}).toArray(); print('Total parking events: '+events.length); console.table(events.map(function(e,i){const p=e.payload||{};const action=(p.type||(e.type||'').replace('transaction.','')).toUpperCase();return {'#':i+1,'Event':action,'Vehicle':p.vehicleId||e.vehicleId||'','Space':p.spaceId||e.spaceId||'','Area':p.areaName||'','Cost':p.cost||'','Event Time':new Date(Number(e.timestamp)*1000).toISOString(),'Stored At':e.storedAt?new Date(Number(e.storedAt)).toISOString():''};}))"
 if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above and verify the replica set, credentials, and TLS files.
 goto MENU
 

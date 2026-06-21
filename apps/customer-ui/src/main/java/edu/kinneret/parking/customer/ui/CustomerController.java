@@ -519,7 +519,7 @@ public class CustomerController {
                                 stopClientIp, UUID.randomUUID().toString()).sign(signer);
 
                         try {
-                            rabbitManager.withChannel((channel, node) -> {
+                            rabbitManager.withPublisherConfirms((channel, node) -> {
                                 channel.basicPublish("", config.getTransactionsQueueName(), null,
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
@@ -602,7 +602,7 @@ public class CustomerController {
                                 MessageEnvelope stopEnv = MessageEnvelope.createUnsigned("transaction.stop",
                                         stopPayload, stopClientIp, UUID.randomUUID().toString()).sign(signer);
                                 try {
-                                    rabbitManager.withChannel((channel, node) -> {
+                                    rabbitManager.withPublisherConfirms((channel, node) -> {
                                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
@@ -775,7 +775,7 @@ public class CustomerController {
 
                 boolean isOffline = false;
                 try {
-                    rabbitManager.withChannel((channel, node) -> {
+                    rabbitManager.withPublisherConfirms((channel, node) -> {
                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                 envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                         logger.info("[TRACE: " + correlationId + "] Published stop message to " + node.toAddress()

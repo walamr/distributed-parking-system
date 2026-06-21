@@ -10,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableView;
 import org.bson.Document;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Controller for the Municipality Office (MO) UI.
@@ -28,6 +29,7 @@ public class MOController {
 
     private final ObservableList<Document> transactionItems = FXCollections.observableArrayList();
     private final ObservableList<Document> citationItems = FXCollections.observableArrayList();
+    private final AtomicBoolean transactionRefreshInProgress = new AtomicBoolean(false);
 
     /**
      * Creates a new controller with the specified repository.
@@ -132,15 +134,43 @@ public class MOController {
      * @param ctBtn the citation report button
      */
     public void attachButtons(Button txBtn, Button ctBtn) {
-        txBtn.setOnAction(e -> handleTransactions());
+        txBtn.setOnAction(e -> refreshTransactions(true));
         ctBtn.setOnAction(e -> handleCitations());
+        startTransactionAutoRefresh();
+    }
+
+    private void startTransactionAutoRefresh() {
+        Thread refreshThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(1_000L);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                Platform.runLater(() -> {
+                    String header = tableHeader == null ? "" : tableHeader.getText();
+                    if (transactionsTable != null && transactionsTable.isVisible()
+                            && header != null && header.startsWith("TRANSACTION REPORT")) {
+                        refreshTransactions(false);
+                    }
+                });
+            }
+        }, "municipality-transaction-refresh");
+        refreshThread.setDaemon(true);
+        refreshThread.start();
     }
 
     /**
      * Handles the transaction report request.
      */
-    private void handleTransactions() {
-        setStatus("Fetching transactions from cluster...", false);
+    private void refreshTransactions(boolean announceRefresh) {
+        if (!transactionRefreshInProgress.compareAndSet(false, true)) {
+            return;
+        }
+        if (announceRefresh) {
+            setStatus("Fetching transactions from cluster...", false);
+        }
         Task<List<Document>> task = new Task<>() {
             @Override
             protected List<Document> call() {
@@ -151,15 +181,20 @@ public class MOController {
                     if (t1 != t2) {
                         return Long.compare(t1, t2);
                     }
+                    long stored1 = d1.get("storedAt") instanceof Number n1 ? n1.longValue() : 0L;
+                    long stored2 = d2.get("storedAt") instanceof Number n2 ? n2.longValue() : 0L;
+                    if (stored1 != stored2) {
+                        return Long.compare(stored1, stored2);
+                    }
                     String type1 = d1.getString("type");
                     String type2 = d2.getString("type");
                     boolean isStop1 = type1 != null && type1.endsWith(".stop");
                     boolean isStop2 = type2 != null && type2.endsWith(".stop");
                     if (isStop1 && !isStop2) {
-                        return -1; // d1 (stop) comes first
+                        return 1; // start must be processed before stop
                     }
                     if (!isStop1 && isStop2) {
-                        return 1;  // d2 (stop) comes first
+                        return -1;
                     }
                     return 0;
                 });
@@ -206,12 +241,21 @@ public class MOController {
             }
         };
         task.setOnSucceeded(e -> {
+            transactionRefreshInProgress.set(false);
             transactionItems.setAll(task.getValue());
             showTable(true);
             tableHeader.setText("TRANSACTION REPORT (" + transactionItems.size() + ")");
-            setStatus("Success", false);
+            if (announceRefresh) {
+                setStatus("Success - automatic refresh is active", false);
+            }
         });
-        task.setOnFailed(e -> setStatus("Error: Failed to retrieve transaction report from cluster.", true));
+        task.setOnFailed(e -> {
+            transactionRefreshInProgress.set(false);
+            if (announceRefresh) {
+                setStatus("Error: Failed to retrieve transaction report from cluster.", true);
+            }
+        });
+        task.setOnCancelled(e -> transactionRefreshInProgress.set(false));
         new Thread(task).start();
     }
 
