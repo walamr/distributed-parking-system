@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class PEOCLI {
 
     private static final Logger logger = LoggerFactory.getLogger(PEOCLI.class);
     private static String loggedInOfficer = null;
+    private static final List<PEOActivityLogEntry> sessionActivities = Collections.synchronizedList(new ArrayList<>());
 
     /**
      * Starts the cluster-aware PEO command-line interface.
@@ -78,11 +81,11 @@ public class PEOCLI {
                     }
                 } else {
                     System.out.println("\nStatus: LOGGED IN as Officer '" + loggedInOfficer + "'");
-                    System.out.println("Options: [1] Check Legality, [2] Issue Citation, [3] List Registered Vehicles, [4] Logout, [5] Exit");
+                    System.out.println("Options: [1] Check Legality, [2] Issue Citation, [3] View Activity History, [4] List Registered Vehicles, [5] Logout, [6] Exit");
                     System.out.print("Select: ");
                     String choice = scanner.nextLine();
 
-                    if ("5".equals(choice)) break;
+                    if ("6".equals(choice)) break;
 
                     switch (choice) {
                         case "1":
@@ -92,7 +95,29 @@ public class PEOCLI {
                             String checkSpaceId = scanner.nextLine();
                             try {
                                 String result = repository.checkLegality(checkVin, checkSpaceId);
-                                System.out.println("LEGALITY CHECK: " + result);
+                                
+                                // Record legality check activity in the session log
+                                sessionActivities.add(new PEOActivityLogEntry("CHECK", checkVin, result, System.currentTimeMillis()));
+
+                                if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
+                                    try {
+                                        org.bson.Document queryLog = new org.bson.Document("timestamp", java.time.Instant.now().toString())
+                                                .append("vehicleId", checkVin.toUpperCase())
+                                                .append("spaceId", checkSpaceId.toUpperCase())
+                                                .append("response", result);
+                                        repository.logSystemQuery(queryLog);
+                                    } catch (Exception e) {
+                                        // Ignore logging failure to avoid blocking user
+                                    }
+                                }
+
+                                System.out.println("\n+--------------------------------------------------+");
+                                System.out.println("|                  LEGALITY CHECK                  |");
+                                System.out.println("+--------------------------------------------------+");
+                                System.out.println(String.format("|  %-46s  |", "Vehicle VIN  : " + checkVin.toUpperCase()));
+                                System.out.println(String.format("|  %-46s  |", "Space ID     : " + checkSpaceId.toUpperCase()));
+                                System.out.println(String.format("|  %-46s  |", "Result       : " + result));
+                                System.out.println("+--------------------------------------------------+");
                             } catch (Exception e) {
                                 logger.warn("Failed to check legality for VIN: {}", safeForLog(checkVin));
                                 System.err.println("ERROR: Unable to connect to the database cluster. Please try again later.");
@@ -110,6 +135,51 @@ public class PEOCLI {
                             issueCitation(rabbitManager, config, signer, citeVin, citeSpaceId, amount, reason, loggedInOfficer);
                             break;
                         case "3":
+                            List<PEOActivityLogEntry> list = new ArrayList<>();
+                            
+                            // 1. Fetch transaction history from the database
+                            try {
+                                List<Document> transactions = repository.getAllTransactions();
+                                for (Document doc : transactions) {
+                                    String type = doc.getString("type");
+                                    String action = "transaction.stop".equals(type) || "stop".equals(type) ? "PARKING STOP" : "PARKING START";
+                                    String vehicle = ParkingRepository.readPayloadField(doc, "vehicleId");
+                                    String space = ParkingRepository.readPayloadField(doc, "spaceId");
+                                    long ts = getTimestampMs(doc);
+                                    list.add(new PEOActivityLogEntry(action, vehicle, "Space " + space, ts));
+                                }
+                            } catch (Exception e) {
+                                System.err.println("WARNING: Unable to load transaction history from the database.");
+                            }
+
+                            // 2. Merge with session activities
+                            synchronized (sessionActivities) {
+                                list.addAll(sessionActivities);
+                            }
+
+                            // 3. Sort by timestamp descending (newest first)
+                            list.sort((a, b) -> Long.compare(b.timestamp, a.timestamp));
+
+                            // 4. Render output table
+                            System.out.println("\n+--------------------------------------------------+");
+                            System.out.println("|                 ACTIVITY HISTORY                 |");
+                            System.out.println("+----------------+-------------+-------------------+");
+                            System.out.println(String.format("| %-14s | %-11s | %-17s |", "Action", "VIN", "Result"));
+                            System.out.println("+----------------+-------------+-------------------+");
+                            if (list.isEmpty()) {
+                                System.out.println("|  No activities found.                            |");
+                                System.out.println("+--------------------------------------------------+");
+                            } else {
+                                for (PEOActivityLogEntry entry : list) {
+                                    System.out.print(String.format("| %-14s | %-11s | %-17s |\n",
+                                            entry.action,
+                                            entry.vin == null ? "" : entry.vin.toUpperCase(),
+                                            entry.result));
+                                }
+                                System.out.println("+----------------+-------------+-------------------+");
+                            }
+                            break;
+                        case "4":
                             try {
                                 List<Document> vehicles = repository.getAllVehicles();
                                 System.out.println("Registered Vehicles in System (" + vehicles.size() + " found):");
@@ -120,7 +190,7 @@ public class PEOCLI {
                                 System.err.println("ERROR: Unable to retrieve vehicles list from the database.");
                             }
                             break;
-                        case "4":
+                        case "5":
                             System.out.println("Logging out officer '" + loggedInOfficer + "'.");
                             loggedInOfficer = null;
                             break;
@@ -164,7 +234,24 @@ public class PEOCLI {
              
              manager.withChannelForQueue(config.getCitationsQueueName(), (channel, node) -> {
                  channel.basicPublish("", config.getCitationsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                 System.out.println("SUCCESS: Citation published via cluster node: " + node.toAddress());
+                 
+                 String displayReason = reason == null ? "" : reason;
+                 if (displayReason.length() > 30) {
+                     displayReason = displayReason.substring(0, 27) + "...";
+                 }
+                 
+                 System.out.println("\n+--------------------------------------------------+");
+                 System.out.println("|                CITATION ISSUED                   |");
+                 System.out.println("+--------------------------------------------------+");
+                 System.out.println(String.format("|  %-46s  |", "Vehicle VIN  : " + (vin == null ? "" : vin.toUpperCase())));
+                 System.out.println(String.format("|  %-46s  |", "Space ID     : " + (spaceId == null ? "" : spaceId.toUpperCase())));
+                 System.out.println(String.format("|  %-46s  |", "Amount       : " + (amount == null ? "" : amount)));
+                 System.out.println(String.format("|  %-46s  |", "Reason       : " + displayReason));
+                 System.out.println(String.format("|  %-46s  |", "Status       : SUCCESS (Published via " + node.toAddress() + ")"));
+                 System.out.println("+--------------------------------------------------+");
+                 
+                 // Record citation activity in the session log
+                 sessionActivities.add(new PEOActivityLogEntry("CITATION", vin, "Issued", System.currentTimeMillis()));
              });
          } catch (Exception e) {
              logger.warn("Failed to publish citation request to the cluster: {}", SecurityLogger.sanitize(e.getMessage()));
@@ -259,5 +346,37 @@ public class PEOCLI {
 
     private static String safeForLog(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private static class PEOActivityLogEntry {
+        final String action;
+        final String vin;
+        final String result;
+        final long timestamp;
+
+        PEOActivityLogEntry(String action, String vin, String result, long timestamp) {
+            this.action = action;
+            this.vin = vin;
+            this.result = result;
+            this.timestamp = timestamp;
+        }
+    }
+
+    private static long getTimestampMs(Document doc) {
+        Object ts = doc.get("timestamp");
+        if (ts instanceof Number) {
+            return ((Number) ts).longValue() * 1000L;
+        } else if (ts instanceof String) {
+            try {
+                return java.time.Instant.parse((String) ts).toEpochMilli();
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+        Object storedAt = doc.get("storedAt");
+        if (storedAt instanceof Number) {
+            return ((Number) storedAt).longValue();
+        }
+        return 0L;
     }
 }

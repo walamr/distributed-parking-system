@@ -10,6 +10,7 @@ import java.util.Map;
  */
 public final class AppConfig {
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(AppConfig.class.getName());
+    private static Boolean cachedIsLocal = null;
     private static final String DEFAULT_VHOST = "/parking";
     private static final String DEFAULT_NODES = "localhost:5671,localhost:5673,localhost:5674";
     private static final String DEFAULT_TRANSACTIONS_QUEUE = "transactions.queue";
@@ -282,38 +283,49 @@ public final class AppConfig {
             
             String os = System.getProperty("os.name", "").toLowerCase();
             boolean isWindowsOrMac = os.contains("win") || os.contains("mac");
-            boolean isLocal = mongo1.equals(mongo2) || mongo1.equals("127.0.0.1") || mongo1.equals("localhost");
+            boolean isLocal;
+            if (cachedIsLocal != null) {
+                isLocal = cachedIsLocal;
+            } else {
+                isLocal = mongo1.equals(mongo2) || mongo1.equals("127.0.0.1") || mongo1.equals("localhost") || !isAddressReachable(mongo1, 27017, 800);
+                cachedIsLocal = isLocal;
+            }
             
             System.out.println("[AppConfig] mongo1=" + mongo1 + ", mongo2=" + mongo2 + ", isLocal=" + isLocal + ", isWindowsOrMac=" + isWindowsOrMac);
             
             String r1p, r2p, r3p;
             String m1p, m2p, m3p;
             
-            if (isWindowsOrMac && isLocal) {
-                // On Windows/Mac, Docker Desktop exposes ports on localhost.
-                // We must tell TLS to allow invalid hostnames since we connect via localhost
-                // but the certificates only contain the internal 10.x IPs or container names.
+            if (isLocal) {
+                // Local testing (lab network is unreachable).
+                // We must tell TLS to allow invalid hostnames since we connect via local names/loopback
+                // but the certificates contain the internal 10.x IPs or container names.
                 env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
                 env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
                 
-                // RabbitMQ and Recommender don't have custom DNS resolvers in our code,
-                // so we MUST connect to them directly via 127.0.0.1 and their exposed ports.
-                rabbit1 = "127.0.0.1"; rabbit2 = "127.0.0.1"; rabbit3 = "127.0.0.1";
-                recommender1 = "127.0.0.1"; recommender2 = "127.0.0.1"; recommender3 = "127.0.0.1";
-                r1p = "5671"; r2p = "5673"; r3p = "5674";
                 m1p = "27017"; m2p = "27018"; m3p = "27019";
                 
-                // MongoDB requires us to connect using the exact hostnames (mongo1, mongo2, mongo3)
-                // for its replica set validation to pass. However, our MongoConnectionManager has a custom 
-                // InetAddressResolver that intercepts 'mongo1' and routes it to the IP defined in MONGO1_IP.
-                // So we override MONGO_IPs to localhost!
-                env.put("MONGO1_IP", "127.0.0.1");
-                env.put("MONGO2_IP", "127.0.0.1");
-                env.put("MONGO3_IP", "127.0.0.1");
+                if (isWindowsOrMac) {
+                    // On Windows/Mac host, connect via loopback mapping
+                    rabbit1 = "127.0.0.1"; rabbit2 = "127.0.0.1"; rabbit3 = "127.0.0.1";
+                    recommender1 = "127.0.0.1"; recommender2 = "127.0.0.1"; recommender3 = "127.0.0.1";
+                    r1p = "5671"; r2p = "5673"; r3p = "5674";
+                    
+                    env.put("MONGO1_IP", "127.0.0.1");
+                    env.put("MONGO2_IP", "127.0.0.1");
+                    env.put("MONGO3_IP", "127.0.0.1");
+                } else {
+                    // Inside local Linux container, connect using container hostnames over the docker bridge network
+                    rabbit1 = "rabbitmq1"; rabbit2 = "rabbitmq2"; rabbit3 = "rabbitmq3";
+                    recommender1 = "recommender1"; recommender2 = "recommender2"; recommender3 = "recommender3";
+                    r1p = "5671"; r2p = "5671"; r3p = "5671";
+                    
+                    env.put("MONGO1_IP", "mongo1");
+                    env.put("MONGO2_IP", "mongo2");
+                    env.put("MONGO3_IP", "mongo3");
+                }
             } else if (isPrivateDockerSubnet(mongo1)) {
-                // When connecting to a remote Docker network (e.g. 10.0.x.x lab machines),
-                // TLS certificates are issued for internal container names/IPs, not for the external IPs.
-                // We must allow invalid hostnames so the TLS handshake succeeds.
+                // Lab deployment
                 env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
                 env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
                 r1p = "5671"; r2p = "5671"; r3p = "5671";
@@ -335,6 +347,15 @@ public final class AppConfig {
             // The custom InetAddressResolver in MongoConnectionManager uses MONGO1_IP to perform the actual routing.
             env.put("MONGO_URI", "mongodb://dummy:dummy@mongo1:" + m1p + ",mongo2:" + m2p + ",mongo3:" + m3p + "/parking_db?replicaSet=rs0&authSource=admin");
             env.put("RECOMMENDER_NODES", recommender1 + ":8091," + recommender2 + ":8092," + recommender3 + ":8093");
+        }
+    }
+
+    private static boolean isAddressReachable(String host, int port, int timeoutMs) {
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress(host, port), timeoutMs);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

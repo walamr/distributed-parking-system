@@ -158,24 +158,11 @@ public final class RabbitMqConnectionManager {
         factory.setNetworkRecoveryInterval(appConfig.getRabbitMqRecoveryIntervalMs());
         if (appConfig.isRabbitMqTlsEnabled()) {
             try {
-                // Use trust-only SSL context (no client certificate) because RabbitMQ
-                // does not require mTLS from clients. Sending a keystore cert causes
-                // "unknown_ca" errors when the client cert is signed by a different CA.
-                String rabbitCaPath = appConfig.getTlsTruststorePath()
-                        .replace("truststore.jks", "ca-cert.pem")
-                        .replace("truststore.p12", "ca-cert.pem");
-                SSLContext sslContext;
-                java.io.File caFile = new java.io.File(TlsUtils.resolvePath(rabbitCaPath));
-                if (caFile.exists()) {
-                    sslContext = TlsUtils.createTrustOnlySslContextFromPem(rabbitCaPath);
-                } else {
-                    // Fallback to JKS truststore if PEM not found
-                    sslContext = TlsUtils.createSslContext(
-                            appConfig.getTlsTruststorePath(),
-                            appConfig.getTlsTruststorePassword(),
-                            appConfig.getTlsKeystorePath(),
-                            appConfig.getTlsKeystorePassword());
-                }
+                SSLContext sslContext = TlsUtils.createSslContext(
+                        appConfig.getTlsTruststorePath(),
+                        appConfig.getTlsTruststorePassword(),
+                        appConfig.getTlsKeystorePath(),
+                        appConfig.getTlsKeystorePassword());
                 
                 // --- CRITICAL: Ensure mTLS sends the client certificate ---
                 factory.setSocketFactory(sslContext.getSocketFactory());

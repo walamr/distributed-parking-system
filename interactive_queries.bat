@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal enabledelayedexpansion
+setlocal
 
 if "%~1"=="1" (
     set "MONGO_NODE=mongo1"
@@ -62,7 +62,7 @@ echo 0. Return to Node selection
 echo =========================================================
 set /p choice="Enter the query number (0-9): "
 
-set "MONGO_CMD=docker exec -i %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27017,mongo3:27017/parking_db?replicaSet=rs0^&authSource=admin" --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem --quiet --eval"
+set MONGO_CMD=docker exec -i %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27017,mongo3:27017/parking_db?replicaSet=rs0&authSource=admin" --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem --quiet --eval
 set "READ_PREF=db.getMongo().setReadPref('primary'); "
 
 if "%choice%"=="9" goto EXIT_SCRIPT

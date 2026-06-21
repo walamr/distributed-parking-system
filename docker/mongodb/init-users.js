@@ -42,7 +42,8 @@ ensureRole({
     { resource: { db: "parking_db", collection: "vehicles" }, actions: [ "find" ] },
     { resource: { db: "parking_db", collection: "spaces" }, actions: [ "find" ] },
     { resource: { db: "parking_db", collection: "transactions" }, actions: [ "find" ] },
-    { resource: { db: "parking_db", collection: "users" }, actions: [ "find", "insert", "update" ] }
+    { resource: { db: "parking_db", collection: "users" }, actions: [ "find", "insert", "update" ] },
+    { resource: { db: "parking_db", collection: "citations" }, actions: [ "find" ] }
   ],
   roles: []
 });

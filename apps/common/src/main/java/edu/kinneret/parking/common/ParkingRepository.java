@@ -319,6 +319,27 @@ public class ParkingRepository implements AutoCloseable {
     }
 
     /**
+     * Retrieves all recorded system queries (legality checks).
+     * Reads from the primary so newly logged checks are immediately visible.
+     *
+     * @return the ordered list of stored system query documents
+     */
+    public List<Document> getAllSystemQueries() {
+        List<Document> results = new ArrayList<>();
+        if (!isDbOnline || database == null) return results;
+        try {
+            database.getCollection("system_log")
+                    .withReadPreference(ReadPreference.primary())
+                    .find()
+                    .sort(Sorts.orderBy(Sorts.descending("timestamp")))
+                    .into(results);
+        } catch (Exception e) {
+            System.err.println("Error querying system queries from database: " + e.getMessage());
+        }
+        return results;
+    }
+
+    /**
      * Reads a payload field from a stored MongoDB document. The helper tolerates both
      * the current nested-document shape and the legacy string payload shape.
      *

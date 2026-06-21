@@ -292,7 +292,7 @@ services:
     restart: on-failure
     depends_on:
       queue-server:
-        condition: service_completed_successfully
+        condition: service_started
       mongo-init:
         condition: service_completed_successfully
       rabbitmq1:
