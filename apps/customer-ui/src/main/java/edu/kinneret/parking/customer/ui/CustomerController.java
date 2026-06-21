@@ -623,16 +623,12 @@ public class CustomerController {
                     }
                 }
 
-                // Add new start doc to local offline history so it is immediately visible in
-                // the table!
                 Document startDoc = new Document("type", "transaction.start")
                         .append("payload", new Document("vehicleId", vin)
                                 .append("spaceId", spaceId)
                                 .append("areaName", areaName)
                                 .append("cost", "-"))
                         .append("timestamp", java.time.Instant.now().getEpochSecond());
-                localOfflineTransactions.add(0, startDoc);
-                saveLocalTransactions(vin);
 
                 String correlationId = UUID.randomUUID().toString(); // Tracing start
                 String clientIp = InetAddress.getLocalHost().getHostAddress();
@@ -642,35 +638,29 @@ public class CustomerController {
                 MessageEnvelope envelope = MessageEnvelope
                         .createUnsigned("transaction.start", payload, clientIp, correlationId).sign(signer);
 
-                boolean isOffline = false;
-                try {
-                    rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                        channel.basicPublish("", config.getTransactionsQueueName(), null,
-                                envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                        logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress());
-                    });
-                } catch (Exception ex) {
-                    logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
-                    isOffline = true;
-                }
-                return isOffline;
+                rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
+                    channel.basicPublish("", config.getTransactionsQueueName(), null,
+                            envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
+                    logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress()
+                            + " and received broker confirmation");
+                });
+
+                // Show the new session locally only after RabbitMQ accepts the event.
+                localOfflineTransactions.add(0, startDoc);
+                saveLocalTransactions(vin);
+                return false;
             }
 
         };
 
         task.setOnSucceeded(e -> {
-            boolean isOffline = task.getValue();
             parkingStartTime = java.time.Instant.now();
             activeSpace = spaceId;
             Platform.runLater(() -> {
                 infoCard.setVisible(true);
                 infoCard.setManaged(true);
             });
-            if (isOffline) {
-                setStatus("Parking request saved locally only; RabbitMQ and MongoDB confirmation are unavailable.", false);
-            } else {
-                setStatus("Parking started successfully.", false);
-            }
+            setStatus("Parking started successfully.", false);
         });
         task.setOnFailed(e -> {
             Throwable ex = e.getSource().getException();
@@ -759,55 +749,50 @@ public class CustomerController {
                     throw new IllegalStateException("There is no active parking session in space " + spaceId + ". You are parked in space " + resolvedActiveSpace + ".");
                 }
 
-                // Add to local offline history so it is immediately visible in the table!
+                String stoppedSpaceId = resolvedActiveSpace;
                 Document stopDoc = new Document("type", "transaction.stop")
                         .append("payload", new Document("vehicleId", vin)
-                                .append("spaceId", spaceNumberField.getText().trim())
+                                .append("spaceId", stoppedSpaceId)
                                 .append("areaName", areaName)
                                 .append("cost", costString))
                         .append("timestamp", java.time.Instant.now().getEpochSecond());
-                localOfflineTransactions.add(0, stopDoc);
-                saveLocalTransactions(vin);
 
                 String correlationId = UUID.randomUUID().toString(); // Tracing start
                 String clientIp = InetAddress.getLocalHost().getHostAddress();
                 String payload = String.format(
                         "{\"vehicleId\":\"%s\",\"spaceId\":\"%s\",\"areaName\":\"%s\",\"type\":\"stop\",\"cost\":\"%s\"}",
-                        vin, spaceNumberField.getText().trim(), areaName, costString);
+                        vin, stoppedSpaceId, areaName, costString);
                 MessageEnvelope envelope = MessageEnvelope
                         .createUnsigned("transaction.stop", payload, clientIp, correlationId).sign(signer);
 
-                boolean isOffline = false;
-                try {
-                    rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                        channel.basicPublish("", config.getTransactionsQueueName(), null,
-                                envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                        logger.info("[TRACE: " + correlationId + "] Published stop message to " + node.toAddress()
-                                + " (Queue declared)");
-                    });
-                } catch (Exception ex) {
-                    logger.error("Queue server is offline. Transaction processed in Offline Mode: " + ex.getMessage());
-                    isOffline = true;
-                }
-                return isOffline;
+                rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
+                    channel.basicPublish("", config.getTransactionsQueueName(), null,
+                            envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
+                    logger.info("[TRACE: " + correlationId + "] Published stop message to " + node.toAddress()
+                            + " and received broker confirmation");
+                });
+
+                // Update local history only after RabbitMQ confirms that Storage Server is consuming.
+                localOfflineTransactions.add(0, stopDoc);
+                saveLocalTransactions(vin);
+                return false;
             }
 
         };
 
         task.setOnSucceeded(e -> {
-            boolean isOffline = task.getValue();
             parkingStartTime = null;
             lastActiveSpaceBeforeStop = activeSpace;
             activeSpace = null;
-            if (isOffline) {
-                setStatus("🛑 Parking Stopped (Offline Mode)", false);
-            } else {
-                setStatus("🛑 Parking Stopped", false);
-            }
+            setStatus("Parking stopped successfully.", false);
         });
         task.setOnFailed(e -> {
-            logger.error("Failed to stop parking request.", e.getSource().getException());
-            setStatus("Error: " + e.getSource().getException().getMessage(), true);
+            Throwable failure = task.getException();
+            logger.error("Failed to stop parking request. The active parking session was preserved.", failure);
+            String message = failure != null && failure.getMessage() != null
+                    ? failure.getMessage()
+                    : "Unable to stop parking. Please verify that Storage Server is running.";
+            setStatus("Error: " + message, true);
         });
         new Thread(task).start();
     }
