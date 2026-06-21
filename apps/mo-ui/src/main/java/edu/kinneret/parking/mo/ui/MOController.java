@@ -30,6 +30,8 @@ public class MOController {
     private final ObservableList<Document> transactionItems = FXCollections.observableArrayList();
     private final ObservableList<Document> citationItems = FXCollections.observableArrayList();
     private final AtomicBoolean transactionRefreshInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean citationRefreshInProgress = new AtomicBoolean(false);
+    private volatile boolean citationBaselineLoaded;
 
     /**
      * Creates a new controller with the specified repository.
@@ -135,9 +137,10 @@ public class MOController {
      */
     public void attachButtons(Button txBtn, Button ctBtn) {
         txBtn.setOnAction(e -> refreshTransactions(true));
-        ctBtn.setOnAction(e -> handleCitations());
+        ctBtn.setOnAction(e -> refreshCitations(true));
         startTransactionAutoRefresh();
         refreshTransactions(true);
+        refreshCitations(false);
     }
 
     private void startTransactionAutoRefresh() {
@@ -155,6 +158,7 @@ public class MOController {
                             && header != null && header.startsWith("TRANSACTION REPORT")) {
                         refreshTransactions(false);
                     }
+                    refreshCitations(false);
                 });
             }
         }, "municipality-transaction-refresh");
@@ -263,8 +267,13 @@ public class MOController {
     /**
      * Handles the citation report request.
      */
-    private void handleCitations() {
-        setStatus("Fetching citations from cluster...", false);
+    private void refreshCitations(boolean announceRefresh) {
+        if (!citationRefreshInProgress.compareAndSet(false, true)) {
+            return;
+        }
+        if (announceRefresh) {
+            setStatus("Fetching citations from cluster...", false);
+        }
         Task<List<Document>> task = new Task<>() {
             @Override
             protected List<Document> call() {
@@ -282,12 +291,28 @@ public class MOController {
             }
         };
         task.setOnSucceeded(e -> {
+            citationRefreshInProgress.set(false);
+            int previousCount = citationItems.size();
             citationItems.setAll(task.getValue());
-            showTable(false);
-            tableHeader.setText("CITATION REPORT (" + citationItems.size() + ")");
-            setStatus("Success", false);
+            boolean newCitationArrived = citationBaselineLoaded && citationItems.size() > previousCount;
+            citationBaselineLoaded = true;
+            if (announceRefresh || newCitationArrived || citationsTable.isVisible()) {
+                showTable(false);
+                tableHeader.setText("CITATION REPORT (" + citationItems.size() + ")");
+            }
+            if (announceRefresh) {
+                setStatus("Success - automatic citation refresh is active", false);
+            } else if (newCitationArrived) {
+                setStatus("New citation received automatically", false);
+            }
         });
-        task.setOnFailed(e -> setStatus("Error: Failed to retrieve citation report from cluster.", true));
+        task.setOnFailed(e -> {
+            citationRefreshInProgress.set(false);
+            if (announceRefresh) {
+                setStatus("Error: Failed to retrieve citation report from cluster.", true);
+            }
+        });
+        task.setOnCancelled(e -> citationRefreshInProgress.set(false));
         new Thread(task).start();
     }
 

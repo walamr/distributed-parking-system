@@ -502,15 +502,12 @@ public class CustomerController {
                             localOldArea = "Unknown";
                         }
 
-                        // Add stop doc to local offline transactions
                         Document autoStopDoc = new Document("type", "transaction.stop")
                                 .append("payload", new Document("vehicleId", vin)
                                         .append("spaceId", oldActiveSpace)
                                         .append("areaName", localOldArea)
                                         .append("cost", costString))
                                 .append("timestamp", java.time.Instant.now().getEpochSecond());
-                        localOfflineTransactions.add(0, autoStopDoc);
-
                         String stopPayload = String.format(
                                 "{\"vehicleId\":\"%s\",\"spaceId\":\"%s\",\"areaName\":\"%s\",\"type\":\"stop\",\"cost\":\"%s\"}",
                                 vin, oldActiveSpace, localOldArea, costString);
@@ -524,21 +521,22 @@ public class CustomerController {
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
                             awaitTransactionPersistence(stopEnv);
+                            localOfflineTransactions.add(0, autoStopDoc);
+                            saveLocalTransactions(vin);
                             System.out.println("[CustomerUI] Auto-stopped previous local active session for VIN: " + vin
                                     + " in space " + oldActiveSpace + ", cost: " + costString);
                             logger.info("Auto-stopped previous local active session for VIN: " + vin + " in space "
                                     + oldActiveSpace);
                         } catch (Exception qex) {
-                            System.out.println(
-                                    "[CustomerUI] Queue offline while auto-stopping previous local session for VIN: "
-                                            + vin + ", space: " + oldActiveSpace);
-                            logger.warn(
-                                    "Queue offline while auto-stopping previous local active session for VIN: " + vin);
+                            throw new IllegalStateException(
+                                    "The previous parking session could not be stopped and saved.", qex);
                         }
                         stoppedLocalSession = true;
                     } catch (Exception ex) {
                         System.out.println("[CustomerUI] Error auto-stopping local active session: " + ex.getMessage());
                         logger.error("Error auto-stopping local active session: " + ex.getMessage(), ex);
+                        throw new IllegalStateException(
+                                "Cannot start a new parking session until the previous session is stopped.", ex);
                     }
                 }
 
@@ -594,8 +592,6 @@ public class CustomerController {
                                                 .append("areaName", dbArea)
                                                 .append("cost", costString))
                                         .append("timestamp", java.time.Instant.now().getEpochSecond());
-                                localOfflineTransactions.add(0, autoStopDoc);
-
                                 String stopPayload = String.format(
                                         "{\"vehicleId\":\"%s\",\"spaceId\":\"%s\",\"areaName\":\"%s\",\"type\":\"stop\",\"cost\":\"%s\"}",
                                         vin, dbSpaceId, dbArea, costString);
@@ -608,19 +604,20 @@ public class CustomerController {
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
                                     awaitTransactionPersistence(stopEnv);
+                                    localOfflineTransactions.add(0, autoStopDoc);
+                                    saveLocalTransactions(vin);
                                     System.out.println("[CustomerUI] Auto-stopped previous active DB session for VIN: "
                                             + vin + " in space " + dbSpaceId + ", cost: " + costString);
                                     logger.info("Auto-stopped previous active DB session for VIN: " + vin + " in space "
                                             + dbSpaceId);
                                 } catch (Exception qex) {
-                                    System.out.println(
-                                            "[CustomerUI] Queue offline while auto-stopping previous active DB session for VIN: "
-                                                    + vin + ", space: " + dbSpaceId);
-                                    logger.warn("Queue offline while auto-stopping previous DB active session for VIN: "
-                                            + vin);
+                                    throw new IllegalStateException(
+                                            "The active database parking session could not be stopped and saved.", qex);
                                 }
                             }
                         }
+                    } catch (IllegalStateException ex) {
+                        throw ex;
                     } catch (Exception ex) {
                         System.out.println("[CustomerUI] Warning checking active DB sessions: " + ex.getMessage());
                         logger.warn("Database offline or unreachable while checking active parking sessions: "
@@ -683,8 +680,10 @@ public class CustomerController {
         task.setOnFailed(e -> {
             Throwable ex = e.getSource().getException();
             logger.error("Failed to start parking request.", ex);
-            String genericMsg = "Unable to process request. Please try again later.";
-            setStatus("Error: " + genericMsg, true);
+            String message = ex instanceof IllegalStateException && ex.getMessage() != null
+                    ? ex.getMessage()
+                    : "Unable to process request. Please try again later.";
+            setStatus("Error: " + message, true);
         });
         new Thread(task).start();
     }

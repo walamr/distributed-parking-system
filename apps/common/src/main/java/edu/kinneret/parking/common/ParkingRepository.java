@@ -320,7 +320,7 @@ public class ParkingRepository implements AutoCloseable {
 
     /**
      * Retrieves all recorded citations.
-     * Uses ReadPreference.SECONDARY_PREFERRED to offload cluster load from the primary node.
+     * Reads from the primary so newly persisted citations are immediately visible.
      *
      * @return the ordered list of stored citation documents
      */
@@ -328,11 +328,23 @@ public class ParkingRepository implements AutoCloseable {
         List<Document> results = new ArrayList<>();
         if (!isDbOnline || database == null) return results;
         database.getCollection("citations")
-                .withReadPreference(ReadPreference.secondaryPreferred())
+                .withReadPreference(ReadPreference.primary())
                 .find()
                 .sort(Sorts.orderBy(Sorts.descending("timestamp"), Sorts.descending("storedAt")))
                 .into(results);
         return results;
+    }
+
+    /** Checks whether the storage server persisted a citation on the primary. */
+    public boolean isCitationPersisted(String messageId) {
+        if (database == null || messageId == null || messageId.isBlank()) {
+            return false;
+        }
+        return database.getCollection("citations")
+                .withReadPreference(ReadPreference.primary())
+                .find(Filters.eq("messageId", messageId))
+                .projection(new Document("_id", 1))
+                .first() != null;
     }
 
     /**

@@ -322,9 +322,10 @@ public class PEOController {
                 ValidationUtils.validateParkingPayload(payload, config.getMaxAllowedAmount(), "citation.issue");
                 MessageEnvelope envelope = MessageEnvelope.createUnsigned("citation.issue", payload, clientIp, correlationId).sign(signer);
                 
-                rabbitManager.withChannel((channel, node) -> {
+                rabbitManager.withPublisherConfirms((channel, node) -> {
                     channel.basicPublish("", config.getCitationsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                 });
+                awaitCitationPersistence(envelope);
                 return null;
             }
         };
@@ -338,6 +339,18 @@ public class PEOController {
         });
         task.setOnFailed(e -> setOutput("Error: Service temporarily unavailable.", true));
         new Thread(task).start();
+    }
+
+    private void awaitCitationPersistence(MessageEnvelope envelope) throws InterruptedException {
+        String messageId = envelope.getMessageId().toString();
+        for (int attempt = 0; attempt < 50; attempt++) {
+            if (repository.isCitationPersisted(messageId)) {
+                return;
+            }
+            Thread.sleep(100L);
+        }
+        throw new IllegalStateException(
+                "Storage Server did not confirm citation persistence within 5 seconds.");
     }
 
     /**
