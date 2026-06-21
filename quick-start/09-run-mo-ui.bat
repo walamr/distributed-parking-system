@@ -12,7 +12,7 @@ echo ==================================================
 set /p mode="Select Option [Default 1] > "
 
 set run_task=:mo-ui:runCLI
-if "%mode%"=="2" set run_task=:mo-ui:run
+if "%mode%"=="2" set run_task=:mulligan-app:run
 
 echo.
 echo Starting MO Application...

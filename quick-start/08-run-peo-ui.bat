@@ -12,7 +12,7 @@ echo ==================================================
 set /p mode="Select Option [Default 1] > "
 
 set run_task=:peo-ui:runCLI
-if "%mode%"=="2" set run_task=:peo-ui:run
+if "%mode%"=="2" set run_task=:mulligan-app:run
 
 echo.
 echo Starting PEO Application...
