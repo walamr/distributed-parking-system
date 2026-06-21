@@ -516,7 +516,7 @@ public class CustomerController {
                                 stopClientIp, UUID.randomUUID().toString()).sign(signer);
 
                         try {
-                            rabbitManager.withPublisherConfirms((channel, node) -> {
+                            rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
                                 channel.basicPublish("", config.getTransactionsQueueName(), null,
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
@@ -598,7 +598,7 @@ public class CustomerController {
                                 MessageEnvelope stopEnv = MessageEnvelope.createUnsigned("transaction.stop",
                                         stopPayload, stopClientIp, UUID.randomUUID().toString()).sign(signer);
                                 try {
-                                    rabbitManager.withPublisherConfirms((channel, node) -> {
+                                    rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
                                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
@@ -644,7 +644,7 @@ public class CustomerController {
 
                 boolean isOffline = false;
                 try {
-                    rabbitManager.withPublisherConfirms((channel, node) -> {
+                    rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                 envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                         logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress());
@@ -779,7 +779,7 @@ public class CustomerController {
 
                 boolean isOffline = false;
                 try {
-                    rabbitManager.withPublisherConfirms((channel, node) -> {
+                    rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
                         channel.basicPublish("", config.getTransactionsQueueName(), null,
                                 envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                         logger.info("[TRACE: " + correlationId + "] Published stop message to " + node.toAddress()
@@ -1340,11 +1340,7 @@ public class CustomerController {
                 // R1-Aesthetic-Premium)
                 statusLabel.setStyle(null);
                 statusLabel.getStyleClass().removeAll("status-label-error", "status-label-ok");
-                if (message.contains("Started")) {
-                    statusLabel.getStyleClass().add("status-label-ok");
-                } else if (message.contains("Stopped")) {
-                    statusLabel.getStyleClass().add("status-label-ok");
-                }
+                statusLabel.getStyleClass().add("status-label-ok");
             }
 
             if (message != null && !message.isEmpty()) {

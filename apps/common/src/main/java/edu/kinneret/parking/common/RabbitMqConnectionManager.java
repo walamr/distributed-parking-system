@@ -75,6 +75,28 @@ public final class RabbitMqConnectionManager {
     }
 
     /**
+     * Publishes with confirms only when the target queue has an active consumer.
+     * This prevents client UIs from reporting success while storage-server is down.
+     *
+     * @param queueName target durable queue
+     * @param channelConsumer publishing action
+     */
+    public void withPublisherConfirmsForQueue(String queueName, ChannelConsumer channelConsumer) {
+        String validatedQueue = ValidationUtils.requireValidQueueName(queueName, "queueName");
+        withChannel((channel, node) -> {
+            com.rabbitmq.client.AMQP.Queue.DeclareOk queueStatus = channel.queueDeclarePassive(validatedQueue);
+            if (queueStatus.getConsumerCount() < 1) {
+                throw new IOException("Storage Server is not consuming from " + validatedQueue + ".");
+            }
+            channel.confirmSelect();
+            channelConsumer.accept(channel, node);
+            if (!channel.waitForConfirms(5000)) {
+                throw new IOException("RabbitMQ message was not confirmed by the broker within timeout.");
+            }
+        });
+    }
+
+    /**
      * Opens a channel and automatically closes the underlying connection when the action finishes.
      *
      * @param channelConsumer the action to execute with an active channel

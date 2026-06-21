@@ -27,6 +27,7 @@ $RABBIT3_IP = $config["RABBIT3_IP"]
 $RECOMMENDER1_IP = $config["RECOMMENDER1_IP"]
 $RECOMMENDER2_IP = $config["RECOMMENDER2_IP"]
 $RECOMMENDER3_IP = $config["RECOMMENDER3_IP"]
+$NETWORK_HMAC_SECRET = $config["HMAC_SECRET"]
 
 Write-Host "=================================================="
 Write-Host "  Distributed Setup Configuration"
@@ -36,7 +37,7 @@ Write-Host "RabbitMQ : $RABBIT1_IP, $RABBIT2_IP, $RABBIT3_IP"
 Write-Host "Recommender : $RECOMMENDER1_IP, $RECOMMENDER2_IP, $RECOMMENDER3_IP"
 Write-Host "=================================================="
 
-$required = @("MONGO1_IP", "MONGO2_IP", "MONGO3_IP", "RABBIT1_IP", "RABBIT2_IP", "RABBIT3_IP", "RECOMMENDER1_IP", "RECOMMENDER2_IP", "RECOMMENDER3_IP")
+$required = @("MONGO1_IP", "MONGO2_IP", "MONGO3_IP", "RABBIT1_IP", "RABBIT2_IP", "RABBIT3_IP", "RECOMMENDER1_IP", "RECOMMENDER2_IP", "RECOMMENDER3_IP", "HMAC_SECRET")
 foreach ($key in $required) {
     if (-not $config[$key]) {
         Write-Error "Required value $key is missing from $ConfigFile"
@@ -63,7 +64,10 @@ if (Test-Path ".env") {
 }
 
 # Dynamically generate a 256-bit cryptographically secure random key if not already present
-if ($EXISTING_HMAC_SECRET) {
+if ($NETWORK_HMAC_SECRET) {
+    $DYNAMIC_HMAC_SECRET = $NETWORK_HMAC_SECRET
+}
+elseif ($EXISTING_HMAC_SECRET) {
     $DYNAMIC_HMAC_SECRET = $EXISTING_HMAC_SECRET
 }
 else {

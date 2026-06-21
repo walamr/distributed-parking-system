@@ -425,6 +425,14 @@ public final class AppConfig {
                 loadEnvFile("../" + profileEnvFile, env);
                 loadEnvFile("../../" + profileEnvFile, env);
             }
+            // Cluster-wide settings must override per-PC files. In particular, every
+            // publisher and storage-server must use the same HMAC secret.
+            String[] sharedConfigPaths = {
+                    "network-ips.env", "../network-ips.env", "../../network-ips.env"
+            };
+            for (String sharedConfigPath : sharedConfigPaths) {
+                loadEnvFile(sharedConfigPath, env);
+            }
             // Re-apply network IPs to ensure localhost overrides are kept
             overrideWithNetworkIps(env);
         }

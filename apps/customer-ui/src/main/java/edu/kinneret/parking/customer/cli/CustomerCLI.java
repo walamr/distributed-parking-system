@@ -214,7 +214,7 @@ public class CustomerCLI {
             String clientIp = InetAddress.getLocalHost().getHostAddress();
             MessageEnvelope envelope = MessageEnvelope.createUnsigned("transaction." + type, payload, clientIp, correlationId).sign(signer);
             
-            manager.withPublisherConfirms((channel, node) -> {
+            manager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
                 channel.basicPublish("", config.getTransactionsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
             });
             System.out.println(publishSuccessMessage(type));

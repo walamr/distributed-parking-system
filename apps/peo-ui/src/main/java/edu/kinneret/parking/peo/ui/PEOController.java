@@ -322,7 +322,7 @@ public class PEOController {
                 ValidationUtils.validateParkingPayload(payload, config.getMaxAllowedAmount(), "citation.issue");
                 MessageEnvelope envelope = MessageEnvelope.createUnsigned("citation.issue", payload, clientIp, correlationId).sign(signer);
                 
-                rabbitManager.withPublisherConfirms((channel, node) -> {
+                rabbitManager.withPublisherConfirmsForQueue(config.getCitationsQueueName(), (channel, node) -> {
                     channel.basicPublish("", config.getCitationsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                 });
                 return null;
