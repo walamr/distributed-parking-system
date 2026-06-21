@@ -27,22 +27,31 @@ public class ParkingRepository implements AutoCloseable {
      */
     public static volatile boolean isDbOnline = true;
 
+    private static final java.util.Set<AppConfig> activeConfigs = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     static {
         Thread monitorThread = new Thread(() -> {
             while (true) {
-                try {
-                    edu.kinneret.parking.common.AppConfig config = edu.kinneret.parking.common.AppConfig.fromEnvironment(edu.kinneret.parking.common.AppConfig.ApplicationProfile.MO_UI);
+                boolean anyOnline = false;
+                java.util.List<AppConfig> configsToCheck = new java.util.ArrayList<>(activeConfigs);
+                if (configsToCheck.isEmpty()) {
+                    try {
+                        configsToCheck.add(edu.kinneret.parking.common.AppConfig.fromEnvironment(edu.kinneret.parking.common.AppConfig.ApplicationProfile.MO_UI));
+                    } catch (Exception ignored) {}
+                }
+
+                for (AppConfig config : configsToCheck) {
                     try (edu.kinneret.parking.common.ParkingRepository repo = new edu.kinneret.parking.common.ParkingRepository(config)) {
                         if (repo.getDatabase() != null) {
                             repo.getDatabase().runCommand(new org.bson.Document("ping", 1));
-                            isDbOnline = true;
-                        } else {
-                            isDbOnline = false;
+                            anyOnline = true;
+                            break;
                         }
+                    } catch (Exception e) {
+                        // ignore and try next configuration
                     }
-                } catch (Exception e) {
-                    isDbOnline = false;
                 }
+                isDbOnline = anyOnline;
                 try {
                     Thread.sleep(8000);
                 } catch (InterruptedException e) {
@@ -60,6 +69,9 @@ public class ParkingRepository implements AutoCloseable {
      * @param config the application configuration used to reach MongoDB
      */
     public ParkingRepository(AppConfig config) {
+        if (config != null) {
+            activeConfigs.add(config);
+        }
         MongoConnectionManager tempMgr = null;
         MongoDatabase tempDb = null;
         try {
