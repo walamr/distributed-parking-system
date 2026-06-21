@@ -281,7 +281,7 @@ public class RecommenderServer implements AutoCloseable {
             switch (type) {
                 case "CLIENT_QUERY" -> handleClientQuery(spaceId, correlationId, vehicleId, writer);
                 case "FORWARD_QUERY" -> handleForwardQuery(request, writer);
-                case "COLLECT_REQUEST" -> handleCollectRequest(spaceId, correlationId, writer);
+                case "COLLECT_REQUEST" -> handleCollectRequest(spaceId, correlationId, vehicleId, writer);
                 default -> throw new IllegalArgumentException("Unsupported recommender message type.");
             }
         } catch (IllegalArgumentException e) {
@@ -395,10 +395,10 @@ public class RecommenderServer implements AutoCloseable {
      * @param writer writer used to return the signed collect response
      * @return no return value
      */
-    private void handleCollectRequest(String spaceId, String correlationId, PrintWriter writer) {
+    private void handleCollectRequest(String spaceId, String correlationId, String vehicleId, PrintWriter writer) {
         try {
             String localResult = calculateLocalRecommendation(spaceId);
-            displayLocalRecommendation(spaceId, "-", localResult);
+            displayLocalRecommendation(spaceId, vehicleId, localResult);
             JsonObject response = createSignedMessage("COLLECT_RESPONSE", spaceId, correlationId, nodeId);
             response.addProperty("localResult", localResult);
             signMessage(response, signer);
@@ -445,7 +445,7 @@ public class RecommenderServer implements AutoCloseable {
  */
 
     private void sendConsensusResponse(String spaceId, String correlationId, String vehicleId, PrintWriter writer, Map<String, String> explicitVotes) {
-        String consensus = executeLeaderConsensus(spaceId, explicitVotes);
+        String consensus = executeLeaderConsensus(spaceId, vehicleId, explicitVotes);
         JsonObject response = createSignedMessage("CLIENT_RESPONSE", spaceId, correlationId, nodeId);
         if (consensus != null) {
             response.addProperty("status", "SUCCESS");
@@ -490,10 +490,10 @@ public class RecommenderServer implements AutoCloseable {
 
  */
 
-    private String executeLeaderConsensus(String spaceId, Map<String, String> explicitVotes) {
+    private String executeLeaderConsensus(String spaceId, String vehicleId, Map<String, String> explicitVotes) {
         Map<String, String> votes = new ConcurrentHashMap<>();
         String localResult = calculateLocalRecommendation(spaceId);
-        displayLocalRecommendation(spaceId, "-", localResult);
+        displayLocalRecommendation(spaceId, vehicleId, localResult);
         votes.put(nodeId, localResult);
         votes.putAll(explicitVotes);
 
@@ -517,6 +517,9 @@ public class RecommenderServer implements AutoCloseable {
                         try (PrintWriter collectWriter = new PrintWriter(collectSocket.getOutputStream(), true);
                              BufferedReader collectReader = new BufferedReader(new InputStreamReader(collectSocket.getInputStream()))) {
                             JsonObject collectRequest = createSignedMessage("COLLECT_REQUEST", spaceId, UUID.randomUUID().toString(), nodeId);
+                            if (vehicleId != null && !"-".equals(vehicleId)) {
+                                collectRequest.addProperty("vehicleId", vehicleId);
+                            }
                             signMessage(collectRequest, signer);
                             collectWriter.println(collectRequest);
 
