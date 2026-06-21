@@ -309,6 +309,17 @@ public final class AppConfig {
                 env.put("MONGO1_IP", "127.0.0.1");
                 env.put("MONGO2_IP", "127.0.0.1");
                 env.put("MONGO3_IP", "127.0.0.1");
+            } else if (isWindowsOrMac && isPrivateDockerSubnet(mongo1)) {
+                // On Windows/Mac connecting to a remote Docker network (e.g. 10.0.x.x lab machines),
+                // TLS certificates are issued for internal container names/IPs, not for the external IPs.
+                // We must allow invalid hostnames so the TLS handshake succeeds.
+                env.put("RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+                env.put("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "true");
+                r1p = "5671"; r2p = "5671"; r3p = "5671";
+                m1p = "27017"; m2p = "27017"; m3p = "27017";
+                env.put("MONGO1_IP", mongo1);
+                env.put("MONGO2_IP", mongo2);
+                env.put("MONGO3_IP", mongo3);
             } else {
                 r1p = "5671"; r2p = "5671"; r3p = "5671";
                 m1p = "27017"; m2p = "27017"; m3p = "27017";
