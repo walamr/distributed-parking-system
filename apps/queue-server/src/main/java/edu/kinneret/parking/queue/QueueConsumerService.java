@@ -42,7 +42,9 @@ public final class QueueConsumerService {
                 connectionManager,
                 new QueueMessageSecurityValidator(
                         new SecureMessageSigner(appConfig.getHmacSecret()), 
-                        appConfig != null ? new NonceStore(appConfig) : new NonceStore(60)));
+                        appConfig != null ? new NonceStore(appConfig) : new NonceStore(1200),
+                        java.time.Clock.systemUTC(),
+                        appConfig != null ? appConfig.getNonceTtlSeconds() : 1200));
     }
 
     /**
@@ -146,10 +148,11 @@ public final class QueueConsumerService {
                     if (repository != null) {
                         repository.storeMessage(envelope);
                     }
+                    channel.basicAck(deliveryTag, false);
                 } catch (Exception ex) {
                     logger.warning("Failed to store validated queue message: " + SecurityLogger.sanitize(ex.getMessage()));
+                    channel.basicReject(deliveryTag, false);
                 }
-                channel.basicAck(deliveryTag, false);
             } else {
                 channel.basicReject(deliveryTag, false);
                 // LOG ON SERVER SIDE ONLY (Hardening R1-E-01)

@@ -25,7 +25,7 @@ public final class AppConfig {
     private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 5000;
     private static final long DEFAULT_RABBITMQ_RECOVERY_INTERVAL_MS = 5000;
     private static final String DEFAULT_HMAC_SECRET = "";
-    private static final long DEFAULT_NONCE_TTL_SECONDS = 60;
+    private static final long DEFAULT_NONCE_TTL_SECONDS = 1200;
     private static final double DEFAULT_MAX_ALLOWED_AMOUNT = 10000.0d;
 
     private final List<ClusterNode> rabbitMqNodes;

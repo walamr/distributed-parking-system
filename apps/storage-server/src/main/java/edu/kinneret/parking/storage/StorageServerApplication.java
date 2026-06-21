@@ -44,7 +44,9 @@ public class StorageServerApplication {
         SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/storage-security.log"));
         QueueMessageSecurityValidator validator = new QueueMessageSecurityValidator(
             new SecureMessageSigner(config.getHmacSecret()),
-            new NonceStore(config)
+            new NonceStore(config),
+            java.time.Clock.systemUTC(),
+            config.getNonceTtlSeconds()
         );
 
         MongoStorageService storageService = new MongoStorageService(config, "parking_db");
