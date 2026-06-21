@@ -18,9 +18,9 @@ Get-Content $ConfigFile | Where-Object { $_ -match "^\s*[^#].*=.*" } | ForEach-O
     $config[$parts[0].Trim()] = $parts[1].Trim()
 }
 
-$MONGO1_IP  = $config["MONGO1_IP"]
-$MONGO2_IP  = $config["MONGO2_IP"]
-$MONGO3_IP  = $config["MONGO3_IP"]
+$MONGO1_IP = $config["MONGO1_IP"]
+$MONGO2_IP = $config["MONGO2_IP"]
+$MONGO3_IP = $config["MONGO3_IP"]
 $RABBIT1_IP = $config["RABBIT1_IP"]
 $RABBIT2_IP = $config["RABBIT2_IP"]
 $RABBIT3_IP = $config["RABBIT3_IP"]
@@ -36,7 +36,7 @@ Write-Host "RabbitMQ : $RABBIT1_IP, $RABBIT2_IP, $RABBIT3_IP"
 Write-Host "Recommender : $RECOMMENDER1_IP, $RECOMMENDER2_IP, $RECOMMENDER3_IP"
 Write-Host "=================================================="
 
-$required = @("MONGO1_IP","MONGO2_IP","MONGO3_IP","RABBIT1_IP","RABBIT2_IP","RABBIT3_IP","RECOMMENDER1_IP","RECOMMENDER2_IP","RECOMMENDER3_IP")
+$required = @("MONGO1_IP", "MONGO2_IP", "MONGO3_IP", "RABBIT1_IP", "RABBIT2_IP", "RABBIT3_IP", "RECOMMENDER1_IP", "RECOMMENDER2_IP", "RECOMMENDER3_IP")
 foreach ($key in $required) {
     if (-not $config[$key] -or $config[$key] -match "^192\.168\.1\.(10[1-9]|110)$") {
         Write-Warning "Warning: $key = $($config[$key]) - This might be a placeholder"
@@ -61,7 +61,8 @@ if (Test-Path ".env") {
 # Dynamically generate a 256-bit cryptographically secure random key if not already present
 if ($EXISTING_HMAC_SECRET) {
     $DYNAMIC_HMAC_SECRET = $EXISTING_HMAC_SECRET
-} else {
+}
+else {
     $bytes = New-Object Byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $DYNAMIC_HMAC_SECRET = [System.BitConverter]::ToString($bytes) -replace '-'
@@ -70,7 +71,8 @@ if ($EXISTING_HMAC_SECRET) {
 # Dynamically generate a cryptographically secure random Erlang cookie if not already present
 if ($EXISTING_ERLANG_COOKIE) {
     $DYNAMIC_ERLANG_COOKIE = $EXISTING_ERLANG_COOKIE
-} else {
+}
+else {
     $cookieBytes = New-Object Byte[] 24
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($cookieBytes)
     $DYNAMIC_ERLANG_COOKIE = [System.BitConverter]::ToString($cookieBytes) -replace '-'
@@ -79,7 +81,8 @@ if ($EXISTING_ERLANG_COOKIE) {
 # Dynamically generate a cryptographically secure random keystore/truststore password if not already present
 if ($EXISTING_KEYSTORE_PASSWORD) {
     $DYNAMIC_KEYSTORE_PASSWORD = $EXISTING_KEYSTORE_PASSWORD
-} else {
+}
+else {
     $keystoreBytes = New-Object Byte[] 16
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($keystoreBytes)
     $DYNAMIC_KEYSTORE_PASSWORD = [System.BitConverter]::ToString($keystoreBytes) -replace '-'
@@ -92,12 +95,13 @@ function Get-CommonEnvContent {
     if ($isLocal) {
         $R1_P = "5671"; $R2_P = "5673"; $R3_P = "5674"
         $M1_P = "27017"; $M2_P = "27018"; $M3_P = "27019"
-    } else {
+    }
+    else {
         $R1_P = "5671"; $R2_P = "5671"; $R3_P = "5671"
         $M1_P = "27017"; $M2_P = "27017"; $M3_P = "27017"
     }
 
-  return @"
+    return @"
 RABBITMQ_NODES=${RABBIT1_IP}:${R1_P},${RABBIT2_IP}:${R2_P},${RABBIT3_IP}:${R3_P}
 RABBITMQ_VHOST=/parking
 RABBITMQ_TLS_ENABLED=true
@@ -105,6 +109,8 @@ RABBITMQ_TRUSTSTORE_PATH=docker/rabbitmq/certs/truststore.jks
 RABBITMQ_TRUSTSTORE_PASSWORD=password
 RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
 RABBITMQ_KEYSTORE_PASSWORD=password
+TLS_SERVER_KEYSTORE_PATH=docker/rabbitmq/certs/server-keystore.jks
+TLS_SERVER_KEYSTORE_PASSWORD=password
 RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
 RABBITMQ_CONNECTION_TIMEOUT_MS=5000
 RABBITMQ_RECOVERY_INTERVAL_MS=5000
@@ -241,7 +247,8 @@ $isLocal = ($MONGO1_IP -eq $MONGO2_IP)
 if ($isLocal) {
     $R1_P = "5671"; $R2_P = "5673"; $R3_P = "5674"
     $M1_P = "27017"; $M2_P = "27018"; $M3_P = "27019"
-} else {
+}
+else {
     $R1_P = "5671"; $R2_P = "5671"; $R3_P = "5671"
     $M1_P = "27017"; $M2_P = "27017"; $M3_P = "27017"
 }
@@ -254,6 +261,8 @@ RABBITMQ_TRUSTSTORE_PATH=docker/rabbitmq/certs/truststore.jks
 RABBITMQ_TRUSTSTORE_PASSWORD=password
 RABBITMQ_KEYSTORE_PATH=docker/rabbitmq/certs/keystore.jks
 RABBITMQ_KEYSTORE_PASSWORD=password
+TLS_SERVER_KEYSTORE_PATH=docker/rabbitmq/certs/server-keystore.jks
+TLS_SERVER_KEYSTORE_PASSWORD=password
 RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
 
 MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin

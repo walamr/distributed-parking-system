@@ -281,11 +281,14 @@ public final class AppConfig {
             
             String os = System.getProperty("os.name", "").toLowerCase();
             boolean isWindowsOrMac = os.contains("win") || os.contains("mac");
+            boolean isLocal = mongo1.equals(mongo2) || mongo1.equals("127.0.0.1") || mongo1.equals("localhost");
+            
+            System.out.println("[AppConfig] mongo1=" + mongo1 + ", mongo2=" + mongo2 + ", isLocal=" + isLocal + ", isWindowsOrMac=" + isWindowsOrMac);
             
             String r1p, r2p, r3p;
             String m1p, m2p, m3p;
             
-            if (isWindowsOrMac) {
+            if (isWindowsOrMac && isLocal) {
                 // On Windows/Mac, Docker Desktop exposes ports on localhost.
                 // We must tell TLS to allow invalid hostnames since we connect via localhost
                 // but the certificates only contain the internal 10.x IPs or container names.
