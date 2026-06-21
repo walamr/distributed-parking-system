@@ -1,7 +1,7 @@
 db = db.getSiblingDB("parking_db");
 
 print("\n\n### 1. Transactions sorted by timestamp (oldest to newest) ###");
-printjson(db.transactions.find().sort({timestamp: 1}).toArray());
+printjson(db.transactions.find().sort({timestamp: 1, storedAt: 1, _id: 1}).toArray());
 
 print("\n\n### 2. Citations sorted by timestamp (oldest to newest) ###");
 printjson(db.citations.find().sort({timestamp: 1}).toArray());

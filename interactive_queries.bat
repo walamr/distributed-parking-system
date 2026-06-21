@@ -62,8 +62,8 @@ echo 0. Return to Node selection
 echo =========================================================
 set /p choice="Enter the query number (0-9): "
 
-set "MONGO_CMD=docker exec -i %MONGO_NODE% mongosh --host localhost --port 27017 -u mulligan_db_admin -p db_pwd_rotated_admin --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem parking_db --quiet --eval"
-set "READ_PREF=db.getMongo().setReadPref('secondaryPreferred'); "
+set "MONGO_CMD=docker exec -i %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27017,mongo3:27017/parking_db?replicaSet=rs0^&authSource=admin" --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem --quiet --eval"
+set "READ_PREF=db.getMongo().setReadPref('primary'); "
 
 if "%choice%"=="9" goto EXIT_SCRIPT
 if "%choice%"=="1" goto Q1
@@ -81,7 +81,7 @@ goto MENU
 
 :Q1
 echo Fetching data from %MONGO_NODE%...
-%MONGO_CMD% "%READ_PREF% printjson(db.transactions.find().sort({timestamp: 1}).toArray())"
+%MONGO_CMD% "%READ_PREF% const events=db.transactions.find().sort({timestamp:1,storedAt:1,_id:1}).toArray(); print('Total parking events: '+events.length); printjson(events)"
 if errorlevel 1 echo ERROR: MongoDB query failed. Check the message above and verify the replica set, credentials, and TLS files.
 goto MENU
 
