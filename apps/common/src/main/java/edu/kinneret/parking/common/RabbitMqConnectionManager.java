@@ -39,7 +39,17 @@ public final class RabbitMqConnectionManager {
         for (ClusterNode node : nodesToTry) {
             try {
                 ConnectionFactory factory = buildFactory(node);
-                Connection connection = factory.newConnection("queue-server");
+                
+                // Build failover address list starting with the target node, then adding other enabled nodes
+                List<com.rabbitmq.client.Address> addresses = new java.util.ArrayList<>();
+                addresses.add(new com.rabbitmq.client.Address(node.getHost(), node.getPort()));
+                for (ClusterNode other : appConfig.getRabbitMqNodes()) {
+                    if (other.isEnabled() && !other.equals(node)) {
+                        addresses.add(new com.rabbitmq.client.Address(other.getHost(), other.getPort()));
+                    }
+                }
+
+                Connection connection = factory.newConnection(addresses, "queue-server");
                 clusterClientSelector.reportSuccess(node); // --- NEW: Reset failure counter ---
                 return new ConnectionHandle(connection, node);
             } catch (IOException | TimeoutException ex) {
