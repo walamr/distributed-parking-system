@@ -315,9 +315,23 @@ public class CustomerCLI {
             }
         }
 
+        // Look up the zone/area name for this space (same as GUI versions do)
+        String areaName = "";
+        if (repository != null) {
+            try {
+                String zone = repository.getSpaceZone(safeSpace);
+                if (zone != null) areaName = zone;
+            } catch (Exception ignored) {
+                // areaName is optional — leave it empty if DB is unreachable
+            }
+        }
+
         JsonObject payload = new JsonObject();
         payload.addProperty("vehicleId", safeVin);
         payload.addProperty("spaceId", safeSpace);
+        if (!areaName.isEmpty()) {
+            payload.addProperty("areaName", areaName);
+        }
         payload.addProperty("type", safeType);
         if ("stop".equals(safeType)) {
             payload.addProperty("cost", costString);

@@ -112,6 +112,11 @@ public class RecommenderServerApplication extends Application {
         }
 
         SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/recommender-security.log"));
+
+        // Suppress noisy background infrastructure logs (same pattern as CustomerCLI)
+        java.util.logging.Logger.getLogger("edu.kinneret.parking.common.MongoConnectionManager").setLevel(java.util.logging.Level.WARNING);
+        java.util.logging.Logger.getLogger("edu.kinneret.parking.common.NonceStore").setLevel(java.util.logging.Level.WARNING);
+        java.util.logging.Logger.getLogger("edu.kinneret.parking.common.AppConfig").setLevel(java.util.logging.Level.WARNING);
         AppConfig appConfig = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.QUEUE_SERVER);
 
         // Fallback to AppConfig for recommender nodes if not explicitly configured in system property or CLI arguments
@@ -340,58 +345,67 @@ public class RecommenderServerApplication extends Application {
      */
     private static void runConsoleMenu() {
         try (Scanner scanner = new Scanner(System.in)) {
-            System.out.println("==========================================");
-            System.out.println("   RECOMMENDER NODE '" + nodeId + "' CLI");
-            System.out.println("==========================================");
-            System.out.println("Listen Port: " + port);
-            System.out.println("Leader status: " + isLeader);
+            System.out.println("\n+--------------------------------------------------+");
+            System.out.println("|     MULLIGAN PARKING - RECOMMENDER NODE CLI      |");
+            System.out.println("+--------------------------------------------------+");
+            System.out.printf( "|  Node ID   : %-35s |%n", nodeId);
+            System.out.printf( "|  Port      : %-35s |%n", port);
+            System.out.printf( "|  Role      : %-35s |%n", isLeader ? "LEADER (Coordinator)" : "FOLLOWER");
+            System.out.println("+--------------------------------------------------+");
+            System.out.println("|  Node is RUNNING and listening for queries.      |");
+            System.out.println("+--------------------------------------------------+");
+
+            if (!scanner.hasNextLine()) {
+                // Non-interactive mode (e.g. Docker) — keep alive silently
+                while (true) {
+                    try { Thread.sleep(3600000); } catch (InterruptedException e) { break; }
+                }
+                return;
+            }
 
             while (true) {
-                System.out.println("\nNode Mode: " + (server.isMalicious() ? "MALICIOUS" : "NORMAL"));
-                System.out.println("Malicious Payload: " + server.getMaliciousPayload());
-                System.out.println("Options: [p] Change Malicious Payload, [m] Toggle Malicious Mode, [q] Quit Node");
-                System.out.print("Select: ");
+                String modeLabel = server.isMalicious()
+                        ? "MALICIOUS (payload: " + server.getMaliciousPayload() + ")"
+                        : "NORMAL";
+                System.out.println("\n==================================================");
+                System.out.println("  MODE   : " + modeLabel);
+                System.out.println("==================================================");
+                System.out.println("  [1] Toggle Malicious Mode");
+                System.out.println("  [2] Change Malicious Payload");
+                System.out.println("  [3] Exit / Stop Node");
+                System.out.println("--------------------------------------------------");
+                System.out.print("Select Option > ");
 
-                if (!scanner.hasNextLine()) {
-                    // Keep the process alive in non-interactive environment (e.g. Docker)
-                    while (true) {
-                        try {
-                            Thread.sleep(3600000);
-                        } catch (InterruptedException e) {
-                            break;
-                        }
-                    }
-                    break;
-                }
+                if (!scanner.hasNextLine()) break;
+                String input = scanner.nextLine().trim();
 
-                String input = scanner.nextLine().trim().toLowerCase();
-
-                if ("q".equals(input)) {
-                    System.out.println("Stopping Recommender Node...");
-                    server.close();
-                    break;
-                } else if ("m".equals(input)) {
-                    boolean nextState = !server.isMalicious();
-                    server.setMalicious(nextState);
-                    System.out.println("SUCCESS: Toggled malicious mode to: " + nextState);
-                } else if ("p".equals(input)) {
-                    System.out.print("Enter the fake Lot ID (e.g. 5): ");
-                    if (scanner.hasNextLine()) {
-                        String fakeLot = scanner.nextLine().trim();
-                        System.out.print("Enter the fake Space ID (e.g. 1): ");
+                switch (input) {
+                    case "1":
+                        boolean nextState = !server.isMalicious();
+                        server.setMalicious(nextState);
+                        System.out.println("\n>>> " + (nextState ? "MALICIOUS mode ENABLED." : "Returned to NORMAL mode."));
+                        break;
+                    case "2":
+                        System.out.print("Enter fake Space ID to recommend (e.g. 5): ");
                         if (scanner.hasNextLine()) {
                             String fakeSpace = scanner.nextLine().trim();
-                            String newPayload = fakeLot + ";" + fakeSpace;
+                            String newPayload = fakeSpace + ";0";
                             try {
                                 server.setMaliciousPayload(newPayload);
-                                System.out.println("SUCCESS: Changed malicious payload to: " + server.getMaliciousPayload());
+                                System.out.println("\n>>> Malicious payload set to: " + server.getMaliciousPayload());
                             } catch (IllegalArgumentException ex) {
-                                System.out.println("ERROR: " + ex.getMessage());
+                                System.out.println("\n>>> ERROR: " + ex.getMessage());
                             }
                         }
-                    }
-                } else {
-                    System.out.println("Invalid option.");
+                        break;
+                    case "3":
+                        System.out.println("\n>>> Stopping Recommender Node '" + nodeId + "'...");
+                        server.close();
+                        System.out.println(">>> Node stopped. Goodbye.");
+                        System.exit(0);
+                        break;
+                    default:
+                        System.out.println("\n>>> ERROR: Invalid option. Please enter 1, 2, or 3.");
                 }
             }
         }
