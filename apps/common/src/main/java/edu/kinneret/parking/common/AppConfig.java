@@ -287,7 +287,12 @@ public final class AppConfig {
             if (cachedIsLocal != null) {
                 isLocal = cachedIsLocal;
             } else {
-                isLocal = mongo1.equals(mongo2) || mongo1.equals("127.0.0.1") || mongo1.equals("localhost") || !isAddressReachable(mongo1, 27017, 800);
+                boolean isDifferentIps = mongo1 != null && mongo2 != null && !mongo1.trim().equalsIgnoreCase(mongo2.trim());
+                if (isDifferentIps) {
+                    isLocal = false;
+                } else {
+                    isLocal = mongo1 == null || mongo1.equals("127.0.0.1") || mongo1.equals("localhost") || !isAddressReachable(mongo1, 27017, 800);
+                }
                 cachedIsLocal = isLocal;
             }
             

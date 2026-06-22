@@ -69,9 +69,12 @@ public class MOCLI {
                         }
 
                         try {
-                            repository.registerUser(managerId, password, "mo", "");
-                            loggedInManager = managerId;
-                            System.out.println("SUCCESS: Authenticated as manager '" + managerId + "'.");
+                            if (repository.authenticateUser(managerId, password)) {
+                                loggedInManager = managerId;
+                                System.out.println("SUCCESS: Authenticated as manager '" + managerId + "'.");
+                            } else {
+                                System.out.println("ERROR: Invalid Manager ID or password. Please try again.");
+                            }
                         } catch (Exception e) {
                             System.err.println("ERROR: Unable to connect to the database cluster for login. Please try again.");
                         }

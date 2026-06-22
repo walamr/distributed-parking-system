@@ -49,4 +49,10 @@ for (let i = 1; i <= 100; i++) {
 }
 db.spaces.insertMany(spacesList);
 
+db.users.insertMany([
+  { username: "customer", password: "customer_secure_pass_2026", role: "Customer", vin: "604-95-839", createdAt: Date.now() },
+  { username: "peo_service", password: "peo_secure_pass_2026", role: "PEO", vin: "123456789", createdAt: Date.now() },
+  { username: "mulligan_admin", password: "admin_ultra_secure_99", role: "MO", vin: "999999999", createdAt: Date.now() }
+]);
+
 print("--- MongoDB Sample Data Imported Successfully ---");

@@ -70,9 +70,12 @@ public class PEOCLI {
                         }
 
                         try {
-                            repository.registerUser(officerId, password, "peo", "");
-                            loggedInOfficer = officerId;
-                            System.out.println("SUCCESS: Authenticated as officer '" + officerId + "'.");
+                            if (repository.authenticateUser(officerId, password)) {
+                                loggedInOfficer = officerId;
+                                System.out.println("SUCCESS: Authenticated as officer '" + officerId + "'.");
+                            } else {
+                                System.out.println("ERROR: Invalid Officer ID or password. Please try again.");
+                            }
                         } catch (Exception e) {
                             System.err.println("ERROR: Unable to connect to the database cluster for login. Please try again.");
                         }
