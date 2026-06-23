@@ -26,6 +26,13 @@ public final class RabbitMqTopologyInitializer {
 
     /**
      * Declares the required durable quorum queues.
+     *
+     * <p>This is the single place the quorum topology is created. It is intentionally NOT
+     * pre-declared in {@code definitions.json}, because each broker imports those definitions at
+     * its own boot; the first node to boot would then create the quorum queues while it is the only
+     * cluster member, fixing them to a single member. Declaring here, after queue-server has waited
+     * for the whole cluster to form, lets {@code x-quorum-initial-group-size=3} spread members
+     * across rabbit1/rabbit2/rabbit3 so the queues survive a single-node failure.
      */
     public void initialize() {
         connectionManager.withChannel((channel, activeNode) -> {

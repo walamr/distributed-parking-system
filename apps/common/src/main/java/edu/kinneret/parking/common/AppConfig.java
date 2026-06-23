@@ -32,6 +32,11 @@ public final class AppConfig {
     private static final int DEFAULT_MONGO_SOCKET_TIMEOUT_MS = 10000;
     private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 5000;
     private static final long DEFAULT_RABBITMQ_RECOVERY_INTERVAL_MS = 5000;
+    // Publisher confirms for a quorum queue are only positively acknowledged after the message is
+    // replicated to a majority of the queue's members. When one node is stopped, the queue briefly
+    // re-elects a Raft leader; 10s is generous enough to ride through that election without being so
+    // long that a genuinely unavailable queue hangs the UI. Combined with channel failover/retries.
+    private static final int DEFAULT_PUBLISH_CONFIRM_TIMEOUT_MS = 10000;
     private static final String DEFAULT_HMAC_SECRET = "";
     private static final long DEFAULT_NONCE_TTL_SECONDS = 1200;
     private static final double DEFAULT_MAX_ALLOWED_AMOUNT = 10000.0d;
@@ -53,6 +58,8 @@ public final class AppConfig {
     private final String mongoUri;
     private final int rabbitMqConnectionTimeoutMs;
     private final long rabbitMqRecoveryIntervalMs;
+    private final int rabbitMqPublishConfirmTimeoutMs;
+    private final int rabbitMqExpectedNodes;
     private final boolean mongoTlsEnabled;
     private final String mongoTlsCaCertPath;
     private final boolean mongoTlsAllowInvalidHostnames;
@@ -199,6 +206,8 @@ public final class AppConfig {
             String mongoUri,
             int rabbitMqConnectionTimeoutMs,
             long rabbitMqRecoveryIntervalMs,
+            int rabbitMqPublishConfirmTimeoutMs,
+            int rabbitMqExpectedNodes,
             boolean mongoTlsEnabled,
             String mongoTlsCaCertPath,
             boolean mongoTlsAllowInvalidHostnames,
@@ -230,6 +239,8 @@ public final class AppConfig {
         this.mongoUri = mongoUri;
         this.rabbitMqConnectionTimeoutMs = rabbitMqConnectionTimeoutMs;
         this.rabbitMqRecoveryIntervalMs = rabbitMqRecoveryIntervalMs;
+        this.rabbitMqPublishConfirmTimeoutMs = rabbitMqPublishConfirmTimeoutMs;
+        this.rabbitMqExpectedNodes = rabbitMqExpectedNodes;
         this.mongoTlsEnabled = mongoTlsEnabled;
         this.mongoTlsCaCertPath = mongoTlsCaCertPath;
         this.mongoTlsAllowInvalidHostnames = mongoTlsAllowInvalidHostnames;
@@ -568,6 +579,20 @@ public final class AppConfig {
         if (nodes.isEmpty()) {
             throw new IllegalArgumentException("At least one RabbitMQ node must be configured.");
         }
+        int publishConfirmTimeoutMs = parsePositiveInt(
+                readOrDefault(
+                        environment,
+                        "RABBITMQ_PUBLISH_CONFIRM_TIMEOUT_MS",
+                        String.valueOf(DEFAULT_PUBLISH_CONFIRM_TIMEOUT_MS)),
+                "RABBITMQ_PUBLISH_CONFIRM_TIMEOUT_MS");
+        // Defaults to the number of configured nodes so queue-server waits for the whole cluster
+        // (e.g. all 3) before declaring quorum queues, which is what spreads members across nodes.
+        int expectedNodes = parsePositiveInt(
+                readOrDefault(
+                        environment,
+                        "RABBITMQ_EXPECTED_NODES",
+                        String.valueOf(nodes.size())),
+                "RABBITMQ_EXPECTED_NODES");
 
         String tlsTruststorePath = readOrDefault(environment, "RABBITMQ_TRUSTSTORE_PATH", DEFAULT_TRUSTSTORE_PATH);
         String tlsTruststorePassword = readOrDefault(environment, "RABBITMQ_TRUSTSTORE_PASSWORD",
@@ -653,6 +678,8 @@ public final class AppConfig {
                 mongoUri,
                 connectionTimeoutMs,
                 recoveryIntervalMs,
+                publishConfirmTimeoutMs,
+                expectedNodes,
                 mongoTlsEnabled,
                 mongoTlsCaCertPath,
                 mongoTlsAllowInvalidHostnames,
@@ -903,6 +930,27 @@ public final class AppConfig {
     }
 
     /**
+     * Returns the publisher-confirm timeout (milliseconds) used when waiting for a
+     * quorum queue to acknowledge a published message.
+     *
+     * @return the publisher-confirm timeout in milliseconds
+     */
+    public int getRabbitMqPublishConfirmTimeoutMs() {
+        return rabbitMqPublishConfirmTimeoutMs;
+    }
+
+    /**
+     * Returns the number of RabbitMQ cluster nodes that should be reachable before
+     * queue-server declares the quorum topology. Defaults to the number of configured
+     * nodes so quorum queues are created with members spread across the whole cluster.
+     *
+     * @return the expected RabbitMQ cluster node count
+     */
+    public int getRabbitMqExpectedNodes() {
+        return rabbitMqExpectedNodes;
+    }
+
+    /**
      * Returns the path to the TLS truststore (JKS).
      *
      * @return the truststore file path
@@ -1124,6 +1172,8 @@ public final class AppConfig {
                 + ", citationsQueueName='" + citationsQueueName + '\''
                 + ", rabbitMqConnectionTimeoutMs=" + rabbitMqConnectionTimeoutMs
                 + ", rabbitMqRecoveryIntervalMs=" + rabbitMqRecoveryIntervalMs
+                + ", rabbitMqPublishConfirmTimeoutMs=" + rabbitMqPublishConfirmTimeoutMs
+                + ", rabbitMqExpectedNodes=" + rabbitMqExpectedNodes
                 + ", mongoUri='" + SecurityLogger.sanitize(mongoUri) + '\''
                 + ", mongoTlsEnabled=" + mongoTlsEnabled
                 + ", mongoServerSelectionTimeoutMs=" + mongoServerSelectionTimeoutMs

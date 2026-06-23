@@ -223,6 +223,36 @@ class AppConfigTest {
     }
 
     @Test
+    void shouldDefaultExpectedNodesToConfiguredNodeCountAndConfirmTimeout() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of(
+                        "RABBITMQ_NODES", "10.0.201.16:5671,10.0.201.17:5671,10.0.201.18:5671",
+                        "RABBITMQ_PASSWORD", "pass",
+                        "MONGO_PASSWORD", "pass",
+                        "HMAC_SECRET", "test-secret-1234567890"));
+
+        assertEquals(10000, config.getRabbitMqPublishConfirmTimeoutMs());
+        assertEquals(3, config.getRabbitMqExpectedNodes());
+    }
+
+    @Test
+    void shouldAllowOverridingPublisherConfirmTimeoutAndExpectedNodes() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of(
+                        "RABBITMQ_NODES", "10.0.201.16:5671,10.0.201.17:5671,10.0.201.18:5671",
+                        "RABBITMQ_PUBLISH_CONFIRM_TIMEOUT_MS", "15000",
+                        "RABBITMQ_EXPECTED_NODES", "2",
+                        "RABBITMQ_PASSWORD", "pass",
+                        "MONGO_PASSWORD", "pass",
+                        "HMAC_SECRET", "test-secret-1234567890"));
+
+        assertEquals(15000, config.getRabbitMqPublishConfirmTimeoutMs());
+        assertEquals(2, config.getRabbitMqExpectedNodes());
+    }
+
+    @Test
     void shouldExposeRabbitMqDiagnosticsWithoutSecrets() {
         AppConfig config = AppConfig.fromEnvironment(
                 AppConfig.ApplicationProfile.CUSTOMER_UI,

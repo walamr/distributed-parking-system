@@ -13,6 +13,7 @@ import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -98,6 +99,50 @@ class RabbitMqConnectionManagerTest {
     }
 
     @Test
+    void connectErrorIncludesVhostAndClassifiesConnectionFailure() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of(
+                        "RABBITMQ_NODES", "10.0.201.16:5671",
+                        "RABBITMQ_TLS_ENABLED", "false",
+                        "HMAC_SECRET", "test-secret-1234567890",
+                        "RABBITMQ_PASSWORD", "test-pass",
+                        "MONGO_PASSWORD", "test-pass"));
+        RabbitMqConnectionManager manager = new RabbitMqConnectionManager(config, (factory, node, name) -> {
+            throw new java.net.ConnectException("Connection refused");
+        });
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, manager::connect);
+
+        assertTrue(ex.getMessage().contains("vhost=/parking"));
+        assertTrue(ex.getMessage().contains("lastErrorType=CONNECTION_FAILURE"));
+    }
+
+    @Test
+    void publisherConfirmsForQueueUsesConfiguredConfirmTimeout() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of(
+                        "RABBITMQ_NODES", "10.0.201.16:5671",
+                        "RABBITMQ_TLS_ENABLED", "false",
+                        "RABBITMQ_PUBLISH_CONFIRM_TIMEOUT_MS", "12345",
+                        "HMAC_SECRET", "test-secret-1234567890",
+                        "RABBITMQ_PASSWORD", "test-pass",
+                        "MONGO_PASSWORD", "test-pass"));
+        AtomicLong capturedConfirmTimeout = new AtomicLong(-1);
+        Channel channel = fakeChannelCapturingConfirmTimeout(capturedConfirmTimeout);
+        RabbitMqConnectionManager manager = new RabbitMqConnectionManager(config,
+                (factory, node, name) -> fakeConnection(channel));
+
+        manager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (ch, node) ->
+                ch.basicPublish("", config.getTransactionsQueueName(),
+                        com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
+                        "{}".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertEquals(12345L, capturedConfirmTimeout.get());
+    }
+
+    @Test
     void publisherConfirmsForQueueShouldAllowDurablePublishWhenConsumerCountIsTemporarilyZero() {
         AppConfig config = AppConfig.fromEnvironment(
                 AppConfig.ApplicationProfile.CUSTOMER_UI,
@@ -173,6 +218,54 @@ class RabbitMqConnectionManagerTest {
                         case "basicPublish" -> {
                             publishCalls.incrementAndGet();
                             yield null;
+                        }
+                        default -> defaultValue(method.getReturnType());
+                    };
+                });
+    }
+
+    private static Channel fakeChannelCapturingConfirmTimeout(AtomicLong capturedConfirmTimeout) {
+        return (Channel) Proxy.newProxyInstance(
+                Channel.class.getClassLoader(),
+                new Class<?>[] { Channel.class },
+                (proxy, method, args) -> {
+                    return switch (method.getName()) {
+                        case "queueDeclarePassive" -> new AMQP.Queue.DeclareOk() {
+                            @Override
+                            public String getQueue() {
+                                return (String) args[0];
+                            }
+
+                            @Override
+                            public int getMessageCount() {
+                                return 0;
+                            }
+
+                            @Override
+                            public int getConsumerCount() {
+                                return 1;
+                            }
+
+                            @Override
+                            public int protocolClassId() {
+                                return 50;
+                            }
+
+                            @Override
+                            public int protocolMethodId() {
+                                return 11;
+                            }
+
+                            @Override
+                            public String protocolMethodName() {
+                                return "queue.declare-ok";
+                            }
+                        };
+                        case "waitForConfirms" -> {
+                            if (args != null && args.length == 1 && args[0] instanceof Long timeout) {
+                                capturedConfirmTimeout.set(timeout);
+                            }
+                            yield true;
                         }
                         default -> defaultValue(method.getReturnType());
                     };

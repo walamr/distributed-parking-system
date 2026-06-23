@@ -1,8 +1,11 @@
 package edu.kinneret.parking.queue;
 
 import edu.kinneret.parking.common.AppConfig;
+import edu.kinneret.parking.common.ClusterNode;
 import edu.kinneret.parking.common.RabbitMqConnectionManager;
 import edu.kinneret.parking.common.SecurityLogger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,6 +44,7 @@ public final class QueueServerApplication {
             QueueHealthChecker healthChecker = new QueueHealthChecker(connectionManager);
             RabbitMqTopologyInitializer topologyInitializer = new RabbitMqTopologyInitializer(appConfig, connectionManager);
             healthChecker.requireHealthyNode();
+            waitForClusterFormation(connectionManager, appConfig);
             topologyInitializer.initialize();
             waitForStorageConsumers(connectionManager, appConfig);
             System.out.println("Queue server topology initialization completed successfully. "
@@ -64,6 +68,54 @@ public final class QueueServerApplication {
             System.err.println("Queue server startup failed. See server logs for details.");
             System.exit(1);
         }
+    }
+
+    /**
+     * Waits until the expected number of RabbitMQ cluster nodes are reachable before the
+     * quorum topology is declared.
+     *
+     * <p>This is the fix for the one-node-down failover bug: a quorum queue fixes its member
+     * set at declaration time to the cluster nodes that are present. If the queues were declared
+     * while only one node was up (for example because a single node imported them from
+     * {@code definitions.json} at boot), they would have a single member and stopping that node
+     * would make the queue unavailable and time out publisher confirms. By waiting for the whole
+     * cluster first, {@code x-quorum-initial-group-size=3} places a member on every node, so the
+     * queue keeps a quorum (2 of 3) when any single node is stopped.
+     *
+     * <p>It does not require any specific node (e.g. rabbit1); it accepts any nodes that are
+     * reachable. If the cluster has not fully formed within the wait window it proceeds with a
+     * loud warning rather than blocking the deployment forever.
+     */
+    private static void waitForClusterFormation(
+            RabbitMqConnectionManager connectionManager,
+            AppConfig appConfig) throws InterruptedException {
+        int expectedNodes = appConfig.getRabbitMqExpectedNodes();
+        List<ClusterNode> configuredNodes = appConfig.getRabbitMqNodes();
+        final int maximumAttempts = 90;
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++) {
+            List<String> reachable = new ArrayList<>();
+            for (ClusterNode node : configuredNodes) {
+                if (connectionManager.isNodeReachable(node)) {
+                    reachable.add(node.toAddress());
+                }
+            }
+            System.out.println("RabbitMQ cluster readiness before topology declaration: reachableNodes="
+                    + reachable + " (" + reachable.size() + " of " + expectedNodes + " expected).");
+            if (reachable.size() >= expectedNodes) {
+                System.out.println("RabbitMQ cluster has the expected " + expectedNodes
+                        + " node(s) reachable; declaring quorum topology now so members span the cluster.");
+                return;
+            }
+            System.out.println("Waiting for the RabbitMQ cluster to form... attempt "
+                    + attempt + " of " + maximumAttempts);
+            Thread.sleep(2_000L);
+        }
+        System.out.println("WARNING: Declaring RabbitMQ topology without all " + expectedNodes
+                + " expected nodes reachable. Quorum queues may be created with fewer members and "
+                + "may not survive a single-node failure. Start every RabbitMQ node, then recreate "
+                + "the queues (see the runbook) if one-node failover does not work.");
+        SecurityLogger.logSecurityEvent("Queue-server declared topology before the full RabbitMQ cluster "
+                + "was reachable; expected " + expectedNodes + " nodes.");
     }
 
     private static void waitForStorageConsumers(

@@ -73,81 +73,9 @@
       "read": "^(amq\\.default|transactions\\.queue|citations\\.queue)$"
     }
   ],
-  "queues": [
-    {
-      "name": "transactions.queue",
-      "vhost": "/parking",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-queue-type": "quorum",
-        "x-quorum-initial-group-size": 3,
-        "x-dead-letter-exchange": "parking.dlx",
-        "x-dead-letter-routing-key": "transactions.dead"
-      }
-    },
-    {
-      "name": "citations.queue",
-      "vhost": "/parking",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-queue-type": "quorum",
-        "x-quorum-initial-group-size": 3,
-        "x-dead-letter-exchange": "parking.dlx",
-        "x-dead-letter-routing-key": "citations.dead"
-      }
-    },
-    {
-      "name": "transactions.dlq",
-      "vhost": "/parking",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-queue-type": "quorum",
-        "x-quorum-initial-group-size": 3
-      }
-    },
-    {
-      "name": "citations.dlq",
-      "vhost": "/parking",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-queue-type": "quorum",
-        "x-quorum-initial-group-size": 3
-      }
-    }
-  ],
+  "queues": [],
   "policies": [],
   "parameters": [],
-  "bindings": [
-    {
-      "source": "parking.dlx",
-      "vhost": "/parking",
-      "destination": "transactions.dlq",
-      "destination_type": "queue",
-      "routing_key": "transactions.dead",
-      "arguments": {}
-    },
-    {
-      "source": "parking.dlx",
-      "vhost": "/parking",
-      "destination": "citations.dlq",
-      "destination_type": "queue",
-      "routing_key": "citations.dead",
-      "arguments": {}
-    }
-  ],
-  "exchanges": [
-    {
-      "name": "parking.dlx",
-      "vhost": "/parking",
-      "type": "direct",
-      "durable": true,
-      "auto_delete": false,
-      "internal": false,
-      "arguments": {}
-    }
-  ]
+  "bindings": [],
+  "exchanges": []
 }

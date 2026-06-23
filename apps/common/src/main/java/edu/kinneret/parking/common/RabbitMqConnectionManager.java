@@ -72,6 +72,9 @@ public final class RabbitMqConnectionManager {
         }
         throw new IllegalStateException("Unable to connect to any RabbitMQ node. configuredNodes="
                 + configuredNodesSummary() + ", attemptedNodes=" + attemptedNodes
+                + ", vhost=" + appConfig.getRabbitMqVirtualHost()
+                + ", tlsEnabled=" + appConfig.isRabbitMqTlsEnabled()
+                + ", lastErrorType=" + classifyFailure(lastFailure)
                 + ", lastFailure=" + lastFailureSummary(lastFailure), lastFailure);
     }
 
@@ -85,8 +88,9 @@ public final class RabbitMqConnectionManager {
         withChannel((channel, node) -> {
             channel.confirmSelect();
             channelConsumer.accept(channel, node);
-            if (!channel.waitForConfirms(5000)) {
-                throw new IOException("RabbitMQ message was not confirmed by the broker within timeout.");
+            if (!channel.waitForConfirms(appConfig.getRabbitMqPublishConfirmTimeoutMs())) {
+                throw new IOException("RabbitMQ message was not confirmed by the broker within "
+                        + appConfig.getRabbitMqPublishConfirmTimeoutMs() + "ms on node " + node.toAddress() + ".");
             }
         });
     }
@@ -110,9 +114,10 @@ public final class RabbitMqConnectionManager {
             }
             channel.confirmSelect();
             channelConsumer.accept(channel, node);
-            if (!channel.waitForConfirms(5000)) {
+            if (!channel.waitForConfirms(appConfig.getRabbitMqPublishConfirmTimeoutMs())) {
                 throw new IOException("RabbitMQ publisher confirm timed out on node " + node.toAddress()
-                        + " for queue " + validatedQueue + ".");
+                        + " for queue " + validatedQueue + " (vhost=" + appConfig.getRabbitMqVirtualHost()
+                        + ", confirmTimeoutMs=" + appConfig.getRabbitMqPublishConfirmTimeoutMs() + ").");
             }
         });
     }
@@ -168,7 +173,72 @@ public final class RabbitMqConnectionManager {
         }
         throw new IllegalStateException("RabbitMQ publish/operation failed on all configured nodes after "
                 + MAX_CHANNEL_ATTEMPTS + " channel attempts. configuredNodes=" + configuredNodesSummary()
+                + ", vhost=" + appConfig.getRabbitMqVirtualHost()
+                + ", tlsEnabled=" + appConfig.isRabbitMqTlsEnabled()
+                + ", confirmTimeoutMs=" + appConfig.getRabbitMqPublishConfirmTimeoutMs()
+                + ", lastErrorType=" + classifyFailure(lastFailure)
                 + ", lastFailure=" + lastFailureSummary(lastFailure), lastFailure);
+    }
+
+    /**
+     * Probes whether a single specific cluster node accepts a connection right now.
+     * Used by queue-server to wait for the whole cluster to come up before declaring
+     * the quorum topology, so the quorum queues are created with members on every node.
+     *
+     * @param node the node to probe
+     * @return {@code true} if a connection to {@code node} succeeds
+     */
+    public boolean isNodeReachable(ClusterNode node) {
+        try {
+            ConnectionFactory factory = buildFactory(node);
+            try (Connection ignored = connectionOpener.open(factory, node, connectionName())) {
+                return true;
+            }
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Classifies the root cause of a failure into a coarse, secret-free category so the
+     * surfaced error distinguishes connection, TLS, auth/vhost, queue, confirm-timeout and
+     * consumer problems instead of a single vague message.
+     */
+    private static String classifyFailure(Throwable throwable) {
+        if (throwable == null) {
+            return "NONE";
+        }
+        Throwable root = throwable;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        String simpleName = root.getClass().getSimpleName();
+        String message = String.valueOf(root.getMessage()).toLowerCase(java.util.Locale.ROOT);
+        if (root instanceof AuthenticationFailureException || message.contains("access_refused")
+                || message.contains("vhost")) {
+            return "AUTH_OR_VHOST_FAILURE";
+        }
+        if (simpleName.toLowerCase(java.util.Locale.ROOT).contains("ssl")
+                || message.contains("certificate") || message.contains("tls")
+                || message.contains("handshake")) {
+            return "TLS_FAILURE";
+        }
+        if (message.contains("confirm timed out") || message.contains("was not confirmed")) {
+            return "PUBLISHER_CONFIRM_TIMEOUT";
+        }
+        if (message.contains("no active consumer")) {
+            return "NO_ACTIVE_CONSUMER";
+        }
+        if (message.contains("not_found") || message.contains("no queue")
+                || message.contains("queuedeclarepassive")) {
+            return "QUEUE_UNAVAILABLE";
+        }
+        if (root instanceof java.net.ConnectException || root instanceof TimeoutException
+                || message.contains("connection refused") || message.contains("timed out")
+                || message.contains("unable to connect")) {
+            return "CONNECTION_FAILURE";
+        }
+        return simpleName;
     }
 
     /**
