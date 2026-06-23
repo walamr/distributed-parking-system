@@ -103,6 +103,7 @@ while ($attempts -lt 30) {
         if ($null -ne $oldNativePref) { $PSNativeCommandUseErrorActionPreference = $oldNativePref }
     }
     if ($primary -and $primary -match "\d+\.\d+\.\d+\.\d+:\d+") {
+        $primary = $Matches[0]
         Write-Host "✅ Primary elected: $primary"
         break
     }
@@ -128,7 +129,7 @@ if (-not $existingCluster) {
 }
 
 # Second, connect using the admin credentials to create the other users and roles
-$ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/admin?tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@$primary/admin?tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/init-users.js "mongo1:/tmp/init-users.js"
 Assert-NativeSuccess "Copying the database-users script"
 docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$ADMIN_URI" --eval "$EVAL_USERS" /tmp/init-users.js
@@ -136,7 +137,7 @@ Assert-NativeSuccess "Creating MongoDB application users"
 
 # 4. Import test data
 Write-Host "--- Step 4: Import sample data ---"
-$PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@localhost:27017/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@$primary/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
 docker cp ./docker/mongodb/seed-data.js "mongo1:/tmp/seed-data.js"
 Assert-NativeSuccess "Copying sample data"
 docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" /tmp/seed-data.js
