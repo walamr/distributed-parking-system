@@ -123,7 +123,7 @@ RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
 RABBITMQ_CONNECTION_TIMEOUT_MS=5000
 RABBITMQ_RECOVERY_INTERVAL_MS=5000
 
-MONGO_URI=mongodb://${mongoUser}:${mongoPass}@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
+MONGO_URI=mongodb://${mongoUser}:${mongoPass}@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=true
@@ -273,7 +273,7 @@ TLS_SERVER_KEYSTORE_PATH=docker/rabbitmq/certs/server-keystore.jks
 TLS_SERVER_KEYSTORE_PASSWORD=password
 RABBITMQ_TLS_ALLOW_INVALID_HOSTNAMES=true
 
-MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin
+MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@${MONGO1_IP}:${M1_P},${MONGO2_IP}:${M2_P},${MONGO3_IP}:${M3_P}/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
 MONGO_TLS_ENABLED=true
 MONGO_TLS_CA_CERT_PATH=docker/mongodb/certs/ca-cert.pem
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES=true

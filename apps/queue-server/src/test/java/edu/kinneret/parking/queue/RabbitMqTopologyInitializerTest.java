@@ -27,6 +27,15 @@ class RabbitMqTopologyInitializerTest {
     }
 
     @Test
+    void shouldDeclareCitationQueueWithDeadLetterRoutingKey() {
+        Map<String, Object> arguments = RabbitMqTopologyInitializer.quorumQueueArguments("citations.dead");
+
+        assertEquals("quorum", arguments.get("x-queue-type"));
+        assertEquals("parking.dlx", arguments.get("x-dead-letter-exchange"));
+        assertEquals("citations.dead", arguments.get("x-dead-letter-routing-key"));
+    }
+
+    @Test
     void queueServerDelegatesPersistenceToStorageServer() {
         assertEquals("storage-server", QueueServerApplication.PERSISTENCE_OWNER);
         assertEquals(false, QueueConsumerService.PERSISTENCE_CONSUMER_ENABLED);

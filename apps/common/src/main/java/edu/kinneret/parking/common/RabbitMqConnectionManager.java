@@ -49,7 +49,7 @@ public final class RabbitMqConnectionManager {
                     }
                 }
 
-                Connection connection = factory.newConnection(addresses, "queue-server");
+                Connection connection = factory.newConnection(addresses, connectionName());
                 clusterClientSelector.reportSuccess(node); // --- NEW: Reset failure counter ---
                 return new ConnectionHandle(connection, node);
             } catch (IOException | TimeoutException ex) {
@@ -196,6 +196,12 @@ public final class RabbitMqConnectionManager {
             }
         }
         return factory;
+    }
+
+    private String connectionName() {
+        AppConfig.ApplicationProfile profile = appConfig.getApplicationProfile();
+        String profileName = profile == null ? "unknown" : profile.name().toLowerCase(java.util.Locale.ROOT);
+        return "parking-" + profileName;
     }
 
     /**

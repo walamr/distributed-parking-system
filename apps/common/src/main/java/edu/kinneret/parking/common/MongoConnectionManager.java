@@ -59,11 +59,11 @@ public final class MongoConnectionManager implements AutoCloseable {
         // window risks failing writes mid-failover; 30s lets the driver wait for the new
         // primary and then complete the (retryable) write instead of erroring out.
         settingsBuilder.applyToClusterSettings(builder ->
-            builder.serverSelectionTimeout(30000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            builder.serverSelectionTimeout(config.getMongoServerSelectionTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)
         );
         settingsBuilder.applyToSocketSettings(builder ->
-            builder.connectTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
-                   .readTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            builder.connectTimeout(config.getMongoConnectTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                   .readTimeout(config.getMongoSocketTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)
         );
 
         // For developers running apps without hosts modification:
@@ -89,8 +89,8 @@ public final class MongoConnectionManager implements AutoCloseable {
             logger.severe("Failed to initialize MongoClient: " + SecurityLogger.sanitize(e.getMessage()));
         }
         this.mongoClient = clientTemp;
-        logger.info("MongoDB client configured: target=" + SecurityLogger.sanitize(config.getMongoUri())
-                + ", database=" + databaseName + ", TLS=" + config.isMongoTlsEnabled());
+        logger.info("MongoDB client configured: " + config.mongoStartupDiagnostics(databaseName)
+                + ", uri=" + SecurityLogger.sanitize(config.getMongoUri()));
     }
 
     /**

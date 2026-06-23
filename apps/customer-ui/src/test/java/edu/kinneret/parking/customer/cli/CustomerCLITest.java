@@ -55,8 +55,9 @@ public class CustomerCLITest {
     public void publishSuccessMessageDoesNotClaimDatabaseSave() {
         String message = CustomerCLI.publishSuccessMessage("start");
         assertTrue(message.contains("accepted by RabbitMQ"));
-        assertTrue(message.contains("persistence is pending"));
         assertFalse(message.toLowerCase().contains("saved to mongodb"));
+        assertFalse(message.toLowerCase().contains("mongodb"));
+        assertFalse(message.toLowerCase().contains("persist"));
     }
 
     /** Recommendation input accepts trimmed numeric space IDs. */

@@ -21,6 +21,9 @@ import java.util.logging.Logger;
  */
 public class StorageServerApplication {
     static final String PERSISTENCE_OWNER = "storage-server";
+    static final boolean MANUAL_ACK_ENABLED = true;
+    private static final int TOPOLOGY_WAIT_ATTEMPTS = 60;
+    private static final long TOPOLOGY_WAIT_DELAY_MS = 2_000L;
     /**
      * Default constructor for StorageServerApplication.
      */
@@ -53,25 +56,32 @@ public class StorageServerApplication {
         logger.info("Persistence owner=" + PERSISTENCE_OWNER + ", MongoDB target="
                 + SecurityLogger.sanitize(config.getMongoUri()) + ", database="
                 + MongoStorageService.DATABASE_NAME + ", TLS=" + config.isMongoTlsEnabled());
+        logger.info("RabbitMQ storage consumer configured: "
+                + config.toRedactedSummary()
+                + ", publisherConfirmsEnabled=false, consumerManualAckEnabled=" + MANUAL_ACK_ENABLED);
         MongoStorageService storageService = new MongoStorageService(config, MongoStorageService.DATABASE_NAME);
         RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(config);
 
-        try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect();
-             Channel channel = handle.connection().createChannel()) {
+        try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect()) {
+            waitForRequiredQueues(handle.connection(), config);
+
+            try (Channel channel = handle.connection().createChannel()) {
             
-            // Limit the number of unacknowledged messages
-            channel.basicQos(10);
+                // Limit the number of unacknowledged messages
+                channel.basicQos(10);
 
-            // Note: Queues and Exchanges are declared by the QueueServer (mulligan_admin).
-            // This service only consumes from the pre-existing queues.
+                // Note: Queues and Exchanges are declared by the QueueServer (mulligan_admin).
+                // This service passively verifies the queues and consumes with manual ACK.
 
-            consumeQueue(channel, config.getTransactionsQueueName(), storageService, validator, config);
-            consumeQueue(channel, config.getCitationsQueueName(), storageService, validator, config);
+                consumeQueue(channel, config.getTransactionsQueueName(), storageService, validator, config);
+                consumeQueue(channel, config.getCitationsQueueName(), storageService, validator, config);
 
-            logger.info("Storage Server is now listening to queues via " + handle.activeNode().toAddress());
+                logger.info("Storage Server is now listening to queues via " + handle.activeNode().toAddress()
+                        + "; manualAck=" + MANUAL_ACK_ENABLED);
             
-            // Keep the application running
-            Thread.currentThread().join();
+                // Keep the application running
+                Thread.currentThread().join();
+            }
             
         } catch (Exception e) {
             String host = "unknown";
@@ -81,6 +91,39 @@ public class StorageServerApplication {
             System.err.println("Storage Server stopped before MongoDB persistence became available.");
             System.exit(1);
         }
+    }
+
+    private static void waitForRequiredQueues(com.rabbitmq.client.Connection connection, AppConfig config)
+            throws InterruptedException {
+        String transactionsQueue = config.getTransactionsQueueName();
+        String citationsQueue = config.getCitationsQueueName();
+        for (int attempt = 1; attempt <= TOPOLOGY_WAIT_ATTEMPTS; attempt++) {
+            try (Channel verificationChannel = connection.createChannel()) {
+                passivelyVerifyQueue(verificationChannel, transactionsQueue);
+                passivelyVerifyQueue(verificationChannel, citationsQueue);
+                logger.info("Required RabbitMQ queues verified: " + transactionsQueue + ", " + citationsQueue);
+                return;
+            } catch (Exception ex) {
+                if (attempt == TOPOLOGY_WAIT_ATTEMPTS) {
+                    throw new IllegalStateException(
+                            "Required RabbitMQ topology is missing or inaccessible. "
+                                    + "Start queue-server so it can declare "
+                                    + transactionsQueue + " and " + citationsQueue + ".",
+                            ex);
+                }
+                logger.warning("Waiting for RabbitMQ topology before consuming; attempt "
+                        + attempt + " of " + TOPOLOGY_WAIT_ATTEMPTS + ". Reason: "
+                        + SecurityLogger.sanitize(ex.getMessage()));
+                Thread.sleep(TOPOLOGY_WAIT_DELAY_MS);
+            }
+        }
+    }
+
+    private static void passivelyVerifyQueue(Channel channel, String queueName) throws IOException {
+        com.rabbitmq.client.AMQP.Queue.DeclareOk status = channel.queueDeclarePassive(queueName);
+        logger.info("Verified RabbitMQ queue=" + queueName
+                + ", messagesReady=" + status.getMessageCount()
+                + ", consumers=" + status.getConsumerCount());
     }
 
     /**

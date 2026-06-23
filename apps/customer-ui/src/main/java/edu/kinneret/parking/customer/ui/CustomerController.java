@@ -517,7 +517,8 @@ public class CustomerController {
 
                         try {
                             rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                                channel.basicPublish("", config.getTransactionsQueueName(), null,
+                                channel.basicPublish("", config.getTransactionsQueueName(),
+                                        com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
                                         stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                             });
                             localOfflineTransactions.add(0, autoStopDoc);
@@ -599,7 +600,8 @@ public class CustomerController {
                                         stopPayload, stopClientIp, UUID.randomUUID().toString()).sign(signer);
                                 try {
                                     rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                                        channel.basicPublish("", config.getTransactionsQueueName(), null,
+                                        channel.basicPublish("", config.getTransactionsQueueName(),
+                                                com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
                                                 stopEnv.toJsonString().getBytes(StandardCharsets.UTF_8));
                                     });
                                     localOfflineTransactions.add(0, autoStopDoc);
@@ -639,7 +641,8 @@ public class CustomerController {
                         .createUnsigned("transaction.start", payload, clientIp, correlationId).sign(signer);
 
                 rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                    channel.basicPublish("", config.getTransactionsQueueName(), null,
+                    channel.basicPublish("", config.getTransactionsQueueName(),
+                            com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
                             envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                     logger.info("[TRACE: " + correlationId + "] Published start message to " + node.toAddress()
                             + " and received broker confirmation");
@@ -660,7 +663,7 @@ public class CustomerController {
                 infoCard.setVisible(true);
                 infoCard.setManaged(true);
             });
-            setStatus("Parking started successfully.", false);
+            setStatus("Parking start request accepted by RabbitMQ.", false);
         });
         task.setOnFailed(e -> {
             Throwable ex = e.getSource().getException();
@@ -766,7 +769,8 @@ public class CustomerController {
                         .createUnsigned("transaction.stop", payload, clientIp, correlationId).sign(signer);
 
                 rabbitManager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                    channel.basicPublish("", config.getTransactionsQueueName(), null,
+                    channel.basicPublish("", config.getTransactionsQueueName(),
+                            com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
                             envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                     logger.info("[TRACE: " + correlationId + "] Published stop message to " + node.toAddress()
                             + " and received broker confirmation");
@@ -784,7 +788,7 @@ public class CustomerController {
             parkingStartTime = null;
             lastActiveSpaceBeforeStop = activeSpace;
             activeSpace = null;
-            setStatus("Parking stopped successfully.", false);
+            setStatus("Parking stop request accepted by RabbitMQ.", false);
         });
         task.setOnFailed(e -> {
             Throwable failure = task.getException();

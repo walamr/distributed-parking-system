@@ -46,6 +46,8 @@ public class CustomerCLI {
         System.out.println("\n+--------------------------------------------------+");
         System.out.println("|     MULLIGAN PARKING - CUSTOMER CLUSTER CLI      |");
         System.out.println("+--------------------------------------------------+");
+        System.out.println("RabbitMQ target: " + config.toRedactedSummary()
+                + ", publisherConfirmsEnabled=true, consumerManualAckEnabled=false");
 
         try (ParkingRepository repository = new ParkingRepository(config);
              Scanner scanner = new Scanner(System.in)) {
@@ -215,7 +217,11 @@ public class CustomerCLI {
             MessageEnvelope envelope = MessageEnvelope.createUnsigned("transaction." + type, payload, clientIp, correlationId).sign(signer);
             
             manager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, node) -> {
-                channel.basicPublish("", config.getTransactionsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
+                channel.basicPublish(
+                        "",
+                        config.getTransactionsQueueName(),
+                        com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
+                        envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
             });
             System.out.println(publishSuccessMessage(type));
         } catch (Exception e) {
@@ -225,8 +231,7 @@ public class CustomerCLI {
     }
 
     static String publishSuccessMessage(String type) {
-        return "SUCCESS: Parking " + type
-                + " request was accepted by RabbitMQ. MongoDB persistence is pending server-side confirmation/logs.";
+        return "SUCCESS: Parking " + type + " request accepted by RabbitMQ.";
     }
 
 /**

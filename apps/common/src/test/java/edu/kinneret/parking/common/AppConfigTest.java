@@ -1,6 +1,7 @@
 package edu.kinneret.parking.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -120,7 +121,7 @@ class AppConfigTest {
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
-        assertEquals("mongodb://mulligan_db_admin:db_pwd_rotated_admin@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin", config.getMongoUri());
+        assertEquals("mongodb://mulligan_db_admin:db_pwd_rotated_admin@10.0.201.25:27017,10.0.201.24:27017,10.0.201.23:27017/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority", config.getMongoUri());
     }
     /**
      * Should substitute storage mongo credentials based on profile.
@@ -137,6 +138,109 @@ class AppConfigTest {
                         "HMAC_SECRET", "test-secret-1234567890"
                 ));
 
-        assertEquals("mongodb://storage_db_user:db_pwd_rotated_storage@10.0.201.25:27017/parking_db", config.getMongoUri());
+        assertEquals("mongodb://storage_db_user:db_pwd_rotated_storage@10.0.201.25:27017/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority", config.getMongoUri());
+    }
+
+    @Test
+    void shouldExpandSingleHostMongoUriToConfiguredReplicaSetHosts() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.STORAGE_SERVER,
+                Map.of(
+                        "RABBITMQ_PASSWORD", "pass",
+                        "MONGO_PASSWORD", "storage-pass",
+                        "MONGO_URI", "mongodb://old_user:old_pass@10.0.201.23:27017/parking_db?directConnection=true",
+                        "MONGO1_IP", "10.0.201.23",
+                        "MONGO2_IP", "10.0.201.24",
+                        "MONGO3_IP", "10.0.201.25",
+                        "HMAC_SECRET", "test-secret-1234567890"
+                ));
+
+        String uri = config.getMongoUri();
+        assertTrue(uri.contains("10.0.201.23:27017,10.0.201.24:27017,10.0.201.25:27017"));
+        assertTrue(uri.contains("replicaSet=rs0"));
+        assertTrue(uri.contains("authSource=admin"));
+        assertTrue(uri.contains("retryWrites=true"));
+        assertTrue(uri.contains("w=majority"));
+        assertFalse(uri.contains("directConnection=true"));
+        assertTrue(uri.startsWith("mongodb://storage_db_user:storage-pass@"));
+    }
+
+    @Test
+    void shouldKeepRuntimeMongoIpsAboveStaleCheckedInEnvFiles() {
+        AppConfig config = AppConfig.fromEnvironment(Map.of(
+                "RABBITMQ_PASSWORD", "runtime-rabbit-pass",
+                "MONGO_PASSWORD", "runtime-mongo-pass",
+                "MONGO_URI", "mongodb://runtime_user:runtime_pass@192.168.70.10:27017/parking_db?directConnection=true",
+                "MONGO1_IP", "192.168.70.10",
+                "MONGO2_IP", "192.168.70.11",
+                "MONGO3_IP", "192.168.70.12",
+                "HMAC_SECRET", "test-secret-1234567890"
+        ));
+
+        String uri = config.getMongoUri();
+        assertTrue(uri.contains("192.168.70.10:27017,192.168.70.11:27017,192.168.70.12:27017"));
+        assertFalse(uri.contains("10.0.201.23"));
+        assertFalse(uri.contains("directConnection=true"));
+    }
+
+    @Test
+    void shouldExposeFailoverSafeMongoTimeoutDefaults() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.MO_UI,
+                Map.of(
+                        "RABBITMQ_PASSWORD", "pass",
+                        "MONGO_PASSWORD", "pass",
+                        "HMAC_SECRET", "test-secret-1234567890"
+                ));
+
+        assertEquals(30000, config.getMongoServerSelectionTimeoutMs());
+        assertEquals(10000, config.getMongoConnectTimeoutMs());
+        assertEquals(10000, config.getMongoSocketTimeoutMs());
+    }
+
+    @Test
+    void shouldSanitizeMongoPasswordsInLogs() {
+        String sanitized = SecurityLogger.sanitize(
+                "uri=mongodb://storage_db_user:secret-pass@10.0.201.23:27017/parking_db?replicaSet=rs0");
+
+        assertFalse(sanitized.contains("storage_db_user:secret-pass"));
+        assertTrue(sanitized.contains("mongodb://<redacted>:<redacted>@10.0.201.23:27017"));
+    }
+
+    @Test
+    void shouldKeepRuntimeRabbitNodesAboveStaleCheckedInEnvFiles() {
+        AppConfig config = AppConfig.fromEnvironment(
+                Map.of(
+                        "RABBITMQ_NODES", "192.168.88.10:5671,192.168.88.11:5671,192.168.88.12:5671",
+                        "RABBITMQ_PASSWORD", "runtime-rabbit-pass",
+                        "MONGO_PASSWORD", "runtime-mongo-pass",
+                        "HMAC_SECRET", "test-secret-1234567890"
+                ));
+
+        assertEquals("192.168.88.10", config.getRabbitMqNodes().get(0).getHost());
+        assertEquals("192.168.88.11", config.getRabbitMqNodes().get(1).getHost());
+        assertEquals("192.168.88.12", config.getRabbitMqNodes().get(2).getHost());
+    }
+
+    @Test
+    void shouldExposeRabbitMqDiagnosticsWithoutSecrets() {
+        AppConfig config = AppConfig.fromEnvironment(
+                AppConfig.ApplicationProfile.CUSTOMER_UI,
+                Map.of(
+                        "RABBITMQ_NODES", "10.0.201.16:5671,10.0.201.17:5671,10.0.201.18:5671",
+                        "RABBITMQ_PASSWORD", "super-secret-rabbit",
+                        "MONGO_PASSWORD", "mongo-pass",
+                        "HMAC_SECRET", "test-secret-1234567890"
+                ));
+
+        String diagnostics = config.toRedactedSummary()
+                + ", publisherConfirmsEnabled=true, consumerManualAckEnabled=false";
+        assertTrue(diagnostics.contains("10.0.201.16"));
+        assertTrue(diagnostics.contains("rabbitMqVirtualHost='/parking'"));
+        assertTrue(diagnostics.contains("transactions.queue"));
+        assertTrue(diagnostics.contains("citations.queue"));
+        assertTrue(diagnostics.contains("publisherConfirmsEnabled=true"));
+        assertFalse(diagnostics.contains("super-secret-rabbit"));
+        assertFalse(diagnostics.contains("mongo-pass"));
     }
 }

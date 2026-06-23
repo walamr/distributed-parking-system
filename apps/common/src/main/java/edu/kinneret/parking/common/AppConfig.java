@@ -1,6 +1,7 @@
 package edu.kinneret.parking.common;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,10 +21,15 @@ public final class AppConfig {
     private static final String DEFAULT_TRUSTSTORE_PASSWORD = "password";
     private static final String DEFAULT_KEYSTORE_PATH = "docker/rabbitmq/certs/keystore.jks";
     private static final String DEFAULT_KEYSTORE_PASSWORD = "password";
-    private static final String DEFAULT_MONGO_URI = "mongodb://%s:%s@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin";
+    private static final String DEFAULT_MONGO_URI = "mongodb://%s:%s@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority";
     private static final boolean DEFAULT_MONGO_TLS_ENABLED = true;
     private static final String DEFAULT_MONGO_TLS_CA_CERT_PATH = "docker/mongodb/certs/ca-cert.pem";
     private static final boolean DEFAULT_MONGO_TLS_ALLOW_INVALID_HOSTNAMES = false;
+    private static final String DEFAULT_MONGO_DATABASE = "parking_db";
+    private static final String DEFAULT_MONGO_REPLICA_SET = "rs0";
+    private static final int DEFAULT_MONGO_SERVER_SELECTION_TIMEOUT_MS = 30000;
+    private static final int DEFAULT_MONGO_CONNECT_TIMEOUT_MS = 10000;
+    private static final int DEFAULT_MONGO_SOCKET_TIMEOUT_MS = 10000;
     private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 5000;
     private static final long DEFAULT_RABBITMQ_RECOVERY_INTERVAL_MS = 5000;
     private static final String DEFAULT_HMAC_SECRET = "";
@@ -50,6 +56,9 @@ public final class AppConfig {
     private final boolean mongoTlsEnabled;
     private final String mongoTlsCaCertPath;
     private final boolean mongoTlsAllowInvalidHostnames;
+    private final int mongoServerSelectionTimeoutMs;
+    private final int mongoConnectTimeoutMs;
+    private final int mongoSocketTimeoutMs;
     private final String hmacSecret;
     private final long nonceTtlSeconds;
     private final double maxAllowedAmount;
@@ -57,6 +66,7 @@ public final class AppConfig {
     private final String mongo1Ip;
     private final String mongo2Ip;
     private final String mongo3Ip;
+    private final ApplicationProfile applicationProfile;
 
     /**
      * Application-specific defaults used to keep least-privilege credentials aligned
@@ -192,13 +202,17 @@ public final class AppConfig {
             boolean mongoTlsEnabled,
             String mongoTlsCaCertPath,
             boolean mongoTlsAllowInvalidHostnames,
+            int mongoServerSelectionTimeoutMs,
+            int mongoConnectTimeoutMs,
+            int mongoSocketTimeoutMs,
             String hmacSecret,
             long nonceTtlSeconds,
             double maxAllowedAmount,
             List<ClusterNode> recommenderNodes,
             String mongo1Ip,
             String mongo2Ip,
-            String mongo3Ip) {
+            String mongo3Ip,
+            ApplicationProfile applicationProfile) {
         this.rabbitMqNodes = List.copyOf(rabbitMqNodes);
         this.rabbitMqUsername = rabbitMqUsername;
         this.rabbitMqPassword = rabbitMqPassword;
@@ -219,6 +233,9 @@ public final class AppConfig {
         this.mongoTlsEnabled = mongoTlsEnabled;
         this.mongoTlsCaCertPath = mongoTlsCaCertPath;
         this.mongoTlsAllowInvalidHostnames = mongoTlsAllowInvalidHostnames;
+        this.mongoServerSelectionTimeoutMs = mongoServerSelectionTimeoutMs;
+        this.mongoConnectTimeoutMs = mongoConnectTimeoutMs;
+        this.mongoSocketTimeoutMs = mongoSocketTimeoutMs;
         this.hmacSecret = hmacSecret;
         this.nonceTtlSeconds = nonceTtlSeconds;
         this.maxAllowedAmount = maxAllowedAmount;
@@ -226,15 +243,17 @@ public final class AppConfig {
         this.mongo1Ip = mongo1Ip;
         this.mongo2Ip = mongo2Ip;
         this.mongo3Ip = mongo3Ip;
+        this.applicationProfile = applicationProfile;
     }
 
     /**
-     * Loads key-value pairs from a {@code .env} file into the supplied map.
-     * Searches for the file in the working directory and two parent directories.
+     * Loads key-value pairs from an env file.
      *
-     * @param env the mutable map to populate with values found in the file
+     * @param path the file path to load
+     * @param env the mutable map to populate
+     * @param overwrite whether file values may overwrite values already present
      */
-    private static void loadEnvFile(String path, Map<String, String> env) {
+    private static void loadEnvFile(String path, Map<String, String> env, boolean overwrite) {
         java.io.File file = new java.io.File(path);
         if (file.exists()) {
             try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
@@ -256,7 +275,9 @@ public final class AppConfig {
                         } else if (value.startsWith("'") && value.endsWith("'") && value.length() >= 2) {
                             value = value.substring(1, value.length() - 1);
                         }
-                        env.put(key, value);
+                        if (overwrite || !env.containsKey(key)) {
+                            env.put(key, value);
+                        }
                     }
                 }
             } catch (java.io.IOException e) {
@@ -395,17 +416,69 @@ public final class AppConfig {
         // First load .env
         String[] pathsToTry = { ".env", "../.env", "../../.env" };
         for (String path : pathsToTry) {
-            loadEnvFile(path, env);
+            loadEnvFile(path, env, true);
         }
 
         // Then load network-ips.env to override values
         String[] configPaths = { "network-ips.env", "../network-ips.env", "../../network-ips.env" };
         for (String path : configPaths) {
-            loadEnvFile(path, env);
+            loadEnvFile(path, env, true);
         }
 
         // Dynamically override variables using loaded network IPs
         overrideWithNetworkIps(env);
+    }
+
+    private static Map<String, String> loadRuntimeEnvironment(ApplicationProfile profile, Map<String, String> runtimeOverrides) {
+        Map<String, String> env = new java.util.HashMap<>();
+        loadDotEnv(env);
+
+        if (profile != null) {
+            // Shared .env is often generated for one runnable. Remove these two
+            // before loading the profile file so each module gets the right RabbitMQ
+            // user unless the real process environment explicitly overrides it below.
+            env.remove("RABBITMQ_USERNAME");
+            env.remove("RABBITMQ_PASSWORD");
+
+            String profileEnvFile = profileEnvFile(profile);
+            if (profileEnvFile != null) {
+                loadEnvFile(profileEnvFile, env, true);
+                loadEnvFile("../" + profileEnvFile, env, true);
+                loadEnvFile("../../" + profileEnvFile, env, true);
+            }
+
+            // Cluster-wide values from network-ips.env must win over stale
+            // profile files, especially the HMAC secret and node IP addresses.
+            String[] sharedConfigPaths = {
+                    "network-ips.env", "../network-ips.env", "../../network-ips.env"
+            };
+            for (String sharedConfigPath : sharedConfigPaths) {
+                loadEnvFile(sharedConfigPath, env, true);
+            }
+        }
+
+        if (runtimeOverrides != null) {
+            env.putAll(runtimeOverrides);
+        }
+
+        // Rebuild derived node lists from the final IP values, then put the runtime
+        // overrides back one more time so a real process environment can still
+        // intentionally override RABBITMQ_NODES, MONGO_URI, etc.
+        overrideWithNetworkIps(env);
+        if (runtimeOverrides != null) {
+            env.putAll(runtimeOverrides);
+        }
+        return env;
+    }
+
+    private static String profileEnvFile(ApplicationProfile profile) {
+        return switch (profile) {
+            case CUSTOMER_UI -> "env-configs/customer.env";
+            case PEO_UI, SMOKE_TEST -> "env-configs/peo.env";
+            case MO_UI -> "env-configs/mo.env";
+            case QUEUE_SERVER -> "env-configs/queue-server.env";
+            case STORAGE_SERVER -> "env-configs/storage-server.env";
+        };
     }
 
     /**
@@ -414,8 +487,7 @@ public final class AppConfig {
      * @return the resolved application configuration
      */
     public static AppConfig fromEnvironment() {
-        Map<String, String> env = new java.util.HashMap<>(System.getenv());
-        loadDotEnv(env);
+        Map<String, String> env = loadRuntimeEnvironment(ApplicationProfile.QUEUE_SERVER, System.getenv());
         return fromEnvironment(ApplicationProfile.QUEUE_SERVER, env);
     }
 
@@ -426,48 +498,12 @@ public final class AppConfig {
      * @return the resolved application configuration
      */
     public static AppConfig fromEnvironment(ApplicationProfile profile) {
-        Map<String, String> env = new java.util.HashMap<>(System.getenv());
-        loadDotEnv(env);
-        
-        // Dynamically load profile-specific configs for unified local testing
-        if (profile != null) {
-            // Always clear the username/password loaded from the shared .env so that
-            // readOrDefault below will fall back to the correct per-profile credentials.
-            // The profile-specific env file (if found) can still override these.
-            env.remove("RABBITMQ_USERNAME");
-            env.remove("RABBITMQ_PASSWORD");
-
-            String profileEnvFile = null;
-            switch (profile) {
-                case CUSTOMER_UI: profileEnvFile = "env-configs/customer.env"; break;
-                case PEO_UI: profileEnvFile = "env-configs/peo.env"; break;
-                case MO_UI: profileEnvFile = "env-configs/mo.env"; break;
-                case QUEUE_SERVER: profileEnvFile = "env-configs/queue-server.env"; break;
-                case STORAGE_SERVER: profileEnvFile = "env-configs/storage-server.env"; break;
-                case SMOKE_TEST: profileEnvFile = "env-configs/peo.env"; break;
-            }
-            if (profileEnvFile != null) {
-                loadEnvFile(profileEnvFile, env);
-                loadEnvFile("../" + profileEnvFile, env);
-                loadEnvFile("../../" + profileEnvFile, env);
-            }
-            // Cluster-wide settings must override per-PC files. In particular, every
-            // publisher and storage-server must use the same HMAC secret.
-            String[] sharedConfigPaths = {
-                    "network-ips.env", "../network-ips.env", "../../network-ips.env"
-            };
-            for (String sharedConfigPath : sharedConfigPaths) {
-                loadEnvFile(sharedConfigPath, env);
-            }
-            // Re-apply network IPs to ensure localhost overrides are kept
-            overrideWithNetworkIps(env);
-        }
+        Map<String, String> env = loadRuntimeEnvironment(profile, System.getenv());
         
         AppConfig resolved = fromEnvironment(profile, env);
-        logger.info("Effective MongoDB target: profile=" + profile
+        logger.info("Effective MongoDB target: " + resolved.mongoStartupDiagnostics(DEFAULT_MONGO_DATABASE)
                 + ", uri=" + SecurityLogger.sanitize(resolved.getMongoUri())
-                + ", database=parking_db, TLS=" + resolved.isMongoTlsEnabled()
-                + ", sources=process environment/.env/network-ips/profile env");
+                + ", sources=process environment overrides .env/network-ips/profile env");
         return resolved;
     }
 
@@ -478,8 +514,7 @@ public final class AppConfig {
      * @return the resolved application configuration
      */
     public static AppConfig fromEnvironment(Map<String, String> environment) {
-        Map<String, String> env = new java.util.HashMap<>(environment);
-        loadDotEnv(env);
+        Map<String, String> env = loadRuntimeEnvironment(ApplicationProfile.QUEUE_SERVER, environment);
         return fromEnvironment(ApplicationProfile.QUEUE_SERVER, env);
     }
 
@@ -552,15 +587,9 @@ public final class AppConfig {
         if (mongoUri == null || mongoUri.isBlank()) {
             mongoUri = String.format(DEFAULT_MONGO_URI, activeProfile.defaultMongoUser(), mongoPass);
         } else {
-            if (mongoUri.startsWith("mongodb://")) {
-                int atIndex = mongoUri.indexOf("@");
-                if (atIndex > 0) {
-                    String prefix = "mongodb://";
-                    String rest = mongoUri.substring(atIndex);
-                    mongoUri = prefix + activeProfile.defaultMongoUser() + ":" + mongoPass + rest;
-                }
-            }
+            mongoUri = replaceMongoCredentials(mongoUri, activeProfile.defaultMongoUser(), mongoPass);
         }
+        mongoUri = normalizeMongoReplicaSetUri(mongoUri, environment);
         
         boolean mongoTlsEnabled = Boolean.parseBoolean(readOrDefault(
                 environment,
@@ -571,6 +600,24 @@ public final class AppConfig {
                 environment,
                 "MONGO_TLS_ALLOW_INVALID_HOSTNAMES",
                 String.valueOf(DEFAULT_MONGO_TLS_ALLOW_INVALID_HOSTNAMES)));
+        int mongoServerSelectionTimeoutMs = parsePositiveInt(
+                readOrDefault(
+                        environment,
+                        "MONGO_SERVER_SELECTION_TIMEOUT_MS",
+                        String.valueOf(DEFAULT_MONGO_SERVER_SELECTION_TIMEOUT_MS)),
+                "MONGO_SERVER_SELECTION_TIMEOUT_MS");
+        int mongoConnectTimeoutMs = parsePositiveInt(
+                readOrDefault(
+                        environment,
+                        "MONGO_CONNECT_TIMEOUT_MS",
+                        String.valueOf(DEFAULT_MONGO_CONNECT_TIMEOUT_MS)),
+                "MONGO_CONNECT_TIMEOUT_MS");
+        int mongoSocketTimeoutMs = parsePositiveInt(
+                readOrDefault(
+                        environment,
+                        "MONGO_SOCKET_TIMEOUT_MS",
+                        String.valueOf(DEFAULT_MONGO_SOCKET_TIMEOUT_MS)),
+                "MONGO_SOCKET_TIMEOUT_MS");
         String hmacSecret = readOrDefault(environment, "HMAC_SECRET", DEFAULT_HMAC_SECRET);
         if (hmacSecret.isBlank()) {
             throw new IllegalStateException("Security Risk: HMAC_SECRET must be configured.");
@@ -609,14 +656,139 @@ public final class AppConfig {
                 mongoTlsEnabled,
                 mongoTlsCaCertPath,
                 mongoTlsAllowInvalidHostnames,
+                mongoServerSelectionTimeoutMs,
+                mongoConnectTimeoutMs,
+                mongoSocketTimeoutMs,
                 hmacSecret,
                 nonceTtlSeconds,
                 maxAllowedAmount,
                 recommenderNodes,
                 m1Ip,
                 m2Ip,
-                m3Ip);
+                m3Ip,
+                activeProfile);
 
+    }
+
+    private static String replaceMongoCredentials(String mongoUri, String username, String password) {
+        if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
+            return mongoUri;
+        }
+        String scheme = "mongodb://";
+        int authorityStart = scheme.length();
+        int slashIndex = mongoUri.indexOf('/', authorityStart);
+        if (slashIndex < 0) {
+            slashIndex = mongoUri.length();
+        }
+        String authority = mongoUri.substring(authorityStart, slashIndex);
+        String rest = mongoUri.substring(slashIndex);
+        int atIndex = authority.lastIndexOf('@');
+        String hosts = atIndex >= 0 ? authority.substring(atIndex + 1) : authority;
+        return scheme + username + ":" + password + "@" + hosts + rest;
+    }
+
+    private static String normalizeMongoReplicaSetUri(String mongoUri, Map<String, String> environment) {
+        if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
+            return mongoUri;
+        }
+
+        String scheme = "mongodb://";
+        int authorityStart = scheme.length();
+        int slashIndex = mongoUri.indexOf('/', authorityStart);
+        if (slashIndex < 0) {
+            slashIndex = mongoUri.length();
+        }
+
+        String authority = mongoUri.substring(authorityStart, slashIndex);
+        String pathAndQuery = slashIndex < mongoUri.length() ? mongoUri.substring(slashIndex) : "/" + DEFAULT_MONGO_DATABASE;
+        int atIndex = authority.lastIndexOf('@');
+        String authPrefix = atIndex >= 0 ? authority.substring(0, atIndex + 1) : "";
+        String hosts = atIndex >= 0 ? authority.substring(atIndex + 1) : authority;
+
+        if (hasConfiguredMongoReplicaHosts(environment)) {
+            hosts = buildMongoSeedHosts(environment);
+        } else if (!hasMultipleMongoHosts(hosts) && hosts.toLowerCase().startsWith("mongo1:")) {
+            hosts = "mongo1:27017,mongo2:27018,mongo3:27019";
+        }
+
+        int queryIndex = pathAndQuery.indexOf('?');
+        String path = queryIndex >= 0 ? pathAndQuery.substring(0, queryIndex) : pathAndQuery;
+        String query = queryIndex >= 0 ? pathAndQuery.substring(queryIndex + 1) : "";
+        if (path == null || path.isBlank() || "/".equals(path)) {
+            path = "/" + DEFAULT_MONGO_DATABASE;
+        }
+
+        LinkedHashMap<String, String> queryParams = parseQuery(query);
+        removeQueryParamIgnoreCase(queryParams, "directConnection");
+        queryParams.put("replicaSet", DEFAULT_MONGO_REPLICA_SET);
+        queryParams.put("authSource", "admin");
+        queryParams.put("retryWrites", "true");
+        queryParams.put("w", "majority");
+
+        return scheme + authPrefix + hosts + path + "?" + buildQuery(queryParams);
+    }
+
+    private static boolean hasConfiguredMongoReplicaHosts(Map<String, String> environment) {
+        return hasText(environment.get("MONGO1_IP"))
+                && hasText(environment.get("MONGO2_IP"))
+                && hasText(environment.get("MONGO3_IP"));
+    }
+
+    private static String buildMongoSeedHosts(Map<String, String> environment) {
+        String mongo1 = readOrDefault(environment, "MONGO1_IP", "mongo1");
+        String mongo2 = readOrDefault(environment, "MONGO2_IP", "mongo2");
+        String mongo3 = readOrDefault(environment, "MONGO3_IP", "mongo3");
+        boolean singleHostLocal = mongo1.equalsIgnoreCase(mongo2) && mongo2.equalsIgnoreCase(mongo3);
+        String p1 = "27017";
+        String p2 = singleHostLocal ? "27018" : "27017";
+        String p3 = singleHostLocal ? "27019" : "27017";
+        return mongo1 + ":" + p1 + "," + mongo2 + ":" + p2 + "," + mongo3 + ":" + p3;
+    }
+
+    private static boolean hasMultipleMongoHosts(String hosts) {
+        return hosts != null && hosts.split(",").length > 1;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private static LinkedHashMap<String, String> parseQuery(String query) {
+        LinkedHashMap<String, String> params = new LinkedHashMap<>();
+        if (query == null || query.isBlank()) {
+            return params;
+        }
+        String[] parts = query.split("&");
+        for (String part : parts) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            String[] kv = part.split("=", 2);
+            String key = kv[0].trim();
+            String value = kv.length == 2 ? kv[1].trim() : "";
+            if (!key.isEmpty()) {
+                params.put(key, value);
+            }
+        }
+        return params;
+    }
+
+    private static void removeQueryParamIgnoreCase(LinkedHashMap<String, String> params, String keyToRemove) {
+        params.keySet().removeIf(key -> key.equalsIgnoreCase(keyToRemove));
+    }
+
+    private static String buildQuery(LinkedHashMap<String, String> params) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (builder.length() > 0) {
+                builder.append('&');
+            }
+            builder.append(entry.getKey());
+            if (!entry.getValue().isEmpty()) {
+                builder.append('=').append(entry.getValue());
+            }
+        }
+        return builder.toString();
     }
 
     /**
@@ -824,6 +996,92 @@ public final class AppConfig {
     }
 
     /**
+     * Returns the MongoDB server-selection timeout used by the Java driver.
+     *
+     * @return timeout in milliseconds
+     */
+    public int getMongoServerSelectionTimeoutMs() {
+        return mongoServerSelectionTimeoutMs;
+    }
+
+    /**
+     * Returns the MongoDB socket connect timeout used by the Java driver.
+     *
+     * @return timeout in milliseconds
+     */
+    public int getMongoConnectTimeoutMs() {
+        return mongoConnectTimeoutMs;
+    }
+
+    /**
+     * Returns the MongoDB socket read timeout used by the Java driver.
+     *
+     * @return timeout in milliseconds
+     */
+    public int getMongoSocketTimeoutMs() {
+        return mongoSocketTimeoutMs;
+    }
+
+    /**
+     * Returns the application profile that produced this configuration.
+     *
+     * @return the active application profile
+     */
+    public ApplicationProfile getApplicationProfile() {
+        return applicationProfile;
+    }
+
+    /**
+     * Builds a password-free MongoDB startup diagnostic string.
+     *
+     * @param databaseName the database name used by the caller
+     * @return a sanitized MongoDB diagnostic summary
+     */
+    public String mongoStartupDiagnostics(String databaseName) {
+        return "profile=" + applicationProfile
+                + ", hosts=" + extractMongoHosts(mongoUri)
+                + ", database=" + databaseName
+                + ", replicaSet=" + queryValue(mongoUri, "replicaSet", "<not set>")
+                + ", TLS=" + mongoTlsEnabled
+                + ", directConnection=" + queryValue(mongoUri, "directConnection", "<not set>")
+                + ", serverSelectionTimeoutMS=" + mongoServerSelectionTimeoutMs
+                + ", retryWrites=" + queryValue(mongoUri, "retryWrites", "<driver default>")
+                + ", writeConcernW=" + queryValue(mongoUri, "w", "<driver default>");
+    }
+
+    private static String extractMongoHosts(String mongoUri) {
+        if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
+            return "<unknown>";
+        }
+        String scheme = "mongodb://";
+        int authorityStart = scheme.length();
+        int slashIndex = mongoUri.indexOf('/', authorityStart);
+        if (slashIndex < 0) {
+            slashIndex = mongoUri.length();
+        }
+        String authority = mongoUri.substring(authorityStart, slashIndex);
+        int atIndex = authority.lastIndexOf('@');
+        return atIndex >= 0 ? authority.substring(atIndex + 1) : authority;
+    }
+
+    private static String queryValue(String mongoUri, String key, String defaultValue) {
+        if (mongoUri == null) {
+            return defaultValue;
+        }
+        int queryIndex = mongoUri.indexOf('?');
+        if (queryIndex < 0 || queryIndex == mongoUri.length() - 1) {
+            return defaultValue;
+        }
+        LinkedHashMap<String, String> params = parseQuery(mongoUri.substring(queryIndex + 1));
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue().isEmpty() ? "<set>" : entry.getValue();
+            }
+        }
+        return defaultValue;
+    }
+
+    /**
      * Returns the shared secret key used for HMAC-SHA256 message signing.
      *
      * @return the HMAC secret
@@ -868,6 +1126,9 @@ public final class AppConfig {
                 + ", rabbitMqRecoveryIntervalMs=" + rabbitMqRecoveryIntervalMs
                 + ", mongoUri='" + SecurityLogger.sanitize(mongoUri) + '\''
                 + ", mongoTlsEnabled=" + mongoTlsEnabled
+                + ", mongoServerSelectionTimeoutMs=" + mongoServerSelectionTimeoutMs
+                + ", mongoConnectTimeoutMs=" + mongoConnectTimeoutMs
+                + ", mongoSocketTimeoutMs=" + mongoSocketTimeoutMs
                 + '}';
     }
 

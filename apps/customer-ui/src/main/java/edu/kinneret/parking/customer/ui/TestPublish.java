@@ -20,10 +20,11 @@ public class TestPublish {
             MessageEnvelope env = MessageEnvelope.createUnsigned("transaction.start", payload, "10.0.201.24", UUID.randomUUID().toString()).sign(signer);
             
             System.out.println("Publishing message...");
-            manager.withChannel((channel, activeNode) -> {
-                channel.basicPublish("", config.getTransactionsQueueName(), null,
+            manager.withPublisherConfirmsForQueue(config.getTransactionsQueueName(), (channel, activeNode) -> {
+                channel.basicPublish("", config.getTransactionsQueueName(),
+                        com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
                         env.toJsonString().getBytes(StandardCharsets.UTF_8));
-                System.out.println("Message published successfully via " + activeNode.toAddress());
+                System.out.println("Message accepted by RabbitMQ via " + activeNode.toAddress());
             });
             
             System.out.println("SUCCESS!");

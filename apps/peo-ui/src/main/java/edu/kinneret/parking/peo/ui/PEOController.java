@@ -323,7 +323,11 @@ public class PEOController {
                 MessageEnvelope envelope = MessageEnvelope.createUnsigned("citation.issue", payload, clientIp, correlationId).sign(signer);
                 
                 rabbitManager.withPublisherConfirmsForQueue(config.getCitationsQueueName(), (channel, node) -> {
-                    channel.basicPublish("", config.getCitationsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
+                    channel.basicPublish(
+                            "",
+                            config.getCitationsQueueName(),
+                            com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
+                            envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
                 });
                 return null;
             }
@@ -331,8 +335,8 @@ public class PEOController {
 
 
         task.setOnSucceeded(e -> {
-            setOutput("Citation Issued to Cluster", false);
-            appendActivity("CITATION", safeVin, "Issued");
+            setOutput("Citation request accepted by RabbitMQ", false);
+            appendActivity("CITATION", safeVin, "Accepted by RabbitMQ");
             citationSection.setVisible(false);
             citationSection.setManaged(false);
         });

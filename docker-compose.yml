@@ -153,7 +153,7 @@ services:
     working_dir: /
     env_file: env-configs/queue-server.env
     environment:
-      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
@@ -192,7 +192,7 @@ services:
     working_dir: /
     env_file: env-configs/queue-server.env
     environment:
-      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
@@ -231,7 +231,7 @@ services:
     working_dir: /
     env_file: env-configs/queue-server.env
     environment:
-      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
@@ -271,7 +271,7 @@ services:
     working_dir: /
     env_file: env-configs/queue-server.env
     environment:
-      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+      - MONGO_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false
@@ -309,7 +309,7 @@ services:
     working_dir: /
     env_file: env-configs/storage-server.env
     environment:
-      - MONGO_URI=mongodb://storage_db_user:db_pwd_rotated_storage@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+      - MONGO_URI=mongodb://storage_db_user:db_pwd_rotated_storage@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin&retryWrites=true&w=majority
       - MONGO_TLS_ENABLED=true
       - MONGO_TLS_CA_CERT_PATH=/etc/mongo/certs/ca-cert.pem
       - MONGO_TLS_ALLOW_INVALID_HOSTNAMES=false

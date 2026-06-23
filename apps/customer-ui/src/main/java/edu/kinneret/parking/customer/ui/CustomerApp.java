@@ -141,6 +141,9 @@ public class CustomerApp extends Application {
     @SuppressWarnings("unchecked")
     public Parent createContent(Stage primaryStage) {
         AppConfig config = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.CUSTOMER_UI);
+        java.util.logging.Logger.getLogger(CustomerApp.class.getName())
+                .info("RabbitMQ client configured: " + config.toRedactedSummary()
+                        + ", publisherConfirmsEnabled=true, consumerManualAckEnabled=false");
         ParkingRepository repository = new ParkingRepository(config);
         RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(config);
         

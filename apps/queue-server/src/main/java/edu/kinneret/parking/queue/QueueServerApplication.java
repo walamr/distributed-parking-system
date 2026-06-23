@@ -33,6 +33,9 @@ public final class QueueServerApplication {
         SecurityLogger.initialize(System.getenv().getOrDefault("SECURITY_LOG_PATH", "logs/security.log"));
         try {
             System.out.println("Starting queue-server with config: " + appConfig.toRedactedSummary());
+            logger.info("RabbitMQ topology service configured: "
+                    + appConfig.toRedactedSummary()
+                    + ", topologyInitializer=true, persistenceConsumerEnabled=false");
 
             RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(appConfig);
             QueueHealthChecker healthChecker = new QueueHealthChecker(connectionManager);

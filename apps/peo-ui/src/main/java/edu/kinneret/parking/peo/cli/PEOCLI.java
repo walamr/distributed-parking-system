@@ -46,6 +46,8 @@ public class PEOCLI {
         System.out.println("==========================================");
         System.out.println("     MULLIGAN PARKING - PEO CLUSTER CLI");
         System.out.println("==========================================");
+        System.out.println("RabbitMQ target: " + config.toRedactedSummary()
+                + ", publisherConfirmsEnabled=true, consumerManualAckEnabled=false");
 
         try (ParkingRepository repository = new ParkingRepository(config);
              Scanner scanner = new Scanner(System.in)) {
@@ -235,27 +237,33 @@ public class PEOCLI {
              String clientIp = InetAddress.getLocalHost().getHostAddress();
              MessageEnvelope envelope = MessageEnvelope.createUnsigned("citation.issue", payload, clientIp, correlationId).sign(signer);
              
-             manager.withChannelForQueue(config.getCitationsQueueName(), (channel, node) -> {
-                 channel.basicPublish("", config.getCitationsQueueName(), null, envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
-                 
-                 String displayReason = reason == null ? "" : reason;
-                 if (displayReason.length() > 30) {
-                     displayReason = displayReason.substring(0, 27) + "...";
-                 }
-                 
-                 System.out.println("\n+--------------------------------------------------+");
-                 System.out.println("|                CITATION ISSUED                   |");
-                 System.out.println("+--------------------------------------------------+");
-                 System.out.println(String.format("|  %-46s  |", "Vehicle VIN  : " + (vin == null ? "" : vin.toUpperCase())));
-                 System.out.println(String.format("|  %-46s  |", "Space ID     : " + (spaceId == null ? "" : spaceId.toUpperCase())));
-                 System.out.println(String.format("|  %-46s  |", "Amount       : " + (amount == null ? "" : amount)));
-                 System.out.println(String.format("|  %-46s  |", "Reason       : " + displayReason));
-                 System.out.println(String.format("|  %-46s  |", "Status       : SUCCESS (Published via " + node.toAddress() + ")"));
-                 System.out.println("+--------------------------------------------------+");
-                 
-                 // Record citation activity in the session log
-                 sessionActivities.add(new PEOActivityLogEntry("CITATION", vin, "Issued", System.currentTimeMillis()));
+             String[] publishNode = new String[] {"unknown"};
+             manager.withPublisherConfirmsForQueue(config.getCitationsQueueName(), (channel, node) -> {
+                 publishNode[0] = node.toAddress();
+                 channel.basicPublish(
+                         "",
+                         config.getCitationsQueueName(),
+                         com.rabbitmq.client.MessageProperties.PERSISTENT_TEXT_PLAIN,
+                         envelope.toJsonString().getBytes(StandardCharsets.UTF_8));
              });
+
+             String displayReason = reason == null ? "" : reason;
+             if (displayReason.length() > 30) {
+                 displayReason = displayReason.substring(0, 27) + "...";
+             }
+
+             System.out.println("\n+--------------------------------------------------+");
+             System.out.println("|                CITATION REQUEST                  |");
+             System.out.println("+--------------------------------------------------+");
+             System.out.println(String.format("|  %-46s  |", "Vehicle VIN  : " + (vin == null ? "" : vin.toUpperCase())));
+             System.out.println(String.format("|  %-46s  |", "Space ID     : " + (spaceId == null ? "" : spaceId.toUpperCase())));
+             System.out.println(String.format("|  %-46s  |", "Amount       : " + (amount == null ? "" : amount)));
+             System.out.println(String.format("|  %-46s  |", "Reason       : " + displayReason));
+             System.out.println(String.format("|  %-46s  |", "Status       : ACCEPTED BY RABBITMQ via " + publishNode[0]));
+             System.out.println("+--------------------------------------------------+");
+
+             // Record citation activity in the session log after broker confirmation.
+             sessionActivities.add(new PEOActivityLogEntry("CITATION", vin, "Accepted by RabbitMQ", System.currentTimeMillis()));
          } catch (Exception e) {
              logger.warn("Failed to publish citation request to the cluster: {}", SecurityLogger.sanitize(e.getMessage()));
              System.err.println("ERROR: Request could not be processed. Please try again.");

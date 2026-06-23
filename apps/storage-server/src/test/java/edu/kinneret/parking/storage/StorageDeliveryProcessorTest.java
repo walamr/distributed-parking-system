@@ -73,6 +73,7 @@ class StorageDeliveryProcessorTest {
     @Test
     void storageServerIsThePersistenceOwner() {
         assertEquals("storage-server", StorageServerApplication.PERSISTENCE_OWNER);
+        assertTrue(StorageServerApplication.MANUAL_ACK_ENABLED);
     }
 
     private static StorageDeliveryProcessor.DeliveryAcknowledger acknowledger(List<String> events) {

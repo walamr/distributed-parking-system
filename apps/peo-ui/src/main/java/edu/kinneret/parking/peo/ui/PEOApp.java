@@ -110,6 +110,9 @@ public class PEOApp extends Application {
     @SuppressWarnings("unchecked")
     public Parent createContent() {
         AppConfig config = AppConfig.fromEnvironment(AppConfig.ApplicationProfile.PEO_UI);
+        java.util.logging.Logger.getLogger(PEOApp.class.getName())
+                .info("RabbitMQ client configured: " + config.toRedactedSummary()
+                        + ", publisherConfirmsEnabled=true, consumerManualAckEnabled=false");
         ParkingRepository repository = new ParkingRepository(config);
         RabbitMqConnectionManager rabbitManager = new RabbitMqConnectionManager(config);
         
