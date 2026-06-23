@@ -319,6 +319,37 @@ public class ParkingRepository implements AutoCloseable {
     }
 
     /**
+     * Counts the citations/tickets stored for an exact parking space.
+     *
+     * <p>Supports both the current top-level {@code spaceId} field and the legacy nested
+     * {@code payload.spaceId} field used by older citation documents. This is the same
+     * exact-space match the recommender uses to compute per-space citation counts. Citations
+     * in this system are stored per exact space (there is no zone field on a citation), so the
+     * count is by space, not by zone.
+     *
+     * <p>Returns {@code 0} when the space has no citations, the input is blank, or the database
+     * is unavailable; it never throws to the caller, since the count is optional display data.
+     * Database errors are logged.
+     *
+     * @param spaceId the parking space identifier
+     * @return the number of citations for the space, or {@code 0}
+     */
+    public long countCitationsForSpace(String spaceId) {
+        if (spaceId == null || spaceId.isBlank() || !isDbOnline || database == null) {
+            return 0L;
+        }
+        try {
+            return database.getCollection("citations").countDocuments(
+                    Filters.or(
+                            Filters.eq("payload.spaceId", spaceId),
+                            Filters.eq("spaceId", spaceId)));
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to count citations for space " + spaceId + ": " + e.getMessage(), e);
+            return 0L;
+        }
+    }
+
+    /**
      * Retrieves all recorded system queries (legality checks).
      * Reads from the primary so newly logged checks are immediately visible.
      *

@@ -444,6 +444,30 @@ public class CustomerCLI {
     }
 
     /**
+     * Returns the citation/ticket count recorded for {@code spaceId} within a recommender
+     * "Result:" payload (for example {@code "Space 3;0, Space 7;2"}), or {@code null} when the
+     * space is not present in the recommended list.
+     *
+     * @param rawResult the recommender result payload (the part after {@code "Result:"})
+     * @param spaceId the parking space number to look up
+     * @return the citation count as a string, or {@code null} when not a recommended space
+     */
+    static String extractTicketsForSpace(String rawResult, String spaceId) {
+        if (rawResult == null || spaceId == null
+                || "NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
+            return null;
+        }
+        for (String part : rawResult.split(", ")) {
+            String clean = part.replace("Space ", "").trim();
+            String[] spaceAndCitations = clean.split(";");
+            if (spaceAndCitations.length >= 1 && spaceAndCitations[0].trim().equals(spaceId.trim())) {
+                return spaceAndCitations.length >= 2 ? spaceAndCitations[1].trim() : "0";
+            }
+        }
+        return null;
+    }
+
+    /**
      * Converts a recommender protocol response into the concise CLI display.
      * Overloaded to maintain backward compatibility with tests.
      *
@@ -498,21 +522,10 @@ public class CustomerCLI {
                 String[] parts = result.split("\n");
                 if (parts.length >= 2) {
                     String rawResult = parts[1].replace("Result:", "").trim();
-                    
+
                     // Check if the user's chosen spaceId matches one of the recommended spaces
-                    boolean choseBest = false;
-                    if (!"NONE".equalsIgnoreCase(rawResult)) {
-                        String[] recommendationParts = rawResult.split(", ");
-                        for (String part : recommendationParts) {
-                            String cleanPart = part.replace("Space ", "").trim();
-                            String[] spaceAndCitations = cleanPart.split(";");
-                            if (spaceAndCitations.length >= 1 && spaceAndCitations[0].trim().equals(spaceId.trim())) {
-                                choseBest = true;
-                                break;
-                            }
-                        }
-                    }
-                    
+                    boolean choseBest = extractTicketsForSpace(rawResult, spaceId) != null;
+
                     // Format recommendation results
                     if ("NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
                         return "+--------------------------------------------------+\n" +
@@ -532,7 +545,7 @@ public class CustomerCLI {
                         String part = recommendationParts[i].replace("Space ", "").trim();
                         String[] spaceAndCitations = part.split(";");
                         if (spaceAndCitations.length >= 2) {
-                            String item = String.format("   - Space %-3s (%s Citations)", spaceAndCitations[0], spaceAndCitations[1]);
+                            String item = String.format("   - Space %-3s (Tickets: %s)", spaceAndCitations[0], spaceAndCitations[1]);
                             formatted.append(String.format("|  %-46s  |", item));
                         } else {
                             String item = "   - " + recommendationParts[i];
@@ -629,13 +642,8 @@ public class CustomerCLI {
                                     org.bson.Document sp = spaces.get(i);
                                     String sid = sp.getString("spaceId");
                                     
-                                    // Count citations
-                                    long citationCount = db.getCollection("citations").countDocuments(
-                                        com.mongodb.client.model.Filters.or(
-                                            com.mongodb.client.model.Filters.eq("payload.spaceId", sid),
-                                            com.mongodb.client.model.Filters.eq("spaceId", sid)
-                                        )
-                                    );
+                                    // Count citations (exact space, supports nested payload.spaceId)
+                                    long citationCount = repository.countCitationsForSpace(sid);
                                     
                                     // Determine occupancy
                                     org.bson.Document latestTx = db.getCollection("transactions").find(

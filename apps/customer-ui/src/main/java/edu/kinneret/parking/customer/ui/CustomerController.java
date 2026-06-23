@@ -1440,7 +1440,7 @@ public class CustomerController {
             String[] spaceAndCitations = part.split(";");
             if (spaceAndCitations.length >= 2) {
                 formatted.append("Space ").append(spaceAndCitations[0])
-                         .append(" (").append(spaceAndCitations[1]).append(" Citations)");
+                         .append(" (Tickets: ").append(spaceAndCitations[1]).append(")");
             } else {
                 formatted.append(recommendationParts[i]);
             }
@@ -1562,24 +1562,26 @@ public class CustomerController {
                     if (parts.length >= 2) {
                         requestLabel.setText(parts[0].replace("Request:", "").trim());
                         String rawResult = parts[1].replace("Result:", "").trim();
-                        
-                        // Check if the user's chosen spaceId matches one of the recommended spaces
-                        boolean choseBest = false;
-                        if (!"NONE".equalsIgnoreCase(rawResult)) {
-                            String[] recommendationParts = rawResult.split(", ");
-                            for (String part : recommendationParts) {
+
+                        // If the customer's chosen space is itself one of the recommended (best)
+                        // spaces, still surface its citation/ticket count instead of hiding it
+                        // behind the celebration message.
+                        String chosenSpaceTickets = null;
+                        if (!"NONE".equalsIgnoreCase(rawResult) && !"Empty List".equalsIgnoreCase(rawResult)) {
+                            for (String part : rawResult.split(", ")) {
                                 String cleanPart = part.replace("Space ", "").trim();
                                 String[] spaceAndCitations = cleanPart.split(";");
                                 if (spaceAndCitations.length >= 1 && spaceAndCitations[0].trim().equals(spaceId.trim())) {
-                                    choseBest = true;
+                                    chosenSpaceTickets = spaceAndCitations.length >= 2 ? spaceAndCitations[1].trim() : "0";
                                     break;
                                 }
                             }
                         }
-                        
+                        boolean choseBest = chosenSpaceTickets != null;
+
                         String formattedRec = formatRecommendationResult(rawResult);
                         if (choseBest) {
-                            formattedRec = "You chose the best space! 🎉";
+                            formattedRec = "You chose the best space! Tickets for this space: " + chosenSpaceTickets + " 🎉";
                             resultLabel.getStyleClass().remove("dashboard-value-primary");
                             resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-font-size: 16px; -fx-alignment: center;");
                             resultLabel.setMaxWidth(Double.MAX_VALUE);

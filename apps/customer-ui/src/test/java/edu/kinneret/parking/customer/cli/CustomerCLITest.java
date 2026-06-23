@@ -108,4 +108,34 @@ public class CustomerCLITest {
         assertEquals("RECOMMENDATION FAILURE: Invalid response from recommender node.",
                 CustomerCLI.formatRecommendationResponse("not-json"));
     }
+
+    /** The recommender result carries a citation/ticket count per recommended space. */
+    @Test
+    public void extractsTicketCountForRecommendedSpace() {
+        assertEquals("3", CustomerCLI.extractTicketsForSpace("Space 2;3, Space 4;5", "2"));
+        assertEquals("5", CustomerCLI.extractTicketsForSpace("Space 2;3, Space 4;5", "4"));
+    }
+
+    /** A space not in the recommended list yields no ticket count. */
+    @Test
+    public void extractsNoTicketCountForUnrecommendedOrEmpty() {
+        assertNull(CustomerCLI.extractTicketsForSpace("Space 2;3, Space 4;5", "9"));
+        assertNull(CustomerCLI.extractTicketsForSpace("NONE", "2"));
+        assertNull(CustomerCLI.extractTicketsForSpace("Empty List", "2"));
+        assertNull(CustomerCLI.extractTicketsForSpace(null, "2"));
+    }
+
+    /** The CLI card view displays the ticket count next to each recommended space. */
+    @Test
+    public void cardViewIncludesTicketCount() {
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "SUCCESS");
+        response.addProperty("result", "Request: Space 9\nResult: Space 2;3, Space 4;5");
+
+        String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "9");
+
+        assertTrue(rendered.contains("Space 2"), "must list the recommended space");
+        assertTrue(rendered.contains("Tickets: 3"), "must show the ticket count for the recommended space");
+        assertTrue(rendered.contains("Tickets: 5"), "must show the ticket count for every recommended space");
+    }
 }
