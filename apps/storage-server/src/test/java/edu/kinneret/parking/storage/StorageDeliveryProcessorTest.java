@@ -51,6 +51,26 @@ class StorageDeliveryProcessorTest {
     }
 
     @Test
+    void transientMongoErrorRequeuesWithoutAck() {
+        List<String> events = new ArrayList<>();
+        boolean result = StorageDeliveryProcessor.persistThenAcknowledge(
+                "transactions.queue",
+                startEnvelope(),
+                "mongodb://<redacted>@mongo1/parking_db",
+                envelope -> {
+                    events.add("insert");
+                    // Simulates a primary election / node-down window during failover.
+                    throw new com.mongodb.MongoTimeoutException("Timed out while waiting for a server");
+                },
+                acknowledger(events));
+
+        assertFalse(result);
+        assertEquals(List.of("insert", "requeue"), events);
+        assertFalse(events.contains("ack"));
+        assertFalse(events.contains("reject"));
+    }
+
+    @Test
     void storageServerIsThePersistenceOwner() {
         assertEquals("storage-server", StorageServerApplication.PERSISTENCE_OWNER);
     }
@@ -65,6 +85,11 @@ class StorageDeliveryProcessorTest {
             @Override
             public void reject() {
                 events.add("reject");
+            }
+
+            @Override
+            public void requeue() {
+                events.add("requeue");
             }
         };
     }

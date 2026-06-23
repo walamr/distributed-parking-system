@@ -129,6 +129,13 @@ public class StorageServerApplication {
                             public void reject() throws Exception {
                                 channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
                             }
+
+                            @Override
+                            public void requeue() throws Exception {
+                                // requeue=true: keep the message so it is redelivered once the
+                                // MongoDB replica set finishes electing a new primary.
+                                channel.basicReject(delivery.getEnvelope().getDeliveryTag(), true);
+                            }
                         });
 
             } catch (Exception e) {

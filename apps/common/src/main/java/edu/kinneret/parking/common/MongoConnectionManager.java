@@ -53,9 +53,13 @@ public final class MongoConnectionManager implements AutoCloseable {
         // Default to reading from primary, but allow failover to secondaries
         settingsBuilder.readPreference(ReadPreference.primaryPreferred());
 
-        // Keep startup tolerant enough for a freshly initialized Docker replica set.
+        // Keep startup tolerant enough for a freshly initialized Docker replica set, and
+        // long enough to ride through a primary election when one node is stopped. The
+        // replica-set election can take ~10-12s to detect a downed primary, so a 10s
+        // window risks failing writes mid-failover; 30s lets the driver wait for the new
+        // primary and then complete the (retryable) write instead of erroring out.
         settingsBuilder.applyToClusterSettings(builder ->
-            builder.serverSelectionTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            builder.serverSelectionTimeout(30000, java.util.concurrent.TimeUnit.MILLISECONDS)
         );
         settingsBuilder.applyToSocketSettings(builder ->
             builder.connectTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)

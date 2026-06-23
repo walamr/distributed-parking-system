@@ -31,15 +31,27 @@ final class StorageDeliveryProcessor {
         try {
             store.store(envelope);
         } catch (Exception ex) {
-            logger.warning("MongoDB insert failed; decision=REJECT, deadLettered=true, exceptionClass="
-                    + ex.getClass().getName() + ", exceptionMessage="
+            // Distinguish a TRANSIENT MongoDB failure (a node down, a primary election
+            // in progress, a socket/timeout) from a PERMANENT one. During a replica-set
+            // failover the write must NOT be dropped to the dead-letter queue: requeue it
+            // so it is redelivered and persisted once the new primary is available. Only
+            // genuinely permanent failures are dead-lettered. (Bad data is already rejected
+            // before persistence, and duplicate keys are swallowed inside the store.)
+            boolean transientFailure = isTransientMongoError(ex);
+            logger.warning("MongoDB insert failed; decision=" + (transientFailure ? "REQUEUE" : "REJECT")
+                    + ", deadLettered=" + (!transientFailure) + ", transient=" + transientFailure
+                    + ", exceptionClass=" + ex.getClass().getName() + ", exceptionMessage="
                     + SecurityLogger.sanitize(ex.getMessage()) + ", " + context);
             try {
-                acknowledger.reject();
-            } catch (Exception rejectEx) {
-                logger.severe("RabbitMQ reject failed for messageId=" + envelope.getMessageId()
-                        + ", exceptionClass=" + rejectEx.getClass().getName()
-                        + ", exceptionMessage=" + SecurityLogger.sanitize(rejectEx.getMessage()));
+                if (transientFailure) {
+                    acknowledger.requeue();
+                } else {
+                    acknowledger.reject();
+                }
+            } catch (Exception nackEx) {
+                logger.severe("RabbitMQ nack/reject failed for messageId=" + envelope.getMessageId()
+                        + ", exceptionClass=" + nackEx.getClass().getName()
+                        + ", exceptionMessage=" + SecurityLogger.sanitize(nackEx.getMessage()));
             }
             return false;
         }
@@ -56,6 +68,32 @@ final class StorageDeliveryProcessor {
         }
     }
 
+    /**
+     * Returns true when the failure looks transient (a replica-set node down, a primary
+     * election in progress, a socket/connection/server-selection timeout, or a retryable
+     * write). Such messages should be requeued rather than dead-lettered so no parking
+     * event is lost during a MongoDB failover.
+     */
+    static boolean isTransientMongoError(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof com.mongodb.MongoSocketException
+                    || t instanceof com.mongodb.MongoTimeoutException
+                    || t instanceof com.mongodb.MongoServerUnavailableException
+                    || t instanceof com.mongodb.MongoNotPrimaryException
+                    || t instanceof com.mongodb.MongoNodeIsRecoveringException) {
+                return true;
+            }
+            if (t instanceof com.mongodb.MongoException) {
+                com.mongodb.MongoException me = (com.mongodb.MongoException) t;
+                if (me.hasErrorLabel("RetryableWriteError")
+                        || me.hasErrorLabel("TransientTransactionError")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @FunctionalInterface
     interface MessageStore {
         void store(MessageEnvelope envelope) throws Exception;
@@ -64,6 +102,15 @@ final class StorageDeliveryProcessor {
     interface DeliveryAcknowledger {
         void ack() throws Exception;
 
+        /** Dead-letters the delivery (permanent failure: never redelivered to this queue). */
         void reject() throws Exception;
+
+        /**
+         * Returns the delivery to the queue for redelivery (transient failure). Defaults to
+         * {@link #reject()} for implementations that do not distinguish the two outcomes.
+         */
+        default void requeue() throws Exception {
+            reject();
+        }
     }
 }
