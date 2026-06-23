@@ -125,6 +125,32 @@ public class CustomerCLITest {
         assertNull(CustomerCLI.extractTicketsForSpace(null, "2"));
     }
 
+    /** When all spaces are occupied, the customer sees a clear English sentence, not a fake result. */
+    @Test
+    public void allSpacesOccupiedShowsClearSentence() {
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "SUCCESS");
+        response.addProperty("result", "Request: Space 5\nResult: Empty List");
+
+        String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "5");
+
+        assertEquals(CustomerCLI.ALL_SPACES_OCCUPIED_MESSAGE, rendered);
+        assertTrue(rendered.toLowerCase().contains("occupied"));
+    }
+
+    /** When the chosen space is itself the best, its own ticket count is shown explicitly. */
+    @Test
+    public void chosenBestSpaceShowsItsTicketCountInCli() {
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "SUCCESS");
+        response.addProperty("result", "Request: Space 2\nResult: Space 2;3");
+
+        String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "2");
+
+        assertTrue(rendered.contains("You chose the best space!"));
+        assertTrue(rendered.contains("Tickets for this space: 3"));
+    }
+
     /** The CLI card view displays the ticket count next to each recommended space. */
     @Test
     public void cardViewIncludesTicketCount() {

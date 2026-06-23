@@ -63,6 +63,20 @@ public class RecommenderServerTest {
         );
         assertEquals("3;1, Space 4;2", RecommenderServer.serializeResults(results));
     }
+
+    /**
+     * When every space in the zone is occupied, all nodes vote "Empty List" and consensus must
+     * resolve to "Empty List" (rather than failing), so the customer can be told all spaces are full.
+     */
+    @Test
+    public void allOccupiedReachesEmptyListConsensus() {
+        java.util.Map<String, String> votes = new java.util.HashMap<>();
+        votes.put("recommender1", "Request: Space 5\nResult: Empty List");
+        votes.put("recommender2", "Request: Space 5\nResult: Empty List");
+        votes.put("recommender3", "Request: Space 5\nResult: Empty List");
+
+        assertEquals("Empty List", RecommenderServer.determineMajority(votes, 2));
+    }
     /**
      * Requested space available and minimum citation count.
      */

@@ -444,6 +444,13 @@ public class CustomerCLI {
     }
 
     /**
+     * Shown to the customer when every parking space in the requested zone is occupied/reserved,
+     * so the recommender returns no available space.
+     */
+    static final String ALL_SPACES_OCCUPIED_MESSAGE =
+            "All parking spaces are currently occupied. No parking recommendation is available.";
+
+    /**
      * Returns the citation/ticket count recorded for {@code spaceId} within a recommender
      * "Result:" payload (for example {@code "Space 3;0, Space 7;2"}), or {@code null} when the
      * space is not present in the recommended list.
@@ -528,18 +535,17 @@ public class CustomerCLI {
 
                     // Format recommendation results
                     if ("NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
-                        return "+--------------------------------------------------+\n" +
-                               "|  No recommendations available.                   |\n" +
-                               "+--------------------------------------------------+";
+                        return ALL_SPACES_OCCUPIED_MESSAGE;
                     }
                     String[] recommendationParts = rawResult.split(", ");
                     StringBuilder formatted = new StringBuilder();
+                    if (choseBest) {
+                        formatted.append("You chose the best space! Tickets for this space: ")
+                                 .append(extractTicketsForSpace(rawResult, spaceId)).append("\n");
+                    }
                     formatted.append("+--------------------------------------------------+\n");
                     formatted.append("|              RECOMMENDATION RESULTS              |\n");
                     formatted.append("+--------------------------------------------------+\n");
-                    if (choseBest) {
-                        formatted.append("|  You chose the best space! [Excellent Choice]    |\n");
-                    }
                     formatted.append("|  Recommendations:                                |\n");
                     for (int i = 0; i < recommendationParts.length; i++) {
                         String part = recommendationParts[i].replace("Space ", "").trim();
@@ -594,7 +600,12 @@ public class CustomerCLI {
                 String[] parts = result.split("\n");
                 if (parts.length >= 2) {
                     String rawResult = parts[1].replace("Result:", "").trim();
-                    
+
+                    // All spaces in the zone are occupied: there is nothing to recommend.
+                    if ("NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
+                        return ALL_SPACES_OCCUPIED_MESSAGE;
+                    }
+
                     // Parse recommendation results (recommended space IDs)
                     List<String> recommendedIds = new java.util.ArrayList<>();
                     if (!"NONE".equalsIgnoreCase(rawResult) && !"Empty List".equalsIgnoreCase(rawResult)) {
@@ -679,7 +690,15 @@ public class CustomerCLI {
                                     rows.add(row);
                                 }
                                 
-                                return formatConsoleTable(headers, rows);
+                                String table = formatConsoleTable(headers, rows);
+                                // If the customer's chosen space is itself a best space, surface its
+                                // own citation/ticket count explicitly above the zone table.
+                                String chosenTickets = extractTicketsForSpace(rawResult, spaceId);
+                                if (chosenTickets != null) {
+                                    return "You chose the best space! Tickets for this space: "
+                                            + chosenTickets + "\n" + table;
+                                }
+                                return table;
                             }
                         } catch (Exception e) {
                             logger.warn("Failed to retrieve zone details for recommendation table: {}", e.getMessage());

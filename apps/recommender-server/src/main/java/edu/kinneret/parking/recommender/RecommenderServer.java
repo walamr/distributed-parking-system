@@ -642,7 +642,8 @@ public class RecommenderServer implements AutoCloseable {
                 if (cleanRec.startsWith("Space ")) {
                     cleanRec = cleanRec.substring(6).trim();
                 }
-                if (recommendation.equals("NONE") || cleanRec.matches("\\d+;\\d+(,\\s*(Space\\s*)?\\d+;\\d+)*")) {
+                if (recommendation.equals("NONE") || recommendation.equalsIgnoreCase("Empty List")
+                        || cleanRec.matches("\\d+;\\d+(,\\s*(Space\\s*)?\\d+;\\d+)*")) {
                     String norm = normalizeRecommendation(recommendation);
                     counts.put(norm, counts.getOrDefault(norm, 0) + 1);
                     originalCounts.computeIfAbsent(norm, k -> new HashMap<>())
