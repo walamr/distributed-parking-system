@@ -61,6 +61,11 @@ public class CustomerController {
     // --- Local persistence for offline transactions ---
     private static final String LOCAL_TX_DIR = "local_parking_data";
 
+    /** Shown when every parking space in the requested zone is occupied/full. */
+    private static final String ZONE_FULL_NOTICE =
+            "All parking spaces in this parking zone are currently full.\n"
+            + "Please try another zone or check again later.";
+
     /**
      * Returns the path to the local transactions file for the given VIN.
      * Stored as: local_parking_data/<vin>.json
@@ -1431,7 +1436,7 @@ public class CustomerController {
     private String formatRecommendationResult(String rawResult) {
         if (rawResult == null || rawResult.isBlank()
                 || "NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
-            return "All parking spaces in this zone are currently occupied. No parking recommendation is available.";
+            return ZONE_FULL_NOTICE;
         }
         // Example rawResult: "Space 3;0" or "Space 3;0, Space 13;0"
         String[] recommendationParts = rawResult.split(", ");
@@ -1557,7 +1562,24 @@ public class CustomerController {
             try {
                 JsonObject response = JsonParser.parseString(task.getValue()).getAsJsonObject();
                 String status = response.get("status").getAsString();
-                if ("SUCCESS".equalsIgnoreCase(status)) {
+                if ("ZONE_FULL".equalsIgnoreCase(status)) {
+                    // Normal business outcome: every space in the requested zone is occupied.
+                    // Show a clear, non-error notice (not a red system failure).
+                    requestLabel.setText(spaceId.trim());
+                    resultLabel.setText(ZONE_FULL_NOTICE);
+                    if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                        resultLabel.getStyleClass().add("dashboard-value-primary");
+                    }
+                    resultLabel.setStyle("");
+                    resultLabel.setMaxWidth(Double.MAX_VALUE);
+                    if (resultHeader != null) {
+                        resultHeader.setVisible(true);
+                        resultHeader.setManaged(true);
+                    }
+                    if (resultItem != null) {
+                        resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                    }
+                } else if ("SUCCESS".equalsIgnoreCase(status)) {
                     String result = response.get("result").getAsString();
                     String[] parts = result.split("\n");
                     if (parts.length >= 2) {

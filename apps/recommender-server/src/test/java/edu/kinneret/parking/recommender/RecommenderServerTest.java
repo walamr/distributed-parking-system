@@ -77,6 +77,19 @@ public class RecommenderServerTest {
 
         assertEquals("Empty List", RecommenderServer.determineMajority(votes, 2));
     }
+
+    /** A full zone is detected from the "Empty List" consensus; a real space list is not. */
+    @Test
+    public void zoneFullConsensusIsDetected() {
+        org.junit.jupiter.api.Assertions.assertTrue(
+                RecommenderServer.isZoneFullConsensus("Empty List"));
+        org.junit.jupiter.api.Assertions.assertTrue(
+                RecommenderServer.isZoneFullConsensus("Request: Space 5\nResult: Empty List"));
+        org.junit.jupiter.api.Assertions.assertFalse(
+                RecommenderServer.isZoneFullConsensus("3;0, Space 4;0"));
+        org.junit.jupiter.api.Assertions.assertFalse(
+                RecommenderServer.isZoneFullConsensus(null));
+    }
     /**
      * Requested space available and minimum citation count.
      */

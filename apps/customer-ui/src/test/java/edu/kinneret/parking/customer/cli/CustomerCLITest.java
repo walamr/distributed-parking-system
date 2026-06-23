@@ -125,9 +125,24 @@ public class CustomerCLITest {
         assertNull(CustomerCLI.extractTicketsForSpace(null, "2"));
     }
 
-    /** When all spaces are occupied, the customer sees a clear English sentence, not a fake result. */
+    /** A dedicated ZONE_FULL status shows the clear "zone full" notice, not a failure. */
     @Test
-    public void allSpacesOccupiedShowsClearSentence() {
+    public void zoneFullStatusShowsFullNotice() {
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "ZONE_FULL");
+        response.addProperty("result", "Request: Space 5\nResult: Empty List");
+
+        String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "5");
+
+        assertEquals(CustomerCLI.ALL_SPACES_OCCUPIED_MESSAGE, rendered);
+        assertTrue(rendered.toLowerCase().contains("full"));
+        assertTrue(rendered.toLowerCase().contains("zone"));
+        assertFalse(rendered.toUpperCase().contains("FAILURE"));
+    }
+
+    /** Defensive: a legacy SUCCESS + "Empty List" result still renders the "zone full" notice. */
+    @Test
+    public void emptyListResultStillShowsFullNotice() {
         JsonObject response = new JsonObject();
         response.addProperty("status", "SUCCESS");
         response.addProperty("result", "Request: Space 5\nResult: Empty List");
@@ -135,8 +150,21 @@ public class CustomerCLITest {
         String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "5");
 
         assertEquals(CustomerCLI.ALL_SPACES_OCCUPIED_MESSAGE, rendered);
-        assertTrue(rendered.toLowerCase().contains("occupied"));
+        assertTrue(rendered.toLowerCase().contains("full"));
         assertTrue(rendered.toLowerCase().contains("zone"));
+    }
+
+    /** A no-majority failure is still a failure, never mislabeled as zone-full. */
+    @Test
+    public void failureIsNotMislabeledAsZoneFull() {
+        JsonObject response = new JsonObject();
+        response.addProperty("status", "FAILURE");
+        response.addProperty("reason", "Recommendation service temporarily unavailable");
+
+        String rendered = CustomerCLI.formatRecommendationResponse(response.toString(), "5");
+
+        assertTrue(rendered.startsWith("RECOMMENDATION FAILURE:"));
+        assertFalse(rendered.toLowerCase().contains("full"));
     }
 
     /** When the chosen space is itself the best, its own ticket count is shown explicitly. */

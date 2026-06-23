@@ -335,12 +335,13 @@ public class RecommenderServer implements AutoCloseable {
                         JsonObject signedReply = parseAndValidateResponse(reply, leaderHost + ":" + leaderPort);
                         clientWriter.println(signedReply);
                         try {
-                            if (signedReply.has("status") && "SUCCESS".equals(signedReply.get("status").getAsString())) {
+                            String replyStatus = signedReply.has("status") ? signedReply.get("status").getAsString() : "";
+                            if ("SUCCESS".equals(replyStatus) || "ZONE_FULL".equals(replyStatus)) {
                                 String result = signedReply.get("result").getAsString();
                                 String[] parts = result.split("\n");
                                 if (parts.length >= 2) {
                                     String finalRec = parts[1].replace("Result:", "").trim();
-                                    logger.info("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + finalRec + ")");
+                                    logger.info("[FORWARD-RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: " + replyStatus + " (" + finalRec + ")");
                                     RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, finalRec);
                                 }
                             } else {
@@ -448,7 +449,7 @@ public class RecommenderServer implements AutoCloseable {
         String consensus = executeLeaderConsensus(spaceId, vehicleId, explicitVotes);
         JsonObject response = createSignedMessage("CLIENT_RESPONSE", spaceId, correlationId, nodeId);
         if (consensus != null) {
-            response.addProperty("status", "SUCCESS");
+            boolean zoneFull = isZoneFullConsensus(consensus);
             String finalResult;
             if (consensus.startsWith("Request:")) {
                 finalResult = consensus;
@@ -459,8 +460,17 @@ public class RecommenderServer implements AutoCloseable {
                 }
                 finalResult = "Request: Space " + spaceId + "\nResult: " + consensusList;
             }
+            // ZONE_FULL is a normal business outcome (every space in the zone is occupied), not a
+            // failure. It is reported with its own status so the client shows a friendly notice
+            // instead of a fake recommendation or a red error.
+            response.addProperty("status", zoneFull ? "ZONE_FULL" : "SUCCESS");
             response.addProperty("result", finalResult);
-            logger.info("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + consensus + ")");
+            if (zoneFull) {
+                logger.info("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId
+                        + " -> Decision: ZONE_FULL (all parking spaces in the zone are occupied)");
+            } else {
+                logger.info("[RECOMMENDATION] Vehicle: " + vehicleId + " requested Space: " + spaceId + " -> Decision: SUCCESS (" + consensus + ")");
+            }
             try {
                 RecommenderServerApplication.updateLatestQuery(spaceId, vehicleId, consensus);
             } catch (NoClassDefFoundError | Exception ignored) {}
@@ -683,6 +693,19 @@ public class RecommenderServer implements AutoCloseable {
             return vote.substring(index + "Result:".length()).trim();
         }
         return vote.trim();
+    }
+
+    /**
+     * Returns whether an agreed consensus represents a zone where every parking space is
+     * occupied (the recommender's {@code "Empty List"} outcome) rather than an actual list of
+     * recommended spaces. Used to report a dedicated {@code ZONE_FULL} status to the client.
+     *
+     * @param consensus the agreed recommendation string (may be {@code null})
+     * @return {@code true} when the zone is full
+     */
+    static boolean isZoneFullConsensus(String consensus) {
+        return consensus != null
+                && "Empty List".equalsIgnoreCase(extractRecommendationList(consensus).trim());
     }
 
     /**

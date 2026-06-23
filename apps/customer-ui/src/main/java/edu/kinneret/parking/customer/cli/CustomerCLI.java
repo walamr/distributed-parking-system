@@ -448,7 +448,8 @@ public class CustomerCLI {
      * so the recommender returns no available space.
      */
     static final String ALL_SPACES_OCCUPIED_MESSAGE =
-            "All parking spaces in this zone are currently occupied. No parking recommendation is available.";
+            "All parking spaces in this parking zone are currently full.\n"
+            + "Please try another zone or check again later.";
 
     /**
      * Returns the citation/ticket count recorded for {@code spaceId} within a recommender
@@ -490,6 +491,9 @@ public class CustomerCLI {
             if (!response.has("status")) {
                 return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
             }
+            if ("ZONE_FULL".equalsIgnoreCase(response.get("status").getAsString())) {
+                return ALL_SPACES_OCCUPIED_MESSAGE;
+            }
             if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
                 if (!response.has("result") || response.get("result").getAsString().isBlank()) {
                     return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
@@ -520,6 +524,9 @@ public class CustomerCLI {
             JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
             if (!response.has("status")) {
                 return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+            }
+            if ("ZONE_FULL".equalsIgnoreCase(response.get("status").getAsString())) {
+                return ALL_SPACES_OCCUPIED_MESSAGE;
             }
             if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
                 if (!response.has("result") || response.get("result").getAsString().isBlank()) {
@@ -591,6 +598,9 @@ public class CustomerCLI {
             JsonObject response = com.google.gson.JsonParser.parseString(responseLine).getAsJsonObject();
             if (!response.has("status")) {
                 return "RECOMMENDATION FAILURE: Invalid response from recommender node.";
+            }
+            if ("ZONE_FULL".equalsIgnoreCase(response.get("status").getAsString())) {
+                return ALL_SPACES_OCCUPIED_MESSAGE;
             }
             if ("SUCCESS".equalsIgnoreCase(response.get("status").getAsString())) {
                 if (!response.has("result") || response.get("result").getAsString().isBlank()) {
