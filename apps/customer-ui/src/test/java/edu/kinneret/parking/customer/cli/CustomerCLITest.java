@@ -136,6 +136,7 @@ public class CustomerCLITest {
 
         assertEquals(CustomerCLI.ALL_SPACES_OCCUPIED_MESSAGE, rendered);
         assertTrue(rendered.toLowerCase().contains("occupied"));
+        assertTrue(rendered.toLowerCase().contains("zone"));
     }
 
     /** When the chosen space is itself the best, its own ticket count is shown explicitly. */

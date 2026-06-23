@@ -448,7 +448,7 @@ public class CustomerCLI {
      * so the recommender returns no available space.
      */
     static final String ALL_SPACES_OCCUPIED_MESSAGE =
-            "All parking spaces are currently occupied. No parking recommendation is available.";
+            "All parking spaces in this zone are currently occupied. No parking recommendation is available.";
 
     /**
      * Returns the citation/ticket count recorded for {@code spaceId} within a recommender

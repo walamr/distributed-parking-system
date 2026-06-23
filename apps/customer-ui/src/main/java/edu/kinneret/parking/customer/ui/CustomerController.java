@@ -1431,7 +1431,7 @@ public class CustomerController {
     private String formatRecommendationResult(String rawResult) {
         if (rawResult == null || rawResult.isBlank()
                 || "NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
-            return "All parking spaces are currently occupied. No parking recommendation is available.";
+            return "All parking spaces in this zone are currently occupied. No parking recommendation is available.";
         }
         // Example rawResult: "Space 3;0" or "Space 3;0, Space 13;0"
         String[] recommendationParts = rawResult.split(", ");
