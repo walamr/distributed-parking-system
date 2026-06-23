@@ -2,17 +2,45 @@
 chcp 65001 >nul
 setlocal
 
+if not exist "network-ips.env" (
+    echo ERROR: network-ips.env was not found.
+    echo Run this script from the project root so the classroom MongoDB IPs can be loaded.
+    exit /b 1
+)
+
+for /f "usebackq tokens=1,* delims==" %%A in ("network-ips.env") do (
+    if /i "%%A"=="MONGO1_IP" set "MONGO1_IP=%%B"
+    if /i "%%A"=="MONGO2_IP" set "MONGO2_IP=%%B"
+    if /i "%%A"=="MONGO3_IP" set "MONGO3_IP=%%B"
+)
+
+if not defined MONGO1_IP (
+    echo ERROR: MONGO1_IP is missing from network-ips.env.
+    exit /b 1
+)
+if not defined MONGO2_IP (
+    echo ERROR: MONGO2_IP is missing from network-ips.env.
+    exit /b 1
+)
+if not defined MONGO3_IP (
+    echo ERROR: MONGO3_IP is missing from network-ips.env.
+    exit /b 1
+)
+
+set "MONGO_RS_HOSTS=%MONGO1_IP%:27017,%MONGO2_IP%:27017,%MONGO3_IP%:27017"
+set "MONGO_RS_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@%MONGO_RS_HOSTS%/parking_db?replicaSet=rs0&authSource=admin"
+
+call :VALIDATE_CLASSROOM_HOSTS
+if errorlevel 1 exit /b 1
+
 if "%~1"=="1" (
-    set "MONGO_NODE=mongo1"
-    goto MENU
+    goto SET_NODE_1
 )
 if "%~1"=="2" (
-    set "MONGO_NODE=mongo2"
-    goto MENU
+    goto SET_NODE_2
 )
 if "%~1"=="3" (
-    set "MONGO_NODE=mongo3"
-    goto MENU
+    goto SET_NODE_3
 )
 
 :CHOOSE_NODE
@@ -28,26 +56,44 @@ echo =========================================================
 set /p node_choice="Enter the node number (1-3, 9 to quit): "
 
 if "%node_choice%"=="9" goto EXIT_SCRIPT
-if "%node_choice%"=="1" (
-    set "MONGO_NODE=mongo1"
-    goto MENU
-)
-if "%node_choice%"=="2" (
-    set "MONGO_NODE=mongo2"
-    goto MENU
-)
-if "%node_choice%"=="3" (
-    set "MONGO_NODE=mongo3"
-    goto MENU
-)
+if "%node_choice%"=="1" goto SET_NODE_1
+if "%node_choice%"=="2" goto SET_NODE_2
+if "%node_choice%"=="3" goto SET_NODE_3
 
 echo Invalid choice, please enter 1, 2, 3, or 9.
 goto CHOOSE_NODE
 
+:SET_NODE_1
+set "MONGO_NODE=mongo1"
+set "MONGO_TARGET=%MONGO1_IP%:27017"
+set "MONGO_CERT=mongo1.pem"
+goto MENU
+
+:SET_NODE_2
+set "MONGO_NODE=mongo2"
+set "MONGO_TARGET=%MONGO2_IP%:27017"
+set "MONGO_CERT=mongo2.pem"
+goto MENU
+
+:SET_NODE_3
+set "MONGO_NODE=mongo3"
+set "MONGO_TARGET=%MONGO3_IP%:27017"
+set "MONGO_CERT=mongo3.pem"
+goto MENU
+
 :MENU
+call :VALIDATE_SELECTED_TARGET
+if errorlevel 1 goto CHOOSE_NODE
 echo.
 echo =========================================================
 echo Mulligan Municipality Parking Queries - Node: %MONGO_NODE%
+echo =========================================================
+echo Selected node: %MONGO_NODE%
+echo Effective target: %MONGO_TARGET%
+echo Replica set URI hosts: %MONGO_RS_HOSTS%
+echo Database: parking_db
+echo Collection: transactions
+echo TLS: enabled
 echo =========================================================
 echo 1. Show all parking transactions sorted from oldest to newest
 echo 2. Show all issued citations sorted chronologically
@@ -62,10 +108,9 @@ echo 0. Return to Node selection
 echo =========================================================
 set /p choice="Enter the query number (0-9): "
 
-rem NOTE: Ports below are for SINGLE-MACHINE mode (docker-compose.yml).
-rem       On 12-machine distributed setup, change all ports back to 27017.
-set MONGO_CMD=docker exec -i %MONGO_NODE% mongosh "mongodb://mulligan_db_admin:db_pwd_rotated_admin@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin" --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_NODE%.pem --quiet --eval
-set "READ_PREF=db.getMongo().setReadPref('primary'); "
+set "MONGO_DIRECT_URI=mongodb://mulligan_db_admin:db_pwd_rotated_admin@%MONGO_TARGET%/parking_db?authSource=admin&directConnection=true"
+set MONGO_CMD=docker exec -i %MONGO_NODE% mongosh "%MONGO_DIRECT_URI%" --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/%MONGO_CERT% --quiet --eval
+set "READ_PREF=db.getMongo().setReadPref('secondaryPreferred'); "
 
 if "%choice%"=="9" goto EXIT_SCRIPT
 if "%choice%"=="1" goto Q1
@@ -139,3 +184,33 @@ goto MENU
 :EXIT_SCRIPT
 endlocal
 exit /b 9
+
+:VALIDATE_CLASSROOM_HOSTS
+echo %MONGO_RS_HOSTS% | findstr /r "172\.18\." >nul
+if not errorlevel 1 (
+    echo ERROR: Invalid classroom Mongo target. Expected MONGO*_IP:27017, got %MONGO_RS_HOSTS%
+    echo Docker bridge addresses such as 172.18.x.x are not valid in classroom mode.
+    exit /b 1
+)
+echo %MONGO_RS_HOSTS% | findstr /c:":27018" >nul
+if not errorlevel 1 (
+    echo ERROR: Invalid classroom Mongo target. Expected MONGO*_IP:27017, got %MONGO_RS_HOSTS%
+    echo Port 27018 is not valid in classroom mode.
+    exit /b 1
+)
+exit /b 0
+
+:VALIDATE_SELECTED_TARGET
+echo %MONGO_TARGET% | findstr /r "^172\.18\." >nul
+if not errorlevel 1 (
+    echo ERROR: Invalid classroom Mongo target. Expected MONGO*_IP:27017, got %MONGO_TARGET%
+    echo Docker bridge addresses such as 172.18.x.x are not valid in classroom mode.
+    exit /b 1
+)
+echo %MONGO_TARGET% | findstr /c:":27018" >nul
+if not errorlevel 1 (
+    echo ERROR: Invalid classroom Mongo target. Expected MONGO*_IP:27017, got %MONGO_TARGET%
+    echo Port 27018 is not valid in classroom mode.
+    exit /b 1
+)
+exit /b 0

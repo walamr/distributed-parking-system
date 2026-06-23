@@ -150,13 +150,34 @@ Assert-NativeSuccess "Copying the database-users script"
 docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$ADMIN_URI" --eval "$EVAL_USERS" /tmp/init-users.js
 Assert-NativeSuccess "Creating MongoDB application users"
 
-# 4. Import test data
-Write-Host "--- Step 4: Import sample data ---"
+# 4. Ensure reference data without clearing runtime collections
+Write-Host "--- Step 4: Ensure reference data without clearing runtime collections ---"
 $PARKING_ADMIN_URI = "mongodb://mulligan_db_admin:$dbAdminPass`@$primary/parking_db?authSource=admin&tls=true&tlsAllowInvalidHostnames=true&tlsAllowInvalidCertificates=true&tlsCAFile=/etc/mongo/certs/ca-cert.pem&tlsCertificateKeyFile=/etc/mongo/certs/mongo1.pem"
+$TX_COUNT_BEFORE = docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" --quiet --eval "db.transactions.countDocuments({})"
+Assert-NativeSuccess "Counting transactions before reference-data seed"
+$TX_COUNT_BEFORE = $TX_COUNT_BEFORE.Trim()
+$CITATION_COUNT_BEFORE = docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" --quiet --eval "db.citations.countDocuments({})"
+Assert-NativeSuccess "Counting citations before reference-data seed"
+$CITATION_COUNT_BEFORE = $CITATION_COUNT_BEFORE.Trim()
 docker cp ./docker/mongodb/seed-data.js "mongo1:/tmp/seed-data.js"
-Assert-NativeSuccess "Copying sample data"
+Assert-NativeSuccess "Copying reference-data seed script"
 docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" /tmp/seed-data.js
-Assert-NativeSuccess "Importing sample data"
+Assert-NativeSuccess "Ensuring reference data"
+$TX_COUNT_AFTER = docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" --quiet --eval "db.transactions.countDocuments({})"
+Assert-NativeSuccess "Counting transactions after reference-data seed"
+$TX_COUNT_AFTER = $TX_COUNT_AFTER.Trim()
+$CITATION_COUNT_AFTER = docker exec mongo1 mongosh --tlsAllowInvalidCertificates "$PARKING_ADMIN_URI" --quiet --eval "db.citations.countDocuments({})"
+Assert-NativeSuccess "Counting citations after reference-data seed"
+$CITATION_COUNT_AFTER = $CITATION_COUNT_AFTER.Trim()
+if ([long]$TX_COUNT_AFTER -lt [long]$TX_COUNT_BEFORE) {
+    Write-Error "Safety check failed: transactions count decreased during startup ($TX_COUNT_BEFORE -> $TX_COUNT_AFTER). Startup must never clear parking_db.transactions."
+    exit 1
+}
+if ([long]$CITATION_COUNT_AFTER -lt [long]$CITATION_COUNT_BEFORE) {
+    Write-Error "Safety check failed: citations count decreased during startup ($CITATION_COUNT_BEFORE -> $CITATION_COUNT_AFTER). Startup must never clear parking_db.citations."
+    exit 1
+}
+Write-Host "Protected counts preserved: transactions $TX_COUNT_BEFORE -> $TX_COUNT_AFTER, citations $CITATION_COUNT_BEFORE -> $CITATION_COUNT_AFTER"
 
 # 5. Final check
 Write-Host "--- Step 5: Cluster Status ---"

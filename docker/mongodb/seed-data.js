@@ -1,14 +1,26 @@
 db = db.getSiblingDB('parking_db');
 
-db.vehicles.deleteMany({});
-db.zones.deleteMany({});
-db.spaces.deleteMany({});
-db.transactions.deleteMany({});
-db.citations.deleteMany({});
-db.users.deleteMany({});
-db.nonces.deleteMany({});
+function upsertByKey(collectionName, keyName, documents) {
+  if (!documents || documents.length === 0) {
+    return;
+  }
 
-db.vehicles.insertMany([
+  const operations = documents.map(function (doc) {
+    const filter = {};
+    filter[keyName] = doc[keyName];
+    return {
+      replaceOne: {
+        filter: filter,
+        replacement: doc,
+        upsert: true
+      }
+    };
+  });
+
+  db.getCollection(collectionName).bulkWrite(operations, { ordered: true });
+}
+
+const vehicles = [
   { vehicleId: "604-95-839", owner: "Jose Morris", accountType: "customer" },
   { vehicleId: "089-64-318", owner: "Jeremy Rodriguez", accountType: "customer" },
   { vehicleId: "058-28-878", owner: "Gerald Hernandez", accountType: "customer" },
@@ -19,7 +31,9 @@ db.vehicles.insertMany([
   { vehicleId: "233-47-038", owner: "Randy Lopez", accountType: "customer" },
   { vehicleId: "412-60-971", owner: "Kevin Kim", accountType: "customer" },
   { vehicleId: "286-66-320", owner: "Robert White", accountType: "customer" }
-]);
+];
+
+upsertByKey("vehicles", "vehicleId", vehicles);
 
 const zonesList = [
   { zoneId: "1", zoneName: "Magnolia Way", hourlyRate: 1.77 },
@@ -34,7 +48,7 @@ const zonesList = [
   { zoneId: "10", zoneName: "Adams Ave", hourlyRate: 55.27 }
 ];
 
-db.zones.insertMany(zonesList);
+upsertByKey("zones", "zoneId", zonesList);
 
 const spacesList = [];
 for (let i = 1; i <= 100; i++) {
@@ -47,12 +61,15 @@ for (let i = 1; i <= 100; i++) {
     hourlyRate: zone.hourlyRate
   });
 }
-db.spaces.insertMany(spacesList);
+upsertByKey("spaces", "spaceId", spacesList);
 
-db.users.insertMany([
+const users = [
   { username: "customer", password: "customer_secure_pass_2026", role: "Customer", vin: "604-95-839", createdAt: Date.now() },
   { username: "peo_service", password: "peo_secure_pass_2026", role: "PEO", vin: "123456789", createdAt: Date.now() },
   { username: "mulligan_admin", password: "admin_ultra_secure_99", role: "MO", vin: "999999999", createdAt: Date.now() }
-]);
+];
 
-print("--- MongoDB Sample Data Imported Successfully ---");
+upsertByKey("users", "username", users);
+
+print("--- MongoDB reference data ensured idempotently ---");
+print("Protected runtime collections were NOT cleared: transactions, citations, nonces");

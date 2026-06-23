@@ -10,6 +10,7 @@ goto START
 call :CHECK_DOCKER
 if errorlevel 1 exit /b 1
 echo Stopping and removing the old MongoDB Node 2 container...
+echo Persistent Docker volume mongo2-data is kept. No database data is deleted.
 docker compose --env-file network-ips.env -f docker-compose.mongo2.yml down
 exit /b %ERRORLEVEL%
 
@@ -28,7 +29,7 @@ echo Waiting for MongoDB Node 1 at %MONGO1_IP%:27017 before starting Node 2...
 call :WAIT_PREVIOUS_NODE "%MONGO1_IP%" "MongoDB Node 1"
 if errorlevel 1 goto FAILED
 echo SUCCESS: MongoDB Node 1 is reachable. Starting Node 2 automatically.
-echo Safe startup always removes the old MongoDB Node 2 container and volume first.
+echo Safe startup restarts the MongoDB Node 2 container without deleting the persistent volume.
 call :CLEAN
 if errorlevel 1 goto FAILED
 echo Starting MongoDB Node 2 container...

@@ -12,6 +12,7 @@ goto START
 call :CHECK_DOCKER
 if errorlevel 1 exit /b 1
 echo Stopping and removing the old MongoDB Node 1 container...
+echo Persistent Docker volume mongo1-data is kept. No database data is deleted.
 docker compose --env-file network-ips.env -f docker-compose.mongo1.yml down
 exit /b %ERRORLEVEL%
 
@@ -20,7 +21,7 @@ call :CHECK_DOCKER
 if errorlevel 1 goto FAILED
 call :CHECK_NETWORK_CONFIG
 if errorlevel 1 goto FAILED
-echo Safe startup always removes the old MongoDB Node 1 container and volume first.
+echo Safe startup restarts the MongoDB Node 1 container without deleting the persistent volume.
 call :CLEAN
 if errorlevel 1 goto FAILED
 echo Starting MongoDB Node 1 container...

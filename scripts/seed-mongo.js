@@ -23,8 +23,17 @@ for (let i = 1; i <= 100; i++) {
     });
 }
 
-// Clear the collection first just in case
-db.spaces.deleteMany({});
+const resetDb = (typeof process !== 'undefined' && process.env && process.env.RESET_DB === 'true');
+if (!resetDb && db.spaces.countDocuments({}) > 0) {
+    print("spaces already contains data. Skipping seed. Set RESET_DB=true only for an intentional reset.");
+    quit(0);
+}
+
+if (resetDb) {
+    print("WARNING: RESET_DB=true. Clearing spaces before reseeding.");
+    db.spaces.deleteMany({});
+}
+
 db.spaces.insertMany(spaces);
 
 print("Successfully seeded " + spaces.length + " spaces into MongoDB!");

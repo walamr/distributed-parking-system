@@ -11,9 +11,9 @@ cls
 echo =========================================================
 echo RabbitMQ Node 1
 echo =========================================================
-echo 1. Clean node data, start, wait for Nodes 2 and 3, then open console
-echo 2. Clean node data, then start (same safe startup)
-echo 3. Clean node data only
+echo 1. Restart node, wait for Nodes 2 and 3, then open console
+echo 2. Restart node only (same safe startup)
+echo 3. Stop container only
 echo 9. Exit
 set /p ACTION="Choose an action: "
 :PROCESS_ACTION
@@ -32,14 +32,15 @@ goto MENU
 :CLEAN
 call :CHECK_DOCKER
 if errorlevel 1 exit /b 1
-echo Cleaning RabbitMQ Node 1 container and volume...
-docker compose --env-file network-ips.env -f docker-compose.rabbitmq1.yml down -v
+echo Stopping RabbitMQ Node 1 container...
+echo Persistent Docker volume rabbitmq1-data is kept. No RabbitMQ data is deleted.
+docker compose --env-file network-ips.env -f docker-compose.rabbitmq1.yml down
 exit /b %ERRORLEVEL%
 
 :START
 call :CHECK_DOCKER
 if errorlevel 1 goto FAILED
-echo Safe startup always removes the old RabbitMQ Node 1 container and volume first.
+echo Safe startup restarts the RabbitMQ Node 1 container without deleting the persistent volume.
 call :CLEAN
 if errorlevel 1 goto FAILED
 echo Starting RabbitMQ Node 1 container...
