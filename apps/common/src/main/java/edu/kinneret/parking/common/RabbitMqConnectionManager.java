@@ -106,20 +106,52 @@ public final class RabbitMqConnectionManager {
         });
     }
 
+    /** Number of channel attempts before surfacing a failure to the caller. */
+    private static final int MAX_CHANNEL_ATTEMPTS = 6;
+    /** Backoff between channel attempts, long enough to ride through a node stop. */
+    private static final long CHANNEL_RETRY_DELAY_MS = 2_000L;
+
     /**
      * Opens a channel and automatically closes the underlying connection when the action finishes.
+     *
+     * <p>Retries transient failures so that stopping ONE RabbitMQ node does not surface as a
+     * user-facing error. When a node is stopped, the fresh connection fails over to a surviving
+     * node, but for a few seconds the quorum queue may still be re-electing its leader and the
+     * storage-server consumer may not have re-registered yet (so the consumer-count guard or the
+     * publish transiently fail). Backing off and retrying lets the cluster settle and the
+     * operation succeed. Re-publishing the same envelope is safe: storage-server de-duplicates by
+     * the unique messageId index.
      *
      * @param channelConsumer the action to execute with an active channel
      */
     public void withChannel(ChannelConsumer channelConsumer) {
-        try (ConnectionHandle handle = connect(); Channel channel = handle.connection().createChannel()) {
-            channelConsumer.accept(channel, handle.activeNode());
-        } catch (IOException | TimeoutException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
+        IllegalStateException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_CHANNEL_ATTEMPTS; attempt++) {
+            try (ConnectionHandle handle = connect(); Channel channel = handle.connection().createChannel()) {
+                channelConsumer.accept(channel, handle.activeNode());
+                return;
+            } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
+                throw new IllegalStateException("RabbitMQ channel operation failed.", ex);
+            } catch (IOException | TimeoutException
+                    | com.rabbitmq.client.ShutdownSignalException | IllegalStateException ex) {
+                lastFailure = (ex instanceof IllegalStateException)
+                        ? (IllegalStateException) ex
+                        : new IllegalStateException("RabbitMQ channel operation failed.", ex);
+                if (attempt < MAX_CHANNEL_ATTEMPTS) {
+                    SecurityLogger.logSecurityEvent("RabbitMQ channel attempt " + attempt + " of "
+                            + MAX_CHANNEL_ATTEMPTS + " failed; retrying after " + CHANNEL_RETRY_DELAY_MS
+                            + "ms: " + SecurityLogger.sanitize(ex.getMessage()));
+                    try {
+                        Thread.sleep(CHANNEL_RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("RabbitMQ channel operation failed.", ie);
+                    }
+                }
             }
-            throw new IllegalStateException("RabbitMQ channel operation failed.", ex);
         }
+        throw lastFailure;
     }
 
     /**
