@@ -13,6 +13,7 @@ import edu.kinneret.parking.common.ValidationUtils;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Logger;
 
 /**
@@ -32,6 +33,7 @@ public class StorageServerApplication {
     }
 
     private static final Logger logger = Logger.getLogger(StorageServerApplication.class.getName());
+    private static final long CONSUMER_RECONNECT_DELAY_MS = 5_000L;
 
     /**
      * Entry point for the Storage Server.
@@ -62,34 +64,54 @@ public class StorageServerApplication {
         MongoStorageService storageService = new MongoStorageService(config, MongoStorageService.DATABASE_NAME);
         RabbitMqConnectionManager connectionManager = new RabbitMqConnectionManager(config);
 
-        try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect()) {
-            waitForRequiredQueues(handle.connection(), config);
+        runConsumersForever(config, storageService, validator, connectionManager);
+    }
 
-            try (Channel channel = handle.connection().createChannel()) {
-            
-                // Limit the number of unacknowledged messages
-                channel.basicQos(10);
+    private static void runConsumersForever(
+            AppConfig config,
+            MongoStorageService storageService,
+            QueueMessageSecurityValidator validator,
+            RabbitMqConnectionManager connectionManager) {
+        while (!Thread.currentThread().isInterrupted()) {
+            try (RabbitMqConnectionManager.ConnectionHandle handle = connectionManager.connect()) {
+                waitForRequiredQueues(handle.connection(), config);
 
-                // Note: Queues and Exchanges are declared by the QueueServer (mulligan_admin).
-                // This service passively verifies the queues and consumes with manual ACK.
+                CountDownLatch connectionClosed = new CountDownLatch(1);
+                handle.connection().addShutdownListener(cause -> {
+                    logger.warning("RabbitMQ storage connection closed on " + handle.activeNode().toAddress()
+                            + "; reconnecting. Cause=" + SecurityLogger.sanitize(String.valueOf(cause)));
+                    connectionClosed.countDown();
+                });
 
-                consumeQueue(channel, config.getTransactionsQueueName(), storageService, validator, config);
-                consumeQueue(channel, config.getCitationsQueueName(), storageService, validator, config);
+                try (Channel channel = handle.connection().createChannel()) {
+                    channel.basicQos(10);
 
-                logger.info("Storage Server is now listening to queues via " + handle.activeNode().toAddress()
-                        + "; manualAck=" + MANUAL_ACK_ENABLED);
-            
-                // Keep the application running
-                Thread.currentThread().join();
+                    // Queues and exchanges are declared by queue-server. Storage passively verifies
+                    // and consumes with manual ACK. It ACKs only after MongoDB persistence succeeds.
+                    consumeQueue(channel, config.getTransactionsQueueName(), storageService, validator, config);
+                    consumeQueue(channel, config.getCitationsQueueName(), storageService, validator, config);
+
+                    logger.info("Storage Server is now listening to queues via " + handle.activeNode().toAddress()
+                            + "; manualAck=" + MANUAL_ACK_ENABLED);
+                    connectionClosed.await();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warning("Storage Server consumer loop interrupted; shutting down.");
+            } catch (Exception e) {
+                String host = "unknown";
+                try { host = InetAddress.getLocalHost().getHostAddress(); } catch (Exception ignored) {}
+                SecurityLogger.logSecurityEvent("RabbitMQ storage consumer reconnect needed: "
+                        + SecurityLogger.sanitize(e.toString()) + " | Host: " + host);
+                logger.warning("Storage Server RabbitMQ consumer disconnected or failed to start; retrying in "
+                        + CONSUMER_RECONNECT_DELAY_MS + "ms. Reason="
+                        + SecurityLogger.sanitize(e.getMessage()));
+                try {
+                    Thread.sleep(CONSUMER_RECONNECT_DELAY_MS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
             }
-            
-        } catch (Exception e) {
-            String host = "unknown";
-            try { host = InetAddress.getLocalHost().getHostAddress(); } catch (Exception ignored) {}
-            SecurityLogger.logSecurityEvent("CRITICAL ERROR: " + e.toString() + " | Host: " + host);
-            logger.severe("Storage Server terminated with a protected error path. See logs/security.log for details.");
-            System.err.println("Storage Server stopped before MongoDB persistence became available.");
-            System.exit(1);
         }
     }
 

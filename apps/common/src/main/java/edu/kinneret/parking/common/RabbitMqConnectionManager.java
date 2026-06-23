@@ -5,6 +5,7 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import com.rabbitmq.client.AuthenticationFailureException;
@@ -17,6 +18,7 @@ import javax.net.ssl.SSLContext;
 public final class RabbitMqConnectionManager {
     private final AppConfig appConfig;
     private final ClusterClientSelector clusterClientSelector;
+    private final ConnectionOpener connectionOpener;
 
     /**
      * Creates a connection manager for the supplied application configuration.
@@ -24,8 +26,17 @@ public final class RabbitMqConnectionManager {
      * @param appConfig the application configuration
      */
     public RabbitMqConnectionManager(AppConfig appConfig) {
+        this(appConfig, (factory, node, name) -> factory.newConnection(
+                new com.rabbitmq.client.Address[] {
+                        new com.rabbitmq.client.Address(node.getHost(), node.getPort())
+                },
+                name));
+    }
+
+    RabbitMqConnectionManager(AppConfig appConfig, ConnectionOpener connectionOpener) {
         this.appConfig = appConfig;
         this.clusterClientSelector = new ClusterClientSelector(appConfig.getRabbitMqNodes());
+        this.connectionOpener = connectionOpener;
     }
 
     /**
@@ -36,24 +47,18 @@ public final class RabbitMqConnectionManager {
     public ConnectionHandle connect() {
         List<ClusterNode> nodesToTry = clusterClientSelector.getNodesInFailoverOrder();
         IllegalStateException lastFailure = null;
+        List<String> attemptedNodes = new ArrayList<>();
         for (ClusterNode node : nodesToTry) {
+            attemptedNodes.add(node.toAddress());
             try {
+                SecurityLogger.logSecurityEvent("Trying RabbitMQ node " + node.toAddress());
                 ConnectionFactory factory = buildFactory(node);
-                
-                // Build failover address list starting with the target node, then adding other enabled nodes
-                List<com.rabbitmq.client.Address> addresses = new java.util.ArrayList<>();
-                addresses.add(new com.rabbitmq.client.Address(node.getHost(), node.getPort()));
-                for (ClusterNode other : appConfig.getRabbitMqNodes()) {
-                    if (other.isEnabled() && !other.equals(node)) {
-                        addresses.add(new com.rabbitmq.client.Address(other.getHost(), other.getPort()));
-                    }
-                }
 
-                Connection connection = factory.newConnection(addresses, connectionName());
-                clusterClientSelector.reportSuccess(node); // --- NEW: Reset failure counter ---
+                Connection connection = connectionOpener.open(factory, node, connectionName());
+                clusterClientSelector.reportSuccess(node);
+                SecurityLogger.logSecurityEvent("Connected to RabbitMQ node " + node.toAddress());
                 return new ConnectionHandle(connection, node);
             } catch (IOException | TimeoutException ex) {
-                // --- NEW: Circuit Breaker Trigger ---
                 clusterClientSelector.reportFailure(node);
                 
                 String errorType = (ex instanceof AuthenticationFailureException) ? "AUTH_FAILURE" : "CONN_FAILURE";
@@ -65,7 +70,9 @@ public final class RabbitMqConnectionManager {
             }
 
         }
-        throw new IllegalStateException("Unable to connect to any RabbitMQ node.", lastFailure);
+        throw new IllegalStateException("Unable to connect to any RabbitMQ node. configuredNodes="
+                + configuredNodesSummary() + ", attemptedNodes=" + attemptedNodes
+                + ", lastFailure=" + lastFailureSummary(lastFailure), lastFailure);
     }
 
     /**
@@ -96,12 +103,16 @@ public final class RabbitMqConnectionManager {
         withChannel((channel, node) -> {
             com.rabbitmq.client.AMQP.Queue.DeclareOk queueStatus = channel.queueDeclarePassive(validatedQueue);
             if (queueStatus.getConsumerCount() < 1) {
-                throw new IOException("Storage Server is not consuming from " + validatedQueue + ".");
+                SecurityLogger.logSecurityEvent("RabbitMQ queue " + validatedQueue
+                        + " is available on " + node.toAddress()
+                        + " but currently reports zero consumers. Publishing is still allowed; "
+                        + "durable quorum queue will hold the message until storage-server consumes it.");
             }
             channel.confirmSelect();
             channelConsumer.accept(channel, node);
             if (!channel.waitForConfirms(5000)) {
-                throw new IOException("RabbitMQ message was not confirmed by the broker within timeout.");
+                throw new IOException("RabbitMQ publisher confirm timed out on node " + node.toAddress()
+                        + " for queue " + validatedQueue + ".");
             }
         });
     }
@@ -132,12 +143,15 @@ public final class RabbitMqConnectionManager {
                 return;
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("RabbitMQ channel operation failed.", ex);
+                throw new IllegalStateException("RabbitMQ operation interrupted. configuredNodes="
+                        + configuredNodesSummary(), ex);
             } catch (IOException | TimeoutException
                     | com.rabbitmq.client.ShutdownSignalException | IllegalStateException ex) {
                 lastFailure = (ex instanceof IllegalStateException)
                         ? (IllegalStateException) ex
-                        : new IllegalStateException("RabbitMQ channel operation failed.", ex);
+                        : new IllegalStateException("RabbitMQ channel operation failed on configured nodes="
+                                + configuredNodesSummary() + ". Cause=" + ex.getClass().getSimpleName()
+                                + ": " + SecurityLogger.sanitize(ex.getMessage()), ex);
                 if (attempt < MAX_CHANNEL_ATTEMPTS) {
                     SecurityLogger.logSecurityEvent("RabbitMQ channel attempt " + attempt + " of "
                             + MAX_CHANNEL_ATTEMPTS + " failed; retrying after " + CHANNEL_RETRY_DELAY_MS
@@ -146,12 +160,15 @@ public final class RabbitMqConnectionManager {
                         Thread.sleep(CHANNEL_RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        throw new IllegalStateException("RabbitMQ channel operation failed.", ie);
+                        throw new IllegalStateException("RabbitMQ operation interrupted while retrying. configuredNodes="
+                                + configuredNodesSummary(), ie);
                     }
                 }
             }
         }
-        throw lastFailure;
+        throw new IllegalStateException("RabbitMQ publish/operation failed on all configured nodes after "
+                + MAX_CHANNEL_ATTEMPTS + " channel attempts. configuredNodes=" + configuredNodesSummary()
+                + ", lastFailure=" + lastFailureSummary(lastFailure), lastFailure);
     }
 
     /**
@@ -283,5 +300,30 @@ public final class RabbitMqConnectionManager {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private String configuredNodesSummary() {
+        return appConfig.getRabbitMqNodes().stream()
+                .filter(ClusterNode::isEnabled)
+                .map(ClusterNode::toAddress)
+                .toList()
+                .toString();
+    }
+
+    private static String lastFailureSummary(Throwable throwable) {
+        if (throwable == null) {
+            return "none";
+        }
+        Throwable root = throwable;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        return root.getClass().getSimpleName() + ": " + SecurityLogger.sanitize(root.getMessage());
+    }
+
+    @FunctionalInterface
+    interface ConnectionOpener {
+        Connection open(ConnectionFactory factory, ClusterNode node, String connectionName)
+                throws IOException, TimeoutException;
     }
 }
