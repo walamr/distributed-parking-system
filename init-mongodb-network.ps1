@@ -61,8 +61,21 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "--- Step 1: Initialize Replica Set ---"
 $INIT_CMD = "rs.initiate({ _id: 'rs0', members: [ { _id: 0, host: '${MONGO1_IP}:27017' }, { _id: 1, host: '${MONGO2_IP}:27017' }, { _id: 2, host: '${MONGO3_IP}:27017' } ] })"
 $EXISTING_STATUS_CMD = "try { if (rs.status().ok === 1) { quit(0); } } catch (e) {} quit(2);"
-docker exec mongo1 mongosh --host localhost --port 27017 -u mulligan_db_admin -p $dbAdminPass --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --quiet --eval "$EXISTING_STATUS_CMD" *> $null
-$existingCluster = ($LASTEXITCODE -eq 0)
+$existingCluster = $false
+$oldErrorAction = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$oldNativePref = if (Test-Path "variable:PSNativeCommandUseErrorActionPreference") { $PSNativeCommandUseErrorActionPreference } else { $null }
+if ($null -ne $oldNativePref) { $PSNativeCommandUseErrorActionPreference = $false }
+try {
+    docker exec mongo1 mongosh --host localhost --port 27017 -u mulligan_db_admin -p $dbAdminPass --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --quiet --eval "$EXISTING_STATUS_CMD" 2>$null >$null
+    $existingCluster = ($LASTEXITCODE -eq 0)
+} catch {
+    $existingCluster = $false
+} finally {
+    $ErrorActionPreference = $oldErrorAction
+    if ($null -ne $oldNativePref) { $PSNativeCommandUseErrorActionPreference = $oldNativePref }
+}
+
 
 if ($existingCluster) {
     Write-Host "Existing replica-set configuration found; rs.initiate was skipped."
@@ -76,7 +89,19 @@ Write-Host "--- Step 2: Wait for Primary election ---"
 $attempts = 0
 while ($attempts -lt 30) {
     Start-Sleep -Seconds 3
-    $primary = docker exec mongo1 mongosh --quiet --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "db.isMaster().primary" 2>$null
+    $primary = $null
+    $oldErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $oldNativePref = if (Test-Path "variable:PSNativeCommandUseErrorActionPreference") { $PSNativeCommandUseErrorActionPreference } else { $null }
+    if ($null -ne $oldNativePref) { $PSNativeCommandUseErrorActionPreference = $false }
+    try {
+        $primary = docker exec mongo1 mongosh --quiet --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "db.isMaster().primary" 2>$null
+    } catch {
+        $primary = $null
+    } finally {
+        $ErrorActionPreference = $oldErrorAction
+        if ($null -ne $oldNativePref) { $PSNativeCommandUseErrorActionPreference = $oldNativePref }
+    }
     if ($primary -and $primary -match "\d+\.\d+\.\d+\.\d+:\d+") {
         Write-Host "✅ Primary elected: $primary"
         break
