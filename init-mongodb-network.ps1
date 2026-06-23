@@ -79,6 +79,21 @@ try {
 
 if ($existingCluster) {
     Write-Host "Existing replica-set configuration found; rs.initiate was skipped."
+
+    # --- Self-heal member addresses (critical for failover) ---
+    # A previously-initialized cluster may carry stale member hosts such as
+    # 'mongo2:27018' / 'mongo3:27019' (left over from the single-host all-in-one
+    # topology or an earlier init). Those addresses are unreachable across the
+    # network, so the cluster only ever works through mongo1: stopping mongo1
+    # leaves mongo2/mongo3 unable to elect a new primary. Force a reconfig to the
+    # canonical '<IP>:27017' addresses so any single node can fail and the rest
+    # re-elect and keep serving. Admin users already exist for an existing cluster.
+    Write-Host "--- Reconciling replica-set member addresses to <IP>:27017 ---"
+    $RECONCILE_CMD = "var d=['${MONGO1_IP}:27017','${MONGO2_IP}:27017','${MONGO3_IP}:27017'];var c=rs.conf();if(c.members.length!==d.length){print('SKIP_MEMBER_COUNT='+c.members.length);quit(0);}var ch=false;for(var i=0;i<c.members.length;i++){if(c.members[i].host!==d[i]){print('FIX member['+i+'] '+c.members[i].host+' -> '+d[i]);c.members[i].host=d[i];ch=true;}}if(ch){c.version++;rs.reconfig(c,{force:true});print('RECONFIGURED');}else{print('CONFIG_OK');}"
+    docker exec mongo1 mongosh --host localhost --port 27017 -u mulligan_db_admin -p $dbAdminPass --authenticationDatabase admin --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --quiet --eval "$RECONCILE_CMD"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Replica-set address reconciliation could not run (exit $LASTEXITCODE). If failover misbehaves, verify member hosts are '<IP>:27017' with: docker exec mongo1 mongosh ... --eval 'rs.conf().members.map(m=>m.host)'."
+    }
 } else {
     docker exec mongo1 mongosh --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames --tlsCAFile /etc/mongo/certs/ca-cert.pem --tlsCertificateKeyFile /etc/mongo/certs/mongo1.pem --host localhost --port 27017 --eval "$INIT_CMD"
     Assert-NativeSuccess "Replica-set initialization"

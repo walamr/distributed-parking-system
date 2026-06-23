@@ -1,5 +1,17 @@
+# ============================================================================
+#  WARNING: SINGLE-HOST (all-in-one) TOPOLOGY ONLY.
+#  This script configures replica-set members as mongo1:27017 / mongo2:27018 /
+#  mongo3:27019, which is correct ONLY for the all-in-one docker-compose.yml
+#  where the three mongods share one host on ports 27017/27018/27019.
+#
+#  DO NOT run this for the networked (3-PC) deployment driven by quick-start.
+#  There each node listens on 27017 on its own machine; these 27018/27019
+#  addresses are unreachable across the network and BREAK failover (stopping the
+#  primary leaves the others unable to elect a new one). For the networked
+#  deployment use init-mongodb-network.ps1, which uses <IP>:27017 addresses.
+# ============================================================================
 # Script to initialize MongoDB Replica Set
-Write-Host "--- Initializing MongoDB Replica Set ---"
+Write-Host "--- Initializing MongoDB Replica Set (SINGLE-HOST all-in-one ONLY) ---"
 
 # Load .env to read custom MongoDB passwords
 if (Test-Path ".env") {

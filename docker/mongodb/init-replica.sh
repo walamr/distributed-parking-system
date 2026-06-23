@@ -1,4 +1,12 @@
 ﻿#!/usr/bin/env bash
+# ============================================================================
+#  WARNING: SINGLE-HOST (all-in-one) TOPOLOGY ONLY.
+#  Configures replica-set members as mongo1:27017 / mongo2:27018 / mongo3:27019,
+#  correct ONLY for the all-in-one docker-compose.yml (three mongods on one host).
+#  DO NOT use for the networked (3-PC) quick-start deployment, where each node
+#  listens on 27017 on its own machine and these ports break failover.
+#  For the networked deployment use init-mongodb-network.ps1 (<IP>:27017).
+# ============================================================================
 set -eu
 
 TLS_ARGS=(
