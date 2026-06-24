@@ -167,7 +167,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender1 port=8091 leaderHost=recommender1 leaderPort=8091 isLeader=true malicious=${RECOMMENDER1_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender1 port=8091 leaderHost=recommender1 leaderPort=8091 isLeader=true malicious=${RECOMMENDER1_MALICIOUS:-false} maliciousPayload=${RECOMMENDER1_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8091:8091"
     networks:
@@ -206,7 +206,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender2 leaderPort=8092 isLeader=true malicious=${RECOMMENDER2_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender2 leaderPort=8092 isLeader=true malicious=${RECOMMENDER2_MALICIOUS:-false} maliciousPayload=${RECOMMENDER2_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8092:8092"
     networks:
@@ -245,7 +245,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender3 leaderPort=8093 isLeader=true malicious=${RECOMMENDER3_MALICIOUS:-false} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender3 leaderPort=8093 isLeader=true malicious=${RECOMMENDER3_MALICIOUS:-false} maliciousPayload=${RECOMMENDER3_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8093:8093"
     networks:

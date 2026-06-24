@@ -193,6 +193,11 @@ public class RecommenderServerApplication extends Application {
         }
     }
 
+    /**
+     * Initializes and displays the JavaFX GUI Control Panel for this recommender node.
+     *
+     * @param primaryStage the primary window stage for JavaFX
+     */
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Mulligan Recommender Node: " + nodeId);

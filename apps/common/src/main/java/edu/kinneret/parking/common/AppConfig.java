@@ -827,14 +827,29 @@ public final class AppConfig {
         return recommenderNodes;
     }
 
+    /**
+     * Returns the IP address for Mongo Node 1.
+     *
+     * @return the IP address
+     */
     public String getMongo1Ip() {
         return mongo1Ip;
     }
 
+    /**
+     * Returns the IP address for Mongo Node 2.
+     *
+     * @return the IP address
+     */
     public String getMongo2Ip() {
         return mongo2Ip;
     }
 
+    /**
+     * Returns the IP address for Mongo Node 3.
+     *
+     * @return the IP address
+     */
     public String getMongo3Ip() {
         return mongo3Ip;
     }

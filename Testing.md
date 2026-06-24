@@ -592,6 +592,11 @@ one malicious plus one missing:
 recommender2 malicious=true and recommender3 stopped
 status FAILURE, reason "No majority consensus reached in cluster."
 
+two recommenders malicious with different payloads:
+recommender2 started with RECOMMENDER2_MALICIOUS=true, RECOMMENDER2_PAYLOAD="999;999"
+recommender3 started with RECOMMENDER3_MALICIOUS=true, RECOMMENDER3_PAYLOAD="888;888"
+status FAILURE, reason "No majority consensus reached in cluster."
+
 invalid parking space:
 spaceId=0 was rejected server-side; no stack trace or internal exception text was returned
 
@@ -630,7 +635,3 @@ recommender-security.log.0.lck
 ```
 
 Pass: recommender security logs persisted across `docker compose down` and restart through named Docker volumes.
-
-Remaining limitation:
-
-- Runtime malicious mode currently has one fixed malicious result (`Space 999;999`). This allowed runtime verification of one malicious node and malicious-plus-missing no-majority behavior. The specific "two different malicious results" scenario is covered by automated unit tests through direct majority-vote inputs, but the Docker runtime does not currently expose a per-node custom malicious payload selector.

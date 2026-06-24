@@ -431,6 +431,12 @@ public class CustomerController {
         final java.time.Instant oldParkingStartTime = parkingStartTime;
 
         Task<Boolean> task = new Task<>() {
+            /**
+             * Performs the background check and transaction initiation logic.
+             *
+             * @return true if successful, false otherwise
+             * @throws Exception if checking or starting fails
+             */
             @Override
             protected Boolean call() throws Exception {
                 String areaName = areaLabel != null ? areaLabel.getText() : "Unknown";
@@ -708,6 +714,12 @@ public class CustomerController {
         }
 
         Task<Boolean> task = new Task<>() {
+            /**
+             * Performs the background stop transaction logic.
+             *
+             * @return true if successful, false otherwise
+             * @throws Exception if checking or stopping fails
+             */
             @Override
             protected Boolean call() throws Exception {
                 String areaName = areaLabel != null ? areaLabel.getText() : "Unknown";
@@ -823,6 +835,11 @@ public class CustomerController {
                 + localOfflineTransactions.size());
 
         Task<List<Document>> task = new Task<>() {
+            /**
+             * Fetches the vehicle transaction history from the repository.
+             *
+             * @return the list of transaction documents
+             */
             @Override
             protected List<Document> call() {
                 List<Document> result = repository.getVehicleHistory(vin);
@@ -1077,6 +1094,11 @@ public class CustomerController {
         // 2. Query MongoDB cluster in a background daemon thread to synchronize precise
         // server data
         Task<Document> task = new Task<>() {
+            /**
+             * Fetches rate and zone information for the given space.
+             *
+             * @return a document containing rate and zone info
+             */
             @Override
             protected Document call() {
                 BigDecimal rate = repository.getSpaceRate(spaceId);
@@ -1533,6 +1555,12 @@ public class CustomerController {
         java.util.Collections.shuffle(recNodes);
 
         Task<String> task = new Task<>() {
+            /**
+             * Connects to recommender nodes to fetch a signed recommendation list.
+             *
+             * @return the recommendation response payload
+             * @throws Exception if connection or query fails
+             */
             @Override
             protected String call() throws Exception {
                 String vin = vinField != null && vinField.getText() != null ? vinField.getText().trim() : "";

@@ -299,6 +299,12 @@ public final class RabbitMqConnectionManager {
                 // --- NEW: Guaranteed Hostname Bypass via SocketConfigurator ---
                 if (appConfig.isRabbitMqTlsAllowInvalidHostnames()) {
                     factory.setSocketConfigurator(new com.rabbitmq.client.DefaultSocketConfigurator() {
+                        /**
+                         * Configures the SSL socket to disable hostname verification.
+                         *
+                         * @param socket the socket being configured
+                         * @throws java.io.IOException on configuration errors
+                         */
                         @Override
                         public void configure(java.net.Socket socket) throws java.io.IOException {
                             if (socket instanceof javax.net.ssl.SSLSocket) {

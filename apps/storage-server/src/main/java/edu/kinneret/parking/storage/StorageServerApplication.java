@@ -182,6 +182,11 @@ public class StorageServerApplication {
                         SecurityLogger.sanitize(config.getMongoUri()),
                         storageService::storeMessage,
                         new StorageDeliveryProcessor.DeliveryAcknowledger() {
+                            /**
+                             * Acknowledges the message delivery, signifying successful processing and persistence.
+                             *
+                             * @throws Exception if acknowledging fails
+                             */
                             @Override
                             public void ack() throws Exception {
                                 channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
@@ -190,11 +195,21 @@ public class StorageServerApplication {
                                         + envelope.getMessageId() + " | Source: " + envelope.getClientIp());
                             }
 
+                            /**
+                             * Rejects the message delivery and moves it to the dead-letter exchange/queue.
+                             *
+                             * @throws Exception if rejection fails
+                             */
                             @Override
                             public void reject() throws Exception {
                                 channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
                             }
 
+                            /**
+                             * Rejects the message delivery and requests it to be requeued for reprocessing.
+                             *
+                             * @throws Exception if requeuing fails
+                             */
                             @Override
                             public void requeue() throws Exception {
                                 // requeue=true: keep the message so it is redelivered once the

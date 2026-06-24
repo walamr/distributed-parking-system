@@ -35,6 +35,12 @@ public final class SecurityLogger {
             // 5MB limit per file, 5 rotated logs, append mode
             FileHandler fileHandler = new FileHandler(logPath, 5242880, 5, true);
             fileHandler.setFormatter(new java.util.logging.Formatter() {
+                /**
+                 * Formats a log record into a structured JSON string.
+                 *
+                 * @param record the log record to format
+                 * @return the formatted JSON string
+                 */
                 @Override
                 public String format(java.util.logging.LogRecord record) {
                     String rawMsg = formatMessage(record);

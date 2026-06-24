@@ -143,3 +143,17 @@ The leader compares the complete serialized list. It does not accept two votes a
 3. **No Consensus Safety**: If more than one node is compromised or offline, or if the cluster is partitioned such that no 2 nodes compute the same result, the leader safety aborts and returns a `FAILURE` status, ensuring incorrect information is never returned to the customer.
 4. **Explicit Node Identity**: Cluster nodes are parsed as explicit `nodeId=host:port` entries when provided, or inferred from service names such as `recommender2`. This avoids the old port-derived `recommender-8092` mismatch and prevents the leader from skipping or contacting the wrong node.
 5. **Security Rejections**: Missing HMAC fields, invalid HMAC values, replayed nonces, timestamps older than 60 seconds, malformed JSON, unsupported fields, and non-numeric or out-of-range spaces are rejected server-side and logged with source, receiver node identity, timestamp, and reason.
+
+---
+
+## 4. Design Rationale: Custom TLS-Socket Protocol vs. Apache Ratis/Raft
+
+While Apache Ratis and the Raft consensus protocol are excellent for state-machine replication (ensuring consistent state updates across a replicated log), the requirements of the Recommender Cluster in this assignment led to the design of a custom, lightweight, TLS-socket-based majority voting consensus protocol.
+
+The key design considerations for this choice were:
+1. **Nature of the Workload (Read-only vs. State Replication)**: 
+   The recommender nodes perform stateless computations (generating recommendations by querying the database) rather than maintaining and replicating a transactional log of state changes. Raft is heavily optimized for committing state transitions to a shared log. Since recommendation generation is a querying process, a lightweight majority-vote consensus protocol on query results is more direct, avoiding the overhead of maintaining a replicated log.
+2. **Strict Byzantine/Malicious Fault Model**:
+   Standard Raft assumes a crash-fault-tolerant (CFT) model, where cluster nodes might crash or delay messages but are not *malicious* (they do not actively lie, forge messages, or return falsified payloads). However, Section 4.2 of the assignment requires the cluster to handle and isolate *malicious/compromised* recommender nodes. Our custom protocol validates signatures using HMAC-SHA256, enforces strict mutual TLS (mTLS) identities, and performs majority validation on the returned recommendation lists. Standard Raft/Ratis does not natively protect against Byzantine nodes voting with corrupted payloads; a custom voting scheme is required at the query interface.
+3. **Complexity & Footprint**:
+   Integrating Apache Ratis requires setting up complex state machines, Raft groups, log directories, and raft-specific port-forwarding, which introduces substantial operational complexity. A custom TLS-socket-based protocol utilizes the existing secure transport layer (mTLS) and is lightweight, clear, and perfectly suited for academic and containerized deployment scopes.

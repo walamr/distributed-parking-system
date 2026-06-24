@@ -177,6 +177,11 @@ public class MOController {
             setStatus("Fetching transactions from cluster...", false);
         }
         Task<List<Document>> task = new Task<>() {
+            /**
+             * Fetches and consolidates the parking transactions report from the repository.
+             *
+             * @return the list of consolidated transaction documents
+             */
             @Override
             protected List<Document> call() {
                 List<Document> rawEvents = repository.getAllTransactions();
@@ -275,6 +280,11 @@ public class MOController {
             setStatus("Fetching citations from cluster...", false);
         }
         Task<List<Document>> task = new Task<>() {
+            /**
+             * Fetches the complete list of citations from the repository.
+             *
+              * @return the list of citation documents
+             */
             @Override
             protected List<Document> call() {
                 List<Document> citations = repository.getAllCitations();

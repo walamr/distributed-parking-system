@@ -3,11 +3,11 @@
 ## Team Members
 | Name | Student ID | Task Performed | Hours Worked |
 | :--- | :--- | :--- | :--- |
-| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 20 Hours |
+| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 22 Hours |
 | **Hanan Taha** | 212277438 | Task 2: Recommender Server | 20 Hours |
-| **Aseel Shaheen** | 214228009 | Task 4: Documentation & DevOps | 20 Hours |
-| **Hala Assadi** | 324830967 | Task 3: Consensus Protocol | 20 Hours |
-| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening (Blue Teaming) | 20 Hours |
+| **Aseel Shaheen** | 214228009 | Task 4: Documentation & DevOps | 21 Hours |
+| **Hala Assadi** | 324830967 | Task 3: Consensus Protocol | 19 Hours |
+| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening (Blue Teaming) | 18 Hours |
 
 ---
 

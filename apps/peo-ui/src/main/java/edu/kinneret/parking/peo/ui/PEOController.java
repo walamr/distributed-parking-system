@@ -207,6 +207,11 @@ public class PEOController {
         }
 
         Task<String> task = new Task<>() {
+            /**
+             * Performs a database legality check for a given vehicle and parking space.
+             *
+             * @return the legality status string
+             */
             @Override
             protected String call() {
                 return repository.checkLegality(safeCheckVin, safeCheckSpace);
@@ -240,6 +245,11 @@ public class PEOController {
 
             // Valid VIN and space — log the query
             Task<Void> logTask = new Task<>() {
+                /**
+                 * Logs the query locally or remotely in the background.
+                 *
+                 * @return null
+                 */
                 @Override
                 protected Void call() {
                     org.bson.Document queryLog = new org.bson.Document("timestamp", java.time.Instant.now().toString())
@@ -306,6 +316,12 @@ public class PEOController {
         final String safeEnforcer = enforcer;
 
         Task<Void> task = new Task<>() {
+            /**
+             * Publishes the citation event request to RabbitMQ.
+             *
+             * @return null
+             * @throws Exception if validation or connection fails
+             */
             @Override
             protected Void call() throws Exception {
                 String correlationId = UUID.randomUUID().toString();

@@ -195,11 +195,21 @@ public final class QueueConsumerService {
         connection.addShutdownListener(this::logShutdownSignal);
         if (connection instanceof Recoverable recoverableConnection) {
             recoverableConnection.addRecoveryListener(new RecoveryListener() {
+                /**
+                 * Callback invoked when the automatic recovery process begins.
+                 *
+                 * @param recoverable the recoverable object
+                 */
                 @Override
                 public void handleRecoveryStarted(Recoverable recoverable) {
                     logger.info("RabbitMQ automatic recovery started after connection disruption on " + initialNodeAddress);
                 }
 
+                /**
+                 * Callback invoked when the automatic recovery process successfully completes.
+                 *
+                 * @param recoverable the recovered object
+                 */
                 @Override
                 public void handleRecovery(Recoverable recoverable) {
                     logger.info("RabbitMQ automatic recovery completed. Consumers were re-registered by the client library.");
