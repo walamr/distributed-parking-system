@@ -54,16 +54,14 @@ public final class SecurityLogger {
                     json.append("\"level\":\"").append(level).append("\",");
                     
                     if (sanitized.contains("event=") && sanitized.contains("source=")) {
-                        String[] parts = sanitized.split(" ");
-                        for (int i = 0; i < parts.length; i++) {
-                            String[] kv = parts[i].split("=", 2);
+                        String[] parts = sanitized.split("\\|");
+                        boolean needsComma = false;
+                        for (String part : parts) {
+                            String[] kv = part.split("=", 2);
                             if (kv.length == 2) {
-                                String key = kv[0].trim();
-                                String value = kv[1].trim();
-                                json.append("\"").append(escapeJson(key)).append("\":\"").append(escapeJson(value)).append("\"");
-                                if (i < parts.length - 1) {
-                                    json.append(",");
-                                }
+                                if (needsComma) json.append(",");
+                                json.append("\"").append(escapeJson(kv[0].trim())).append("\":\"").append(escapeJson(kv[1].trim())).append("\"");
+                                needsComma = true;
                             }
                         }
                     } else if (sanitized.startsWith("[REJECTION]")) {

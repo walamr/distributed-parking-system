@@ -1283,10 +1283,9 @@ public class RecommenderServer implements AutoCloseable {
      */
     private void logSecurity(String event, String source, String reason) {
         SecurityLogger.logSecurityEvent("event=" + event
-                + " timestamp=" + Instant.now()
-                + " source=" + source
-                + " receiver=" + nodeId
-                + " reason=" + reason);
+                + "|source=" + source
+                + "|receiver=" + nodeId
+                + "|reason=" + reason);
     }
 
     /**

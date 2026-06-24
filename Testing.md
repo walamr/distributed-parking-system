@@ -619,6 +619,15 @@ event=REPLAY_REJECTED ... reason=replayed nonce
 event=CONSENSUS_FAILURE ... reason=no exact-list majority
 ```
 
+**Actual persisted log output** (captured from `logs/recommender-security.log.0` committed to this repository):
+
+```json
+{"timestamp":"2026-06-22T16:50:31.726Z","level":"WARNING","event":"CONSENSUS_FAILURE","source":"cluster","receiver":"recommender1","reason":"no exact-list majority"}
+{"timestamp":"2026-06-22T16:50:46.401Z","level":"WARNING","event":"CONSENSUS_FAILURE","source":"cluster","receiver":"recommender1","reason":"no exact-list majority"}
+```
+
+These two `CONSENSUS_FAILURE` events were produced during the two-malicious-servers-with-different-payloads test run on 2026-06-22. `recommender2` was started with `RECOMMENDER2_MALICIOUS=true` payload `999;999` and `recommender3` with `RECOMMENDER3_MALICIOUS=true` payload `888;888`. Since no two nodes agreed on the same list, the leader correctly aborted and returned `FAILURE`. The full log file is available at `logs/recommender-security.log.0` in this repository.
+
 Persistent log check:
 
 ```powershell
@@ -634,4 +643,4 @@ recommender-security.log.0
 recommender-security.log.0.lck
 ```
 
-Pass: recommender security logs persisted across `docker compose down` and restart through named Docker volumes.
+Pass: recommender security logs persisted across `docker compose down` and restart through named Docker volumes. The log files are also committed to the `logs/` directory in this repository as offline evidence.
