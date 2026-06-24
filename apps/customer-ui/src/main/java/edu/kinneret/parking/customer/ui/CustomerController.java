@@ -1420,19 +1420,14 @@ public class CustomerController {
         this.resultHeader = resultHeader;
         if (resultLabel != null) {
             resultLabel.setWrapText(true);
-        }
-    }
+        }    }
 
-/**
-
- * Format recommendation result.
-
- * @param rawResult the rawResult
-
- * @return the string
-
- */
-
+    /**
+     * Formats the raw recommendation result string into a human-readable list.
+     *
+     * @param rawResult the raw recommendation result from the cluster
+     * @return a human-readable formatted string
+     */
     private String formatRecommendationResult(String rawResult) {
         if (rawResult == null || rawResult.isBlank()
                 || "NONE".equalsIgnoreCase(rawResult) || "Empty List".equalsIgnoreCase(rawResult)) {
@@ -1460,7 +1455,6 @@ public class CustomerController {
     /**
      * Validates the current space input and starts an explicit recommendation query.
      *
-     * @param none no input parameters
      * @return no return value
      */
     private void handleRecommendParking() {
@@ -1493,6 +1487,32 @@ public class CustomerController {
             return;
         }
         fetchRecommendation(spaceId);
+    }
+
+    /**
+     * Clears the recommendation display panel to its default state.
+     *
+     * @return no return value
+     */
+    private void clearRecommendation() {
+        if (requestLabel != null) {
+            requestLabel.setText("-");
+        }
+        if (resultLabel != null) {
+            if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
+                resultLabel.getStyleClass().add("dashboard-value-primary");
+            }
+            resultLabel.setText("-");
+            resultLabel.setStyle("");
+            resultLabel.setMaxWidth(Double.MAX_VALUE);
+        }
+        if (resultHeader != null) {
+            resultHeader.setVisible(true);
+            resultHeader.setManaged(true);
+        }
+        if (resultItem != null) {
+            resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        }
     }
 
     /**
@@ -1609,11 +1629,11 @@ public class CustomerController {
                             resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold; -fx-font-size: 16px; -fx-alignment: center;");
                             resultLabel.setMaxWidth(Double.MAX_VALUE);
                             if (resultHeader != null) {
-                                resultHeader.setVisible(false);
-                                resultHeader.setManaged(false);
+                                  resultHeader.setVisible(false);
+                                  resultHeader.setManaged(false);
                             }
                             if (resultItem != null) {
-                                resultItem.setAlignment(javafx.geometry.Pos.CENTER);
+                                  resultItem.setAlignment(javafx.geometry.Pos.CENTER);
                             }
                         } else {
                             if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
@@ -1666,9 +1686,7 @@ public class CustomerController {
             }
             javafx.application.Platform.runLater(() -> {
                 javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(5));
-                pause.setOnFinished(evt -> {
-                    clearRecommendation();
-                });
+                pause.setOnFinished(evt -> clearRecommendation());
                 pause.play();
             });
         });
@@ -1693,34 +1711,13 @@ public class CustomerController {
             }
             javafx.application.Platform.runLater(() -> {
                 javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(5));
-                pause.setOnFinished(evt -> {
-                    clearRecommendation();
-                });
+                pause.setOnFinished(evt -> clearRecommendation());
                 pause.play();
             });
         });
 
         new Thread(task).start();
     }
-
-    private void clearRecommendation() {
-        if (requestLabel != null) {
-            requestLabel.setText("-");
-        }
-        if (resultLabel != null) {
-            if (!resultLabel.getStyleClass().contains("dashboard-value-primary")) {
-                resultLabel.getStyleClass().add("dashboard-value-primary");
-            }
-            resultLabel.setText("-");
-            resultLabel.setStyle("");
-            resultLabel.setMaxWidth(Double.MAX_VALUE);
-        }
-        if (resultHeader != null) {
-            resultHeader.setVisible(true);
-            resultHeader.setManaged(true);
-        }
-        if (resultItem != null) {
-            resultItem.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        }
-    }
 }
+
+

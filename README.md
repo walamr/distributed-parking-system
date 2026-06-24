@@ -1,4 +1,4 @@
-# Distributed Systems - Semester 2, 5786
+# Distributed Systems Course - Semester 2, Academic Year 2025/2026 (5786)
 
 ## Team Members
 | Name | Student ID | Task Performed | Hours Worked |

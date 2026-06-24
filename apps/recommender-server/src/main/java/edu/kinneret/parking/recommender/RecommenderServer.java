@@ -216,15 +216,12 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
-/**
-
- * Is rate limited.
-
- * @param ip the ip
-
- * @return the boolean
-
- */
+    /**
+     * Checks if the requests from a specific IP address exceed the rate limit.
+     *
+     * @param ip remote IP address
+     * @return true if the rate limit is exceeded, false otherwise
+     */
 
     private boolean isRateLimited(String ip) {
         long now = Instant.now().getEpochSecond();
@@ -367,6 +364,12 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Handles a query forwarded from a follower node to the leader.
+     *
+     * @param forwardRequest the forwarded query message envelope
+     * @param leaderWriter the writer to send the response back to the follower
+     */
     private void handleForwardQuery(JsonObject forwardRequest, PrintWriter leaderWriter) {
         if (!isLeader) {
             logger.info("Non-leader node '" + nodeId + "' received FORWARD_QUERY. Executing consensus dynamically as fallback leader.");
@@ -413,37 +416,27 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
-/**
-
- * Send consensus response.
-
- * @param spaceId the spaceId
-
- * @param correlationId the correlationId
-
- * @param writer the writer
-
- */
-
+    /**
+     * Computes the cluster consensus and returns the signed client response.
+     *
+     * @param spaceId requested parking space
+     * @param correlationId query correlation identifier
+     * @param vehicleId requesting vehicle identification number (vin)
+     * @param writer output writer for the client socket
+     */
     private void sendConsensusResponse(String spaceId, String correlationId, String vehicleId, PrintWriter writer) {
         sendConsensusResponse(spaceId, correlationId, vehicleId, writer, Collections.emptyMap());
     }
 
-/**
-
- * Send consensus response.
-
- * @param spaceId the spaceId
-
- * @param correlationId the correlationId
-
- * @param writer the writer
-
- * @param MapString the MapString
-
- * @param explicitVotes the explicitVotes
-
- */
+    /**
+     * Computes the cluster consensus using predefined follower votes and returns the client response.
+     *
+     * @param spaceId requested parking space
+     * @param correlationId query correlation identifier
+     * @param vehicleId requesting vehicle identification number (vin)
+     * @param writer output writer for the client socket
+     * @param explicitVotes map containing precalculated votes from forwarding peers
+     */
 
     private void sendConsensusResponse(String spaceId, String correlationId, String vehicleId, PrintWriter writer, Map<String, String> explicitVotes) {
         String consensus = executeLeaderConsensus(spaceId, vehicleId, explicitVotes);
@@ -486,19 +479,14 @@ public class RecommenderServer implements AutoCloseable {
         writer.println(response);
     }
 
-/**
-
- * Execute leader consensus.
-
- * @param spaceId the spaceId
-
- * @param MapString the MapString
-
- * @param explicitVotes the explicitVotes
-
- * @return the string
-
- */
+    /**
+     * Executes the majority vote consensus process on the leader.
+     *
+     * @param spaceId requested parking space
+     * @param vehicleId requesting vehicle identification number (vin)
+     * @param explicitVotes map of votes already supplied by peer forwarders
+     * @return the consensus recommended space list, or null if no majority
+     */
 
     private String executeLeaderConsensus(String spaceId, String vehicleId, Map<String, String> explicitVotes) {
         Map<String, String> votes = new ConcurrentHashMap<>();
@@ -914,18 +902,40 @@ public class RecommenderServer implements AutoCloseable {
         return results;
     }
 
+    /**
+     * Parses and validates an incoming signed request.
+     *
+     * @param line raw socket query input
+     * @param source connection host details
+     * @return validated JSON message object
+     */
     private JsonObject parseAndValidateRequest(String line, String source) {
         JsonObject request = parseJsonObject(line);
         validateSignedMessage(request, REQUEST_TYPES, true, source);
         return request;
     }
 
+    /**
+     * Parses and validates a signed response.
+     *
+     * @param line raw socket reply input
+     * @param source connection host details
+     * @return validated JSON message object
+     */
     private JsonObject parseAndValidateResponse(String line, String source) {
         JsonObject response = parseJsonObject(line);
         validateSignedMessage(response, RESPONSE_TYPES, false, source);
         return response;
     }
 
+    /**
+     * Validates a signed protocol message against key fields, nonces, and signature.
+     *
+     * @param message parsed message JSON object
+     * @param allowedTypes set of allowed message type strings
+     * @param storeNonce true if the nonce needs to be recorded
+     * @param source origin address of the socket message
+     */
     private void validateSignedMessage(JsonObject message, Set<String> allowedTypes, boolean storeNonce, String source) {
         Set<String> allowed = new HashSet<>(SIGNED_FIELDS);
         for (String field : message.keySet()) {
@@ -964,6 +974,12 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Validates that the timestamp age is within acceptable parameters to prevent replays.
+     *
+     * @param rawTimestamp message unix epoch timestamp
+     * @param source connection host details
+     */
     private void validateTimestamp(String rawTimestamp, String source) {
         try {
             long timestamp = Long.parseLong(rawTimestamp);
@@ -1243,6 +1259,13 @@ public class RecommenderServer implements AutoCloseable {
         return List.copyOf(endpoints);
     }
 
+    /**
+     * Infers node ID from a hostname.
+     *
+     * @param host peer hostname
+     * @param index logical peer index
+     * @return inferred node ID string
+     */
     private static String inferNodeId(String host, int index) {
         String normalized = host == null ? "" : host.trim();
         if (normalized.matches("recommender\\d+")) {
@@ -1251,6 +1274,13 @@ public class RecommenderServer implements AutoCloseable {
         return "recommender" + index;
     }
 
+    /**
+     * Logs a security event to the persistent security logger.
+     *
+     * @param event name of the security event
+     * @param source ip address or socket origin of the message
+     * @param reason text details of the security warning
+     */
     private void logSecurity(String event, String source, String reason) {
         SecurityLogger.logSecurityEvent("event=" + event
                 + " timestamp=" + Instant.now()
@@ -1259,6 +1289,14 @@ public class RecommenderServer implements AutoCloseable {
                 + " reason=" + reason);
     }
 
+    /**
+     * Reads a line bounded by a maximum character count to prevent Denial of Service.
+     *
+     * @param reader socket input reader
+     * @param maxChars maximum character count threshold
+     * @return read line, or null on EOF
+     * @throws IOException on socket read failures
+     */
     private String readBoundedLine(BufferedReader reader, int maxChars) throws IOException {
         StringBuilder sb = new StringBuilder();
         int ch;

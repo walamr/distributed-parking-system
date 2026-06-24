@@ -150,6 +150,7 @@ services:
       - ./apps/recommender-server/build/libs:/app
       - ./docker/mongodb/certs:/etc/mongo/certs:ro
       - ./docker/rabbitmq/certs:/etc/recommender/certs:ro
+      - recommender1-logs:/var/log/mulligan
     working_dir: /
     env_file: env-configs/queue-server.env
     environment:
