@@ -8,6 +8,8 @@ The **Parking Recommender System** is built as a fault-tolerant, high-availabili
 
 To protect against database discrepancies, single-node failure, and malicious/compromised nodes, the system implements a TLS socket-based **Consensus Protocol** with majority voting. Recommender listeners use `SSLServerSocket`, clients and peers use `SSLSocket`, and TLS 1.2 or newer is required. Server-to-server collection/forwarding requires client certificates from the configured keystore/truststore. Every protocol JSON message is also signed with HMAC-SHA256 and includes a timestamp, nonce, sender node identity, and correlation ID.
 
+> **Deployment note (leader-capable nodes).** The leader/follower roles in the diagrams below describe the *logical* protocol: a node that receives a client query either coordinates the vote itself or forwards to a coordinator. In the shipped `docker-compose.yml` every recommender node is started leader-capable (`isLeader=true`), so whichever node the customer happens to contact coordinates the consensus directly by collecting the other nodes' votes. This removes any single point of failure: there is no dependency on one fixed leader being online. The forwarding path shown below is still exercised whenever a node is configured as a pure follower (`isLeader=false`).
+
 ---
 
 ## 2. Protocol Messaging Sequence
