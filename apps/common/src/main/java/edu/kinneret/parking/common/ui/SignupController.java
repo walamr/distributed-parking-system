@@ -338,16 +338,12 @@ public class SignupController {
         }
     }
 
-/**
-
- * Set status.
-
- * @param message the message
-
- * @param error the error
-
- */
-
+    /**
+     * Updates the status label with a message and colors it for success or error.
+     *
+     * @param message the status text to display
+     * @param error   {@code true} to style the message as an error, {@code false} for success
+     */
     private void setStatus(String message, boolean error) {
         statusLabel.setText(message);
         statusLabel.setStyle(error ? "-fx-text-fill: #ef4444;" : "-fx-text-fill: #4ade80;");

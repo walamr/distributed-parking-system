@@ -41,14 +41,11 @@ public class WelcomeController {
         // Ignored
     }
 
-/**
-
- * Navigate.
-
- * @param fxml the fxml
-
- */
-
+    /**
+     * Loads the given FXML view and swaps it into the current stage's scene.
+     *
+     * @param fxml the classpath location of the FXML view to display
+     */
     private void navigate(String fxml) {
         try {
             Stage stage = (Stage) Stage.getWindows().filtered(w -> w.isShowing()).get(0);

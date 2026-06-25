@@ -17,12 +17,7 @@ public final class QueueServerApplication {
     private static final Logger logger = Logger.getLogger(QueueServerApplication.class.getName());
     static final String PERSISTENCE_OWNER = "storage-server";
 
-/**
-
- * Constructs a new QueueServerApplication.
-
- */
-
+    /** Utility class; instantiation is not permitted. */
     private QueueServerApplication() {
     }
 

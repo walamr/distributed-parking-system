@@ -4,13 +4,13 @@
 
 - Course: Distributed Systems
 - Semester / Year: Semester 2, 5786
-- Assignment: Assignment 2 - Hardened Distributed Infrastructure
+- Assignment: Assignment 3 - Recommender and Consensus (with Blue-Team hardening)
 - Documentation owner: Aseel Shaheen (ID: 214228009)
 
-This guide now covers both:
+This guide covers:
 
-- Task 1 runtime setup for Customer UI, PEO UI, and MO UI
-- Task 2 runtime setup for RabbitMQ cluster formation, queue-server startup, smoke test, failover, and recovery
+- Task 1 runtime setup for Customer UI, PEO UI, and MO UI (including the new Recommend Parking interaction)
+- Task 2/3 runtime setup for RabbitMQ cluster formation, MongoDB replica set, the clustered recommender + consensus servers, smoke test, failover, and recovery (see Section 18)
 
 ## 1. Prerequisites
 
@@ -45,9 +45,9 @@ Docker Compose uses official Docker Hub images for the infrastructure services:
 - `rabbitmq:3.13-management`
 - `mongo:7.0`
 
-There are no custom application Dockerfiles in the current Stage 2 deployment. This is intentional and documented: the clustered infrastructure runs in Docker, while the Java 21 applications are built and executed on the host through Gradle. Therefore, the red-team package includes `docker-compose.yml`, RabbitMQ/MongoDB config, scripts, certificates, and compiled Java artifacts, but no fake unused Dockerfile.
+The infrastructure services (RabbitMQ, MongoDB) use official Docker Hub images. The clustered recommender servers run in Docker on the official `eclipse-temurin:21-jre-alpine` image and execute the Gradle-built shaded jar mounted from `apps/recommender-server/build/libs`, so no hand-written application Dockerfile is required. The UI clients and the queue/storage servers are built and executed on the host through Gradle.
 
-The compose network `rabbitmq-internal` is marked `internal: true`. Required access from the host is provided only through explicit loopback port bindings such as `127.0.0.1:5671`, `127.0.0.1:15671`, and `127.0.0.1:27017`.
+The compose network `rabbitmq-internal` is a private `bridge` network. No service port is published on a public interface: every host-facing port is bound to loopback only (for example `127.0.0.1:5671`, `127.0.0.1:15671`, `127.0.0.1:27017`), so the cluster is not reachable from outside the host.
 
 Existing RabbitMQ evidence:
 
@@ -425,7 +425,7 @@ docker exec rabbitmq1 rabbitmqctl list_permissions -p /parking
 Expected evidence:
 
 - Gradle prints `BUILD SUCCESSFUL`.
-- `docker compose config` shows `rabbitmq-internal` as `internal: true`.
+- `docker compose config` shows the `rabbitmq-internal` bridge network and host ports bound to `127.0.0.1` only (no public bindings).
 - RabbitMQ cluster status lists `rabbit@rabbitmq1`, `rabbit@rabbitmq2`, and `rabbit@rabbitmq3`.
 - RabbitMQ listeners include AMQPS `5671` and HTTPS `15671`, with no plaintext AMQP listener on `5672`.
 - Queue listing shows `transactions.queue` and `citations.queue` with type `quorum`.

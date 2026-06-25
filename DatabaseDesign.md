@@ -193,3 +193,34 @@ db.transactions.find({
     ]
 })
 ```
+
+## 10. Recommender Query Access Patterns (Assignment 3)
+
+Each recommender node computes its local recommendation by reading from the same replica set over TLS (read preference `primaryPreferred`). The recommender never writes to the database; it only reads, so it requires read-only access to `spaces`, `transactions`, and `citations`. The computation for a requested space proceeds in three batched steps inside `loadAvailableCandidates`:
+
+**1. All spaces in the requested zone** (the zone is resolved from the requested space):
+```javascript
+db.spaces.find({ "zoneName": "Magnolia Way" })
+```
+
+**2. Latest transaction per space** — a single aggregation returns the most recent transaction for every space in the zone, so a space whose latest action is `start` is treated as occupied and excluded:
+```javascript
+db.transactions.aggregate([
+  { $match: { $or: [ { "payload.spaceId": { $in: spaceIds } },
+                     { "spaceId": { $in: spaceIds } } ] } },
+  { $sort:  { timestamp: -1, storedAt: -1 } },
+  { $group: { _id: { $cond: [ { $ne: [ { $ifNull: ["$payload.spaceId", ""] }, "" ] },
+                              "$payload.spaceId", "$spaceId" ] },
+              latestDoc: { $first: "$$ROOT" } } }
+])
+```
+
+**3. Citation counts per space** — citations for all candidate spaces are fetched in one query and tallied per space:
+```javascript
+db.citations.find({ $or: [ { "payload.spaceId": { $in: spaceIds } },
+                           { "spaceId": { $in: spaceIds } } ] })
+```
+
+The node then applies the Use-Case-8 ranking in memory: keep only available spaces, select those with the **minimum citation count**, then among those choose the **smallest absolute distance** from the requested space number, breaking ties by returning all equally-close spaces sorted numerically. Both the nested-payload and legacy flat field shapes are matched (`payload.spaceId` and `spaceId`) so the recommender works against records written by either assignment stage. When the database is offline the same logic runs against the repository's offline path, returning a deterministic result for testing.
+
+The identical recommendation is computed independently on every node; the consensus layer (see [ConsensusProtocolDesign.md](ConsensusProtocolDesign.md)) then reconciles the per-node lists by majority vote.

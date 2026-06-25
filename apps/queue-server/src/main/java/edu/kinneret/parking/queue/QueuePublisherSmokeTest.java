@@ -12,12 +12,7 @@ import java.nio.charset.StandardCharsets;
  */
 public final class QueuePublisherSmokeTest {
 
-/**
-
- * Constructs a new QueuePublisherSmokeTest.
-
- */
-
+    /** Utility class; instantiation is not permitted. */
     private QueuePublisherSmokeTest() {
     }
 

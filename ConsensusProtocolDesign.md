@@ -146,6 +146,23 @@ The leader compares the complete serialized list. It does not accept two votes a
 
 ---
 
+### Worked Examples (Assignment Section 4.1)
+
+The cluster is 3 nodes, so the majority threshold is 2. The table below maps every example from the assignment to the algorithm's decision. These are exactly the cases covered by the automated tests in `RecommenderServerTest` (see [Testing.md](Testing.md)).
+
+| # | Server1 | Server2 | Server3 | Decision | Why |
+| :- | :- | :- | :- | :- | :- |
+| 4.1.1 All agree | `3;1` | `3;1` | `3;1` | **`3;1`** | 3 identical lists ≥ 2 |
+| 4.1.2 Majority agree | `3;1` | `4;1` | `3;1` | **`3;1`** | `3;1` has 2 votes ≥ 2 |
+| 4.1.3 No agreement | `3;1` | `4;1` | `5;1` | **FAILURE** | every list distinct, max 1 vote |
+| 4.1.4 No agreement (lists) | `3;1, 4;1` | `4;1` | `4;1, 5;1` | **FAILURE** | full lists compared; no list reaches 2 |
+| 4.1.5 No agreement (lists) | `3;1` | `3;1, 5;1` | `5;1` | **FAILURE** | three distinct full lists |
+| 4.1.6 Missing response | `3;1` | (no response) | `3;1` | **`3;1`** | 2 votes agree despite 1 missing |
+| 4.1.7 Missing responses | `3;1` | (no response) | (no response) | **FAILURE** | only 1 vote, below threshold |
+| 4.1.8 Missing + disagree | `3;1` | `4;1` | (no response) | **FAILURE** | two present votes differ, no majority |
+
+The key rule demonstrated by 4.1.4 and 4.1.5 is that the leader compares the **complete serialized list**, not just the first recommended space — so `3;1, 4;1` and `3;1` are different votes.
+
 ## 4. Design Rationale: Custom TLS-Socket Protocol vs. Apache Ratis/Raft
 
 While Apache Ratis and the Raft consensus protocol are excellent for state-machine replication (ensuring consistent state updates across a replicated log), the requirements of the Recommender Cluster in this assignment led to the design of a custom, lightweight, TLS-socket-based majority voting consensus protocol.

@@ -78,16 +78,6 @@ tasks.run.configure {
     standardInput = System.in
 }
 
-task runTestQuery(type: JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'edu.kinneret.parking.customer.ui.TestQuery'
-}
-
-task runTestPublish(type: JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'edu.kinneret.parking.customer.ui.TestPublish'
-}
-
 task runCLI(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'edu.kinneret.parking.customer.cli.CustomerCLI'

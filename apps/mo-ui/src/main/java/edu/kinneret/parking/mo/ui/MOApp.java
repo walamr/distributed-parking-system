@@ -246,18 +246,13 @@ public class MOApp extends Application {
         return root;
     }
 
-/**
-
- * Create health dashboard.
-
- * @param mongoStatus the mongoStatus
-
- * @param rabbitStatus the rabbitStatus
-
- * @return the vbox
-
- */
-
+    /**
+     * Builds the real-time cluster health dashboard panel showing MongoDB and RabbitMQ status.
+     *
+     * @param mongoStatus  the label updated with the MongoDB replica set status
+     * @param rabbitStatus the label updated with the RabbitMQ cluster status
+     * @return the assembled dashboard container
+     */
     private VBox createHealthDashboard(Label mongoStatus, Label rabbitStatus) {
         VBox dashboard = new VBox(10);
         dashboard.setPadding(new Insets(10));

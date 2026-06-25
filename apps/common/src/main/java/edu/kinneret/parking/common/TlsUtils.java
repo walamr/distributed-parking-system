@@ -22,12 +22,7 @@ import javax.net.ssl.TrustManagerFactory;
  */
 public final class TlsUtils {
 
-/**
-
- * Constructs a new TlsUtils.
-
- */
-
+    /** Utility class; instantiation is not permitted. */
     private TlsUtils() {
     }
 

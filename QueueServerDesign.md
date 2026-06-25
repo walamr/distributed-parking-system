@@ -17,6 +17,32 @@
 - Host HTTPS management ports: `15671`, `15673`, `15674`
 - Application vhost: `/parking`
 
+### Topology Diagram
+
+```mermaid
+flowchart LR
+    subgraph Publishers
+        C[Customer UI/CLI\nuser: customer]
+        P[PEO UI/CLI\nuser: peo_service]
+    end
+    subgraph Broker["RabbitMQ Quorum Cluster (TLS 5671/5673/5674)"]
+        TQ[(transactions.queue\nquorum, group size 3)]
+        CQ[(citations.queue\nquorum, group size 3)]
+    end
+    subgraph Consumers
+        QS[Queue Server\nuser: mulligan_admin\ndeclares topology]
+        SS[Storage Server\nuser: peo_service\npersist-then-ack]
+    end
+    R[Recommender Cluster] -. "health check only\n(TLS AMQP)" .-> Broker
+    C -- "publish (write-only)" --> TQ
+    P -- "publish" --> TQ
+    P -- "publish" --> CQ
+    TQ --> SS
+    CQ --> SS
+    QS -- "declare/manage" --> Broker
+    SS -- "validated insert (TLS)" --> M[(MongoDB Replica Set)]
+```
+
 The repository now includes a reproducible setup script:
 
 ```powershell
@@ -92,7 +118,20 @@ Current runtime behavior:
 
 `QueuePublisherSmokeTest` publishes one signed message to each required queue using the configured node list. The smoke test defaults to the `peo_service` account so it can publish to both queues without using admin credentials.
 
-## 7. Verification Commands
+## 7. Message Security Controls (Blue-Team Hardening)
+
+Every message accepted from a queue is validated by `QueueMessageSecurityValidator` on **every** consuming node (queue server and storage server), not only on a single primary:
+
+1. **HMAC-SHA256 authentication** — each `MessageEnvelope` is signed over its canonical content with the shared `HMAC_SECRET`; verification uses a constant-time comparison (`SecureMessageSigner`).
+2. **Replay protection** — the `nonce` is recorded in a cluster-wide MongoDB TTL collection (`NonceStore`). The store fails **closed**: if the distributed nonce collection is unreachable it raises a fatal error rather than silently falling back to per-node memory, so a nonce replayed against any node is rejected.
+3. **Timestamp freshness** — messages older than `QueueMessageSecurityValidator.MAX_MESSAGE_AGE_SECONDS = 60` seconds (or more than 60 seconds in the future) are rejected. This 60-second window is a fixed security policy and is intentionally decoupled from the configurable nonce-retention TTL.
+4. **Business payload validation** — `ValidationUtils` enforces type, range, length, and character-set checks on every payload field; rejections return a generic reason to the client while full detail is written only to the persistent security log.
+
+## 8. Recommender Use of RabbitMQ
+
+The recommender cluster does not publish parking transactions; it reads parking/citation data from MongoDB to compute recommendations. On startup each recommender node performs a TLS AMQP **health check** against the broker node list (`RabbitMqConnectionManager.checkHealth()`) to confirm broker reachability and TLS/mTLS configuration, and logs the result. This keeps the broker as the single observability point for cluster health without granting the recommender publish or consume rights on the application queues.
+
+## 9. Verification Commands
 
 ```powershell
 docker exec rabbitmq1 rabbitmqctl cluster_status
