@@ -6,7 +6,13 @@ import java.time.Clock;
  * Validates queue messages before they are accepted by the queue server.
  */
 public final class QueueMessageSecurityValidator {
-    private static final long DEFAULT_MAX_MESSAGE_AGE_SECONDS = 1200;
+    /**
+     * Maximum accepted message age, fixed at 60 seconds as mandated by the assignment
+     * ("reject messages with timestamps older than 60 seconds on all nodes"). This is a
+     * security policy and is intentionally decoupled from the configurable nonce-retention TTL.
+     */
+    public static final long MAX_MESSAGE_AGE_SECONDS = 60;
+    private static final long DEFAULT_MAX_MESSAGE_AGE_SECONDS = MAX_MESSAGE_AGE_SECONDS;
 
     private final SecureMessageSigner signer;
     private final NonceStore nonceStore;

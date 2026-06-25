@@ -52,7 +52,7 @@ public class StorageServerApplication {
             new SecureMessageSigner(config.getHmacSecret()),
             new NonceStore(config),
             java.time.Clock.systemUTC(),
-            config.getNonceTtlSeconds()
+            QueueMessageSecurityValidator.MAX_MESSAGE_AGE_SECONDS
         );
 
         logger.info("Persistence owner=" + PERSISTENCE_OWNER + ", MongoDB target="

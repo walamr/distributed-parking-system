@@ -42,10 +42,10 @@ public final class QueueConsumerService {
                 appConfig,
                 connectionManager,
                 new QueueMessageSecurityValidator(
-                        new SecureMessageSigner(appConfig.getHmacSecret()), 
-                        appConfig != null ? new NonceStore(appConfig) : new NonceStore(1200),
+                        new SecureMessageSigner(appConfig.getHmacSecret()),
+                        appConfig != null ? new NonceStore(appConfig) : new NonceStore(QueueMessageSecurityValidator.MAX_MESSAGE_AGE_SECONDS),
                         java.time.Clock.systemUTC(),
-                        appConfig != null ? appConfig.getNonceTtlSeconds() : 1200));
+                        QueueMessageSecurityValidator.MAX_MESSAGE_AGE_SECONDS));
     }
 
     /**

@@ -8,7 +8,7 @@ services:
     env_file:
       - network-ips.env
     environment:
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-mulligan-secure-cookie-rotated-99213}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?Set RABBITMQ_ERLANG_COOKIE in your untracked .env file}
       RABBITMQ_NODENAME: rabbit@rabbitmq3
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"

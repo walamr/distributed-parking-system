@@ -80,7 +80,7 @@ The initialization flow now performs all three setup steps required for runtime 
 
 - create the `rs0` replica set
 - create the MongoDB RBAC users
-- import sample `vehicles`, `zones`, and `spaces` data through [`docker/mongodb/seed-data.js`](/C:/Users/user/OneDrive%20-%20Kinneret%20Academic%20College/%D7%A9%D7%95%D7%9C%D7%97%D7%9F%20%D7%94%D7%A2%D7%91%D7%95%D7%93%D7%94/ds-assignment-2-team-5-1/docker/mongodb/seed-data.js)
+- import sample `vehicles`, `zones`, and `spaces` data through [`docker/mongodb/seed-data.js`](docker/mongodb/seed-data.js)
 
 ## 6. Real-Time Health Monitoring
 

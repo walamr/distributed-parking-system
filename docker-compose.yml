@@ -4,7 +4,7 @@ services:
     container_name: rabbitmq1
     hostname: rabbitmq1
     environment:
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-mulligan-secure-cookie-rotated-99213}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?Set RABBITMQ_ERLANG_COOKIE in your untracked .env file}
       RABBITMQ_NODENAME: rabbit@rabbitmq1
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
@@ -32,7 +32,7 @@ services:
     container_name: rabbitmq2
     hostname: rabbitmq2
     environment:
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-mulligan-secure-cookie-rotated-99213}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?Set RABBITMQ_ERLANG_COOKIE in your untracked .env file}
       RABBITMQ_NODENAME: rabbit@rabbitmq2
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
@@ -59,7 +59,7 @@ services:
     container_name: rabbitmq3
     hostname: rabbitmq3
     environment:
-      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-mulligan-secure-cookie-rotated-99213}
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?Set RABBITMQ_ERLANG_COOKIE in your untracked .env file}
       RABBITMQ_NODENAME: rabbit@rabbitmq3
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
       RABBITMQ_CTL_ERL_ARGS: "-proto_dist inet_tls -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config"
@@ -206,7 +206,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender2 leaderPort=8092 isLeader=true malicious=${RECOMMENDER2_MALICIOUS:-false} maliciousPayload=${RECOMMENDER2_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender2 port=8092 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER2_MALICIOUS:-false} maliciousPayload=${RECOMMENDER2_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8092:8092"
     networks:
@@ -245,7 +245,7 @@ services:
       - TLS_SERVER_KEYSTORE_PATH=/etc/recommender/certs/server-keystore.jks
       - TLS_SERVER_KEYSTORE_PASSWORD=${RABBITMQ_KEYSTORE_PASSWORD:-password}
       - SECURITY_LOG_PATH=/var/log/mulligan/recommender-security.log
-    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender3 leaderPort=8093 isLeader=true malicious=${RECOMMENDER3_MALICIOUS:-false} maliciousPayload=${RECOMMENDER3_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
+    command: java -jar /app/recommender-service-1.0.jar --cli nodeId=recommender3 port=8093 leaderHost=recommender1 leaderPort=8091 isLeader=false malicious=${RECOMMENDER3_MALICIOUS:-false} maliciousPayload=${RECOMMENDER3_PAYLOAD:-} nodes=recommender1:8091,recommender2:8092,recommender3:8093
     ports:
       - "8093:8093"
     networks:
