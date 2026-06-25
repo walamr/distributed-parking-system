@@ -496,16 +496,20 @@ public class ParkingRepository implements AutoCloseable {
     }
 
     /**
-     * Checks the health of the MongoDB cluster.
-     * @return the cluster status document
+     * Checks the health of the MongoDB cluster by delegating to the connection manager's
+     * replica-set status command.
+     *
+     * @return the cluster status document, or {@code null} when the cluster is unreachable
      */
     public Document getClusterStatus() {
         return connectionManager.getClusterStatus();
     }
 
     /**
-     * Logs a system query (e.g., PEO inspection) to the database.
-     * @param queryLog the document containing query details
+     * Logs a system query (e.g., a PEO legality inspection) by inserting the supplied document
+     * into the {@code system_log} collection.
+     *
+     * @param queryLog the document containing the query details to persist
      */
     public void logSystemQuery(Document queryLog) {
         database.getCollection("system_log").insertOne(queryLog);

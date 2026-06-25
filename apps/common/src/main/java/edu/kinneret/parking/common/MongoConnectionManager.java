@@ -69,6 +69,15 @@ public final class MongoConnectionManager implements AutoCloseable {
         // For developers running apps without hosts modification:
         // Map container hostnames 'mongo1', 'mongo2', 'mongo3' to the IPs configured in network-ips.env.
         settingsBuilder.inetAddressResolver(new com.mongodb.spi.dns.InetAddressResolver() {
+            /**
+             * Resolves a host name to IP addresses, mapping the replica-set container hostnames
+             * {@code mongo1}, {@code mongo2}, and {@code mongo3} to the IPs configured in
+             * {@code network-ips.env} and delegating all other names to the system resolver.
+             *
+             * @param host the host name to resolve
+             * @return the list of resolved internet addresses
+             * @throws java.net.UnknownHostException when the host name cannot be resolved
+             */
             @Override
             public java.util.List<java.net.InetAddress> lookupByName(String host) throws java.net.UnknownHostException {
                 if ("mongo1".equalsIgnoreCase(host)) {

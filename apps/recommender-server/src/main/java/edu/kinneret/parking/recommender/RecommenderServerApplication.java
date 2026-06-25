@@ -288,6 +288,15 @@ public class RecommenderServerApplication extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Adds a labelled row to a grid pane where the value cell is an existing {@link Label}
+     * instance (so its text can be updated later), used for the live recommendation display.
+     *
+     * @param grid the target grid pane
+     * @param row the zero-based row index
+     * @param label the left-column label text
+     * @param valLabel the right-column value label to add
+     */
     private void addGridRowWithLabel(GridPane grid, int row, String label, Label valLabel) {
         Label lbl = new Label(label);
         lbl.setStyle("-fx-text-fill: #a6adc8; -fx-font-weight: bold;");
@@ -295,6 +304,15 @@ public class RecommenderServerApplication extends Application {
         grid.add(valLabel, 1, row);
     }
 
+    /**
+     * Updates the GUI labels showing the most recent recommendation query and its result. Safe to
+     * call when the GUI has not been initialized (the update is skipped) and always marshals the
+     * update onto the JavaFX application thread.
+     *
+     * @param requestedSpace the parking space the customer requested
+     * @param vehicleId the requesting vehicle identifier, or {@code null}/"-" when unknown
+     * @param recommendedSpace the recommended space text, or {@code null}/blank when none
+     */
     public static void updateLatestQuery(String requestedSpace, String vehicleId, String recommendedSpace) {
         if (latestRequestLabel != null && latestResultLabel != null && latestVehicleLabel != null) {
             Platform.runLater(() -> {
@@ -310,6 +328,13 @@ public class RecommenderServerApplication extends Application {
         }
     }
 
+    /**
+     * Convenience overload that updates the latest-query GUI labels without a known vehicle
+     * identifier.
+     *
+     * @param requestedSpace the parking space the customer requested
+     * @param recommendedSpace the recommended space text, or {@code null}/blank when none
+     */
     public static void updateLatestQuery(String requestedSpace, String recommendedSpace) {
         updateLatestQuery(requestedSpace, "-", recommendedSpace);
     }

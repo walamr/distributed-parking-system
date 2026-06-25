@@ -195,10 +195,8 @@ public class RecommenderServer implements AutoCloseable {
     }
 
     /**
-     * Accepts incoming TLS connections and dispatches each connection to a worker.
-     *
-     * @param none no input parameters
-     * @return no return value
+     * Accepts incoming TLS connections in a loop and dispatches each accepted connection to a
+     * worker thread for handling. Runs until the server is shut down.
      */
     private void listen() {
         while (running) {
@@ -238,7 +236,6 @@ public class RecommenderServer implements AutoCloseable {
      * Reads a single signed JSON request from a TLS socket and routes it by type.
      *
      * @param socket accepted TLS socket from a client or peer recommender
-     * @return no return value
      */
     private void handleConnection(Socket socket) {
         String ip = socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "unknown";
@@ -298,7 +295,6 @@ public class RecommenderServer implements AutoCloseable {
      * @param correlationId request correlation identifier
      * @param vehicleId vehicle identification number (vin)
      * @param clientWriter writer used to return the signed client response
-     * @return no return value
      */
     private void handleClientQuery(String spaceId, String correlationId, String vehicleId, PrintWriter clientWriter) {
         try {
@@ -396,8 +392,8 @@ public class RecommenderServer implements AutoCloseable {
      *
      * @param spaceId validated numeric parking space number
      * @param correlationId request correlation identifier
+     * @param vehicleId vehicle identification number (vin), or "-" when absent
      * @param writer writer used to return the signed collect response
-     * @return no return value
      */
     private void handleCollectRequest(String spaceId, String correlationId, String vehicleId, PrintWriter writer) {
         try {
@@ -672,6 +668,13 @@ public class RecommenderServer implements AutoCloseable {
         return null;
     }
 
+    /**
+     * Extracts only the recommendation list portion of a vote string, stripping any leading
+     * {@code "Request: ... Result:"} preamble so that votes can be compared for consensus.
+     *
+     * @param vote the raw vote string (may be {@code null})
+     * @return the trimmed recommendation list, or an empty string when {@code vote} is {@code null}
+     */
     public static String extractRecommendationList(String vote) {
         if (vote == null) {
             return "";
@@ -766,6 +769,17 @@ public class RecommenderServer implements AutoCloseable {
         return recommendFromSpaceCandidates(safeSpaceId, internal);
     }
 
+    /**
+     * Loads the parking spaces in the requested space's zone that are currently available
+     * (not in an active {@code start} state), pairing each with its citation count. Uses an
+     * aggregation pipeline when MongoDB is online and falls back to the offline repository
+     * otherwise.
+     *
+     * @param desiredSpaceId the validated requested space number
+     * @param zoneName the zone whose spaces should be considered
+     * @param repository the repository used to read spaces, transactions, and citations
+     * @return the list of available candidate spaces with citation counts
+     */
     private List<SpaceCandidate> loadAvailableCandidates(String desiredSpaceId, String zoneName, ParkingRepository repository) {
         List<Document> allSpacesInZone = new ArrayList<>();
         if (ParkingRepository.isDbOnline && repository.getDatabase() != null) {
@@ -877,6 +891,14 @@ public class RecommenderServer implements AutoCloseable {
         return candidates;
     }
 
+    /**
+     * Selects the best recommendation results from candidate spaces by preferring the lowest
+     * citation count and, among those, the spaces closest to the requested space number.
+     *
+     * @param desiredSpaceId the validated requested space number
+     * @param candidates the available candidate spaces to rank
+     * @return the ranked recommendation results sorted by space number, possibly empty
+     */
     private static List<RecommendationResult> recommendFromSpaceCandidates(String desiredSpaceId, List<SpaceCandidate> candidates) {
         if (candidates.isEmpty()) {
             return Collections.emptyList();
@@ -1011,6 +1033,17 @@ public class RecommenderServer implements AutoCloseable {
         return request;
     }
 
+    /**
+     * Builds an unsigned recommender protocol message populated with the supplied fields plus a
+     * freshly generated timestamp and nonce. The HMAC signature is applied separately by
+     * {@link #signMessage(JsonObject, SecureMessageSigner)}.
+     *
+     * @param type the recommender message type
+     * @param spaceId the numeric parking space number
+     * @param correlationId the request correlation identifier
+     * @param nodeId the sender node identity
+     * @return the populated but unsigned JSON message
+     */
     private static JsonObject createSignedMessage(String type, String spaceId, String correlationId, String nodeId) {
         JsonObject request = new JsonObject();
         request.addProperty("type", ValidationUtils.requireValidMessageType(type, "type"));
@@ -1022,16 +1055,39 @@ public class RecommenderServer implements AutoCloseable {
         return request;
     }
 
+    /**
+     * Signs a message in place by computing an HMAC over its canonical field representation and
+     * storing the result under the {@code hmac} property, replacing any existing signature.
+     *
+     * @param message the message to sign
+     * @param signer the HMAC-SHA256 signer
+     */
     private static void signMessage(JsonObject message, SecureMessageSigner signer) {
         message.remove("hmac");
         message.addProperty("hmac", signer.sign(canonicalSigningContent(message)));
     }
 
+    /**
+     * Verifies a message's {@code hmac} property against the HMAC recomputed over its canonical
+     * field representation.
+     *
+     * @param message the message whose signature is to be verified
+     * @param signer the HMAC-SHA256 signer
+     * @return {@code true} if the signature is valid, {@code false} otherwise
+     */
     private static boolean verifyMessage(JsonObject message, SecureMessageSigner signer) {
         String hmac = message.get("hmac").getAsString();
         return signer.verify(canonicalSigningContent(message), hmac);
     }
 
+    /**
+     * Produces the canonical {@code key=value} representation of a message used as the input to
+     * HMAC signing and verification. Only the agreed {@link #SIGNED_FIELDS} are included, in a
+     * deterministic sorted order, so signing and verification always operate on identical text.
+     *
+     * @param message the message to canonicalize
+     * @return the canonical signing string
+     */
     private static String canonicalSigningContent(JsonObject message) {
         Map<String, String> fields = new LinkedHashMap<>();
         SIGNED_FIELDS.stream().sorted().forEach(field -> {
@@ -1044,6 +1100,15 @@ public class RecommenderServer implements AutoCloseable {
         return canonical.toString();
     }
 
+    /**
+     * Opens a mutually authenticated TLS socket to the given peer, restricting the handshake to
+     * the supported modern TLS protocols and applying the configured connection timeout.
+     *
+     * @param host the target host
+     * @param targetPort the target port
+     * @return a connected, handshaken {@link SSLSocket}
+     * @throws IOException if the socket cannot be created or connected
+     */
     private SSLSocket openTlsSocket(String host, int targetPort) throws IOException {
         SSLSocketFactory factory = clientSslContext.getSocketFactory();
         SSLSocket socket = (SSLSocket) factory.createSocket();
@@ -1076,6 +1141,15 @@ public class RecommenderServer implements AutoCloseable {
         return sb.toString();
     }
 
+    /**
+     * Sends a signed failure response to the given writer, conveying a safe, generic reason to
+     * the client without leaking internal error detail.
+     *
+     * @param writer the output writer for the client or peer socket
+     * @param type the response message type
+     * @param correlationId the request correlation identifier
+     * @param reason the client-safe failure reason
+     */
     private void sendSignedFailure(PrintWriter writer, String type, String correlationId, String reason) {
         JsonObject response = createSignedMessage(type, "1", correlationId, nodeId);
         response.addProperty("status", "FAILURE");
@@ -1088,7 +1162,6 @@ public class RecommenderServer implements AutoCloseable {
      * Configures the malicious mode at runtime.
      *
      * @param malicious true to enable malicious faked responses
-     * @return no return value
      */
     public void setMalicious(boolean malicious) {
         this.isMalicious = malicious;
@@ -1150,9 +1223,8 @@ public class RecommenderServer implements AutoCloseable {
     }
 
     /**
-     * Closes the server socket, nonce store, and worker threads.
-     *
-     * @return no return value
+     * Closes the server socket, nonce store, and worker thread pool, stopping the accept loop and
+     * releasing all resources held by this node.
      */
     @Override
     public void close() {
@@ -1177,6 +1249,14 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Parses a raw line of input into a JSON object, rejecting any input that is not a
+     * well-formed JSON object.
+     *
+     * @param line the raw input line
+     * @return the parsed JSON object
+     * @throws IllegalArgumentException if the input is malformed or not a JSON object
+     */
     private static JsonObject parseJsonObject(String line) {
         try {
             if (!JsonParser.parseString(line).isJsonObject()) {
@@ -1188,6 +1268,13 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Ensures that the given object contains the named field as a JSON string primitive.
+     *
+     * @param object the JSON object to inspect
+     * @param fieldName the name of the required string field
+     * @throws IllegalArgumentException if the field is missing or not a string
+     */
     private static void requireString(JsonObject object, String fieldName) {
         if (!object.has(fieldName) || !object.get(fieldName).isJsonPrimitive()
                 || !object.get(fieldName).getAsJsonPrimitive().isString()) {
@@ -1195,6 +1282,14 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Validates a parking space identifier, ensuring it is non-empty, numeric, and within the
+     * supported space-number range, and returns it in canonical numeric form.
+     *
+     * @param spaceId the space identifier to validate
+     * @return the validated space number as a canonical string
+     * @throws IllegalArgumentException if the identifier is empty, non-numeric, or out of range
+     */
     private static String requireValidRecommenderSpace(String spaceId) {
         String safe = ValidationUtils.requireNonEmpty(spaceId, "spaceId");
         if (!safe.matches("\\d+")) {
@@ -1207,6 +1302,13 @@ public class RecommenderServer implements AutoCloseable {
         return String.valueOf(parsed);
     }
 
+    /**
+     * Parses a numeric space identifier into an integer, returning {@code -1} for any
+     * {@code null} or non-numeric input.
+     *
+     * @param spaceId the space identifier to parse
+     * @return the parsed space number, or {@code -1} when the input is not a valid number
+     */
     private static int parseSpaceNumber(String spaceId) {
         if (spaceId == null || !spaceId.matches("\\d+")) {
             return -1;
@@ -1218,6 +1320,14 @@ public class RecommenderServer implements AutoCloseable {
         }
     }
 
+    /**
+     * Filters the supported TLS protocols down to the modern protocols (TLS 1.2 and 1.3) that
+     * this node is allowed to negotiate.
+     *
+     * @param supportedProtocols the protocols supported by the socket
+     * @return the subset of allowed enabled protocols
+     * @throws IllegalStateException if neither TLS 1.2 nor TLS 1.3 is supported
+     */
     private static String[] enabledTlsProtocols(String[] supportedProtocols) {
         List<String> enabled = new ArrayList<>();
         for (String protocol : supportedProtocols) {
@@ -1231,6 +1341,15 @@ public class RecommenderServer implements AutoCloseable {
         return enabled.toArray(String[]::new);
     }
 
+    /**
+     * Parses raw cluster node descriptors into structured {@link NodeEndpoint} values. Each entry
+     * may be in {@code nodeId=host:port} or {@code host:port} form; when the node id is omitted it
+     * is inferred from the hostname or positional index.
+     *
+     * @param rawNodes the raw node descriptor strings (may be {@code null} or empty)
+     * @return an immutable list of parsed endpoints, empty when no nodes are supplied
+     * @throws IllegalArgumentException if any descriptor is malformed
+     */
     private static List<NodeEndpoint> parseClusterNodes(List<String> rawNodes) {
         if (rawNodes == null || rawNodes.isEmpty()) {
             return Collections.emptyList();
@@ -1347,6 +1466,12 @@ public class RecommenderServer implements AutoCloseable {
         final String spaceId;
         final long citationCount;
 
+        /**
+         * Creates a candidate space for ranking.
+         *
+         * @param spaceId the parking space identifier
+         * @param citationCount the number of citations recorded against the space
+         */
         SpaceCandidate(String spaceId, long citationCount) {
             this.spaceId = spaceId;
             this.citationCount = citationCount;

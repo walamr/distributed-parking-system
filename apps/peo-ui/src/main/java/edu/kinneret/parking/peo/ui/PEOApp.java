@@ -80,18 +80,14 @@ public class PEOApp extends Application {
         primaryStage.show();
     }
 
-/**
-
- * Create field box.
-
- * @param title the title
-
- * @param field the field
-
- * @return the vbox
-
- */
-
+    /**
+     * Builds a labeled input group consisting of a bold title with a required-field
+     * asterisk placed above the supplied control.
+     *
+     * @param title the label text shown above the input control
+     * @param field the input control to wrap
+     * @return a vertical box containing the labeled input field
+     */
     private VBox createFieldBox(String title, Control field) {
         Label titleLbl = new Label(title);
         titleLbl.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");

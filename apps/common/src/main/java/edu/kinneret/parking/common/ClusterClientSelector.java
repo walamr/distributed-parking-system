@@ -35,9 +35,11 @@ public final class ClusterClientSelector {
     }
 
     /**
-     * Reports a connection failure to a node, triggering the circuit breaker.
-     * Implements exponential backoff: 30s, 60s, 120s... up to 10 minutes.
-     * @param node the failing node
+     * Reports a connection failure to a node, triggering the circuit breaker by
+     * blacklisting the node for an exponentially increasing duration
+     * (30s, 60s, 120s ... capped at roughly 16 minutes).
+     *
+     * @param node the failing node whose failure count and blacklist expiry are updated
      */
     public void reportFailure(ClusterNode node) {
         String address = node.toAddress();
@@ -52,8 +54,10 @@ public final class ClusterClientSelector {
     }
 
     /**
-     * Reports a successful connection, resetting the failure counter.
-     * @param node the successful node
+     * Reports a successful connection, clearing the node from the blacklist and
+     * resetting its sequential failure counter.
+     *
+     * @param node the node that was successfully reached
      */
     public void reportSuccess(ClusterNode node) {
         String address = node.toAddress();

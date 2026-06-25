@@ -73,6 +73,13 @@ public final class RabbitMqTopologyInitializer {
                 quorumQueueArguments(deadLetterRoutingKey));
     }
 
+    /**
+     * Builds the declaration arguments for a durable quorum queue, including the initial member
+     * group size and the dead-letter exchange and routing key bindings.
+     *
+     * @param deadLetterRoutingKey the routing key used to dead-letter rejected messages
+     * @return the map of quorum queue declaration arguments
+     */
     static Map<String, Object> quorumQueueArguments(String deadLetterRoutingKey) {
         return Map.of(
                 "x-queue-type", "quorum",

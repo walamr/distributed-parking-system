@@ -143,6 +143,10 @@ public class MOController {
         refreshCitations(false);
     }
 
+    /**
+     * Starts a daemon thread that periodically refreshes the currently visible
+     * transaction report and the citation report once per second.
+     */
     private void startTransactionAutoRefresh() {
         Thread refreshThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {
@@ -167,7 +171,11 @@ public class MOController {
     }
 
     /**
-     * Handles the transaction report request.
+     * Handles the transaction report request by fetching and consolidating
+     * transaction events on a background thread and updating the table.
+     *
+     * @param announceRefresh true to display status messages for this refresh,
+     *                        false for a silent background refresh
      */
     private void refreshTransactions(boolean announceRefresh) {
         if (!transactionRefreshInProgress.compareAndSet(false, true)) {
@@ -270,7 +278,11 @@ public class MOController {
     }
 
     /**
-     * Handles the citation report request.
+     * Handles the citation report request by fetching citations on a background
+     * thread, enriching them with zone information, and updating the table.
+     *
+     * @param announceRefresh true to display status messages for this refresh,
+     *                        false for a silent background refresh
      */
     private void refreshCitations(boolean announceRefresh) {
         if (!citationRefreshInProgress.compareAndSet(false, true)) {
@@ -283,7 +295,7 @@ public class MOController {
             /**
              * Fetches the complete list of citations from the repository.
              *
-              * @return the list of citation documents
+             * @return the list of citation documents
              */
             @Override
             protected List<Document> call() {

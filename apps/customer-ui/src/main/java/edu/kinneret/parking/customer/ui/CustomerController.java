@@ -67,8 +67,12 @@ public class CustomerController {
             + "Please try another zone or check again later.";
 
     /**
-     * Returns the path to the local transactions file for the given VIN.
-     * Stored as: local_parking_data/<vin>.json
+     * Returns the path to the local offline transactions file for the given VIN,
+     * stored as {@code local_parking_data/<sanitised-vin>.json}. The VIN is
+     * sanitised so it forms a safe filename.
+     *
+     * @param vin the vehicle identification number
+     * @return the filesystem path of the VIN's local transaction file
      */
     private static Path getLocalTxFile(String vin) {
         String safeVin = vin.replaceAll("[^a-zA-Z0-9_\\-]", "_");
@@ -76,8 +80,11 @@ public class CustomerController {
     }
 
     /**
-     * Loads local offline transactions from disk for the given VIN.
-     * Called once at startup after VIN is known.
+     * Loads previously persisted offline transactions from disk into the in-memory
+     * {@code localOfflineTransactions} list for the given VIN. Called once at startup
+     * after the VIN is known; missing, empty or malformed files are tolerated.
+     *
+     * @param vin the vehicle identification number whose local transactions are loaded
      */
     private static void loadLocalTransactions(String vin) {
         if (vin == null || vin.isBlank())
@@ -106,7 +113,11 @@ public class CustomerController {
     }
 
     /**
-     * Saves the current localOfflineTransactions list to disk for the given VIN.
+     * Persists the current in-memory {@code localOfflineTransactions} list to disk
+     * as JSON for the given VIN, creating the data directory if needed. I/O errors
+     * are logged rather than propagated.
+     *
+     * @param vin the vehicle identification number whose local transactions are saved
      */
     private static void saveLocalTransactions(String vin) {
         if (vin == null || vin.isBlank())
@@ -1131,20 +1142,13 @@ public class CustomerController {
     }
 
     /**
-     * Sets the status message on the UI.
-     * 
-     * @param message the message to display
-     * @param isError true if the message indicates an error
-     */
-    /**
-     * Sets the status message on the UI and manages the visibility of the status
-     * label.
-     * The status label is independent of the info card so it remains visible even
-     * after
-     * parking is stopped.
+     * Aggregates a flat list of start/stop transaction events into completed and
+     * active parking sessions. Events are paired by space number in chronological
+     * order so each session carries its start timestamp, optional end timestamp
+     * and a merged payload, with the resulting sessions sorted newest-first.
      *
-     * @param message the message to display
-     * @param isError true if the message indicates an error
+     * @param merged the combined list of start/stop transaction documents
+     * @return the list of aggregated session documents, sorted by start time descending
      */
     private List<Document> aggregateHistory(List<Document> merged) {
         // Sort merged by timestamp ascending to pair start/stop sequentially
@@ -1257,14 +1261,13 @@ public class CustomerController {
         return sessions;
     }
 
-/**
-
- * Check and resume active session.
-
- * @param merged the merged
-
- */
-
+    /**
+     * Inspects the newest aggregated session and, if it represents an open (not yet
+     * stopped) parking session, restores the active space and start time and shows
+     * the live info card so an in-progress session resumes after a restart or login.
+     *
+     * @param merged the aggregated session list, sorted newest-first
+     */
     private void checkAndResumeActiveSession(List<Document> merged) {
         if (merged == null || merged.isEmpty()) {
             return;
@@ -1292,16 +1295,14 @@ public class CustomerController {
         }
     }
 
-/**
-
- * Set history status.
-
- * @param message the message
-
- * @param isError the isError
-
- */
-
+    /**
+     * Displays a transient status message on the parking-history view, styling it
+     * as an error or success notice and auto-hiding it after five seconds. Runs on
+     * the JavaFX application thread.
+     *
+     * @param message the status text to display
+     * @param isError {@code true} to render the message as an error, {@code false} for a success notice
+     */
     private void setHistoryStatus(String message, boolean isError) {
         if (historyStatusLabel != null) {
             Platform.runLater(() -> {
@@ -1328,16 +1329,14 @@ public class CustomerController {
         }
     }
 
-/**
-
- * Set status.
-
- * @param message the message
-
- * @param isError the isError
-
- */
-
+    /**
+     * Displays a status or error message on the dashboard view, toggling between the
+     * error label and the status label as appropriate and auto-clearing the message
+     * after five seconds. Runs on the JavaFX application thread.
+     *
+     * @param message the message to display
+     * @param isError {@code true} to show the message as an error, {@code false} for a normal status
+     */
     private void setStatus(String message, boolean isError) {
         Platform.runLater(() -> {
             if (isError) {
@@ -1378,18 +1377,15 @@ public class CustomerController {
         });
     }
 
-/**
-
- * Get long safe.
-
- * @param doc the doc
-
- * @param key the key
-
- * @return the long
-
- */
-
+    /**
+     * Safely reads a numeric field from a BSON document as a {@link Long}, returning
+     * {@code null} when the document is {@code null}, the key is absent, or the value
+     * is not a number.
+     *
+     * @param doc the document to read from, may be {@code null}
+     * @param key the field name to read
+     * @return the field value as a {@link Long}, or {@code null} when unavailable or non-numeric
+     */
     private static Long getLongSafe(Document doc, String key) {
         if (doc == null || !doc.containsKey(key))
             return null;
@@ -1400,16 +1396,14 @@ public class CustomerController {
         return null;
     }
 
-/**
-
- * Parse cost safe.
-
- * @param costStr the costStr
-
- * @return the double
-
- */
-
+    /**
+     * Parses a cost string into a {@code double}, stripping any non-numeric
+     * characters (such as currency suffixes) and tolerating {@code null}, empty,
+     * {@code "null"} and placeholder {@code "-"} values by returning {@code 0.0}.
+     *
+     * @param costStr the raw cost string to parse
+     * @return the parsed cost, or {@code 0.0} when the value is absent or unparseable
+     */
     private static double parseCostSafe(String costStr) {
         if (costStr == null || costStr.isEmpty() || costStr.equals("null") || costStr.equals("-")) {
             return 0.0;
@@ -1475,9 +1469,9 @@ public class CustomerController {
     }
 
     /**
-     * Validates the current space input and starts an explicit recommendation query.
-     *
-     * @return no return value
+     * Validates the parking space number currently entered in the dashboard and,
+     * when valid, starts an explicit recommendation query; otherwise shows an error
+     * and resets the recommendation labels.
      */
     private void handleRecommendParking() {
         String spaceId = spaceNumberField == null || spaceNumberField.getText() == null
@@ -1512,9 +1506,8 @@ public class CustomerController {
     }
 
     /**
-     * Clears the recommendation display panel to its default state.
-     *
-     * @return no return value
+     * Resets the recommendation request and result labels to their default
+     * placeholder state and restores their default styling and layout.
      */
     private void clearRecommendation() {
         if (requestLabel != null) {
@@ -1538,10 +1531,11 @@ public class CustomerController {
     }
 
     /**
-     * Sends a signed TLS recommendation request to one recommender node.
+     * Sends a signed TLS recommendation request to the configured recommender nodes
+     * (trying each until one responds) on a background thread, then updates the
+     * recommendation labels with the outcome and schedules them to auto-clear.
      *
-     * @param spaceId validated numeric parking space number
-     * @return no return value
+     * @param spaceId the validated numeric parking space number to request a recommendation for
      */
     private void fetchRecommendation(String spaceId) {
         try {

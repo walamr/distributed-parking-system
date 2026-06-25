@@ -115,6 +115,14 @@ public final class AppConfig {
         private final String defaultMongoUser;
         private final String defaultMongoPass;
 
+            /**
+         * Creates an application profile with its least-privilege RabbitMQ and MongoDB defaults.
+         *
+         * @param defaultUsername  the default RabbitMQ username for the profile
+         * @param defaultPassword  the default RabbitMQ password for the profile
+         * @param defaultMongoUser the default MongoDB username for the profile
+         * @param defaultMongoPass the default MongoDB password for the profile
+         */
         ApplicationProfile(String defaultUsername, String defaultPassword, String defaultMongoUser, String defaultMongoPass) {
             this.defaultUsername = defaultUsername;
             this.defaultPassword = defaultPassword;
@@ -297,6 +305,15 @@ public final class AppConfig {
         }
     }
 
+    /**
+     * Rewrites the derived RabbitMQ, MongoDB, and recommender connection settings in the
+     * supplied environment map based on the per-node IP addresses provided in
+     * {@code network-ips.env}. Detects whether the deployment is local, a private Docker
+     * subnet, or a real lab network and selects the appropriate hostnames, ports, and TLS
+     * hostname-validation behaviour accordingly.
+     *
+     * @param env the mutable environment map whose derived node settings are recomputed
+     */
     private static void overrideWithNetworkIps(Map<String, String> env) {
         String mongo1 = env.get("MONGO1_IP");
         String mongo2 = env.get("MONGO2_IP");
@@ -387,6 +404,15 @@ public final class AppConfig {
         }
     }
 
+    /**
+     * Tests whether a TCP connection to the given host and port can be established within
+     * the supplied timeout.
+     *
+     * @param host      the target host name or IP address
+     * @param port      the target port
+     * @param timeoutMs the connection timeout in milliseconds
+     * @return {@code true} if the connection succeeded, otherwise {@code false}
+     */
     private static boolean isAddressReachable(String host, int port, int timeoutMs) {
         try (java.net.Socket socket = new java.net.Socket()) {
             socket.connect(new java.net.InetSocketAddress(host, port), timeoutMs);
@@ -399,6 +425,9 @@ public final class AppConfig {
     /**
      * Returns true if the IP address is in a private Docker-assigned subnet
      * (typically 10.0.x.x, 172.17-31.x.x, or 192.168.x.x).
+     *
+     * @param ip the IP address to classify
+     * @return {@code true} when the address falls in a private subnet, otherwise {@code false}
      */
     private static boolean isPrivateDockerSubnet(String ip) {
         if (ip == null) return false;
@@ -406,6 +435,13 @@ public final class AppConfig {
                (ip.startsWith("172.") && isInRange172(ip));
     }
 
+    /**
+     * Determines whether a {@code 172.x} IP address lies within the private range
+     * {@code 172.16.x.x}-{@code 172.31.x.x}.
+     *
+     * @param ip the IP address whose second octet is checked
+     * @return {@code true} when the second octet is between 16 and 31 inclusive
+     */
     private static boolean isInRange172(String ip) {
         try {
             String[] parts = ip.split("\\.");
@@ -440,6 +476,16 @@ public final class AppConfig {
         overrideWithNetworkIps(env);
     }
 
+    /**
+     * Builds the effective environment map for a runnable module by layering, in order, the
+     * shared {@code .env} and {@code network-ips.env} files, the module's profile-specific env
+     * file, cluster-wide overrides, and finally the supplied runtime overrides. Derived node
+     * lists are recomputed so that a real process environment may still override them.
+     *
+     * @param profile          the application profile whose env file and defaults apply
+     * @param runtimeOverrides values that take precedence over file-loaded values (may be {@code null})
+     * @return the fully resolved environment map
+     */
     private static Map<String, String> loadRuntimeEnvironment(ApplicationProfile profile, Map<String, String> runtimeOverrides) {
         Map<String, String> env = new java.util.HashMap<>();
         loadDotEnv(env);
@@ -482,6 +528,12 @@ public final class AppConfig {
         return env;
     }
 
+    /**
+     * Maps an application profile to the relative path of its profile-specific env file.
+     *
+     * @param profile the application profile
+     * @return the relative path of the profile's env file
+     */
     private static String profileEnvFile(ApplicationProfile profile) {
         return switch (profile) {
             case CUSTOMER_UI -> "env-configs/customer.env";
@@ -697,6 +749,16 @@ public final class AppConfig {
 
     }
 
+    /**
+     * Replaces the user-info (credentials) portion of a MongoDB connection URI with the
+     * supplied username and password while preserving the host list and query parameters.
+     *
+     * @param mongoUri the original MongoDB connection URI
+     * @param username the username to inject
+     * @param password the password to inject
+     * @return the URI with replaced credentials, or the original URI when it is not a
+     *         {@code mongodb://} URI
+     */
     private static String replaceMongoCredentials(String mongoUri, String username, String password) {
         if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
             return mongoUri;
@@ -714,6 +776,17 @@ public final class AppConfig {
         return scheme + username + ":" + password + "@" + hosts + rest;
     }
 
+    /**
+     * Normalizes a MongoDB connection URI into a canonical replica-set form: rebuilds the
+     * seed host list from the configured node IPs when available, ensures a database path is
+     * present, and forces the {@code replicaSet}, {@code authSource}, {@code retryWrites}, and
+     * {@code w} query parameters while removing any {@code directConnection} flag.
+     *
+     * @param mongoUri    the original MongoDB connection URI
+     * @param environment the environment map used to resolve configured replica host IPs
+     * @return the normalized replica-set URI, or the original URI when it is not a
+     *         {@code mongodb://} URI
+     */
     private static String normalizeMongoReplicaSetUri(String mongoUri, Map<String, String> environment) {
         if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
             return mongoUri;
@@ -755,12 +828,27 @@ public final class AppConfig {
         return scheme + authPrefix + hosts + path + "?" + buildQuery(queryParams);
     }
 
+    /**
+     * Determines whether all three MongoDB replica host IP variables are present and non-blank
+     * in the supplied environment.
+     *
+     * @param environment the environment map to inspect
+     * @return {@code true} when MONGO1_IP, MONGO2_IP, and MONGO3_IP are all set
+     */
     private static boolean hasConfiguredMongoReplicaHosts(Map<String, String> environment) {
         return hasText(environment.get("MONGO1_IP"))
                 && hasText(environment.get("MONGO2_IP"))
                 && hasText(environment.get("MONGO3_IP"));
     }
 
+    /**
+     * Builds the comma-separated {@code host:port} MongoDB seed list from the configured node
+     * IPs, using distinct loopback ports when all three nodes resolve to the same host (local
+     * single-host development) and the standard 27017 port otherwise.
+     *
+     * @param environment the environment map providing the node IP addresses
+     * @return the comma-separated seed host list
+     */
     private static String buildMongoSeedHosts(Map<String, String> environment) {
         String mongo1 = readOrDefault(environment, "MONGO1_IP", "mongo1");
         String mongo2 = readOrDefault(environment, "MONGO2_IP", "mongo2");
@@ -772,14 +860,33 @@ public final class AppConfig {
         return mongo1 + ":" + p1 + "," + mongo2 + ":" + p2 + "," + mongo3 + ":" + p3;
     }
 
+    /**
+     * Determines whether a host string contains more than one comma-separated host entry.
+     *
+     * @param hosts the comma-separated host list
+     * @return {@code true} when the list contains multiple hosts
+     */
     private static boolean hasMultipleMongoHosts(String hosts) {
         return hosts != null && hosts.split(",").length > 1;
     }
 
+    /**
+     * Determines whether a string is non-null and contains non-whitespace characters.
+     *
+     * @param value the string to test
+     * @return {@code true} when the value is non-null and not blank
+     */
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }
 
+    /**
+     * Parses an {@code &}-separated URI query string into an ordered map of key-value pairs,
+     * preserving insertion order and skipping blank segments.
+     *
+     * @param query the raw query string (without the leading {@code ?})
+     * @return an ordered map of the parsed query parameters
+     */
     private static LinkedHashMap<String, String> parseQuery(String query) {
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         if (query == null || query.isBlank()) {
@@ -800,10 +907,23 @@ public final class AppConfig {
         return params;
     }
 
+    /**
+     * Removes every query parameter whose key matches the given name, ignoring case.
+     *
+     * @param params      the mutable query parameter map
+     * @param keyToRemove the parameter name to remove (case-insensitive)
+     */
     private static void removeQueryParamIgnoreCase(LinkedHashMap<String, String> params, String keyToRemove) {
         params.keySet().removeIf(key -> key.equalsIgnoreCase(keyToRemove));
     }
 
+    /**
+     * Serializes an ordered map of query parameters back into an {@code &}-separated query
+     * string, omitting the {@code =value} suffix for parameters with empty values.
+     *
+     * @param params the ordered query parameter map
+     * @return the serialized query string
+     */
     private static String buildQuery(LinkedHashMap<String, String> params) {
         StringBuilder builder = new StringBuilder();
         for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -1112,6 +1232,13 @@ public final class AppConfig {
                 + ", writeConcernW=" + queryValue(mongoUri, "w", "<driver default>");
     }
 
+    /**
+     * Extracts the host-and-port portion of a MongoDB connection URI, stripping any embedded
+     * credentials.
+     *
+     * @param mongoUri the MongoDB connection URI
+     * @return the comma-separated host list, or {@code "<unknown>"} when the URI cannot be parsed
+     */
     private static String extractMongoHosts(String mongoUri) {
         if (mongoUri == null || !mongoUri.startsWith("mongodb://")) {
             return "<unknown>";
@@ -1127,6 +1254,14 @@ public final class AppConfig {
         return atIndex >= 0 ? authority.substring(atIndex + 1) : authority;
     }
 
+    /**
+     * Looks up a single query-parameter value (case-insensitive) from a MongoDB connection URI.
+     *
+     * @param mongoUri     the MongoDB connection URI
+     * @param key          the query parameter name to look up
+     * @param defaultValue the value returned when the parameter is absent
+     * @return the parameter value, {@code "<set>"} when present but empty, or {@code defaultValue}
+     */
     private static String queryValue(String mongoUri, String key, String defaultValue) {
         if (mongoUri == null) {
             return defaultValue;

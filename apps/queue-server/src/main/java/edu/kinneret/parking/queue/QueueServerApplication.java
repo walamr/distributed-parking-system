@@ -113,6 +113,15 @@ public final class QueueServerApplication {
                 + "was reachable; expected " + expectedNodes + " nodes.");
     }
 
+    /**
+     * Waits until the storage-server has attached consumers to both required queues, confirming
+     * that MongoDB persistence is active before the queue-server reports successful startup.
+     *
+     * @param connectionManager the connection manager used to inspect consumer counts
+     * @param appConfig the application configuration providing the queue names
+     * @throws InterruptedException if the waiting thread is interrupted
+     * @throws IllegalStateException if storage consumers do not appear within the wait window
+     */
     private static void waitForStorageConsumers(
             RabbitMqConnectionManager connectionManager,
             AppConfig appConfig) throws InterruptedException {

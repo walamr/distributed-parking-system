@@ -208,28 +208,19 @@ public class PEOCLI {
         System.out.println("Exiting CLI.");
     }
 
-/**
-
- * Issue citation.
-
- * @param manager the manager
-
- * @param config the config
-
- * @param signer the signer
-
- * @param vin the vin
-
- * @param spaceId the spaceId
-
- * @param amount the amount
-
- * @param reason the reason
-
- * @param officerId the officerId
-
- */
-
+    /**
+     * Builds, signs, and publishes a citation request to the RabbitMQ cluster
+     * with publisher confirms, then prints a confirmation summary to the console.
+     *
+     * @param manager   the RabbitMQ connection manager used to publish the request
+     * @param config    the application configuration providing the target queue name
+     * @param signer    the message signer used to authenticate the citation envelope
+     * @param vin       the vehicle identification number being cited
+     * @param spaceId   the parking space identifier where the violation occurred
+     * @param amount    the citation amount as entered by the officer
+     * @param reason    the textual reason for the citation
+     * @param officerId the identifier of the officer issuing the citation
+     */
      private static void issueCitation(RabbitMqConnectionManager manager, AppConfig config, SecureMessageSigner signer, String vin, String spaceId, String amount, String reason, String officerId) {
          try {
              String payload = buildCitationPayload(vin, spaceId, amount, reason, officerId, config);
@@ -270,57 +261,37 @@ public class PEOCLI {
          }
      }
  
-/**
- 
- * Build citation payload.
- 
- * @param vin the vin
- 
- * @param spaceId the spaceId
- 
- * @param amount the amount
- 
- * @param reason the reason
- 
- * @param config the config
- 
- * @return the string
- 
- */
- 
+    /**
+     * Builds a validated JSON citation payload without an associated officer
+     * identifier by delegating to the full overload with an empty officer value.
+     *
+     * @param vin     the vehicle identification number being cited
+     * @param spaceId the parking space identifier where the violation occurred
+     * @param amount  the citation amount as a string to be parsed and validated
+     * @param reason  the textual reason for the citation
+     * @param config  the application configuration providing validation limits
+     * @return the validated citation payload serialized as a JSON string
+     */
      static String buildCitationPayload(String vin, String spaceId, String amount, String reason, AppConfig config) {
-         /**
-          * Build citation payload.
-          * @param vin the vin
-          * @param spaceId the spaceId
-          * @param amount the amount
-          * @param reason the reason
-          * @param config the config
-          * @return the return
-          */
          return buildCitationPayload(vin, spaceId, amount, reason, "", config);
      }
 
-/**
-
- * Build citation payload.
-
- * @param vin the vin
-
- * @param spaceId the spaceId
-
- * @param amount the amount
-
- * @param reason the reason
-
- * @param officerId the officerId
-
- * @param config the config
-
- * @return the string
-
- */
-
+    /**
+     * Validates the supplied citation fields, normalizes the vehicle and space
+     * identifiers, parses and range-checks the amount, and assembles the result
+     * into a validated JSON citation payload.
+     *
+     * @param vin       the vehicle identification number being cited
+     * @param spaceId   the parking space identifier where the violation occurred
+     * @param amount    the citation amount as a string to be parsed and validated
+     * @param reason    the textual reason for the citation
+     * @param officerId the identifier of the officer issuing the citation; omitted
+     *                  from the payload when blank
+     * @param config    the application configuration providing validation limits
+     * @return the validated citation payload serialized as a JSON string
+     * @throws IllegalArgumentException if the amount is not numeric or any field
+     *                                  fails validation
+     */
      static String buildCitationPayload(String vin, String spaceId, String amount, String reason, String officerId, AppConfig config) {
          String safeVin = ValidationUtils.requireValidVehicleId(vin == null ? "" : vin.trim().toUpperCase());
          String safeSpace = ValidationUtils.requireValidSpaceId(spaceId == null ? "" : spaceId.trim().toUpperCase());
@@ -345,26 +316,35 @@ public class PEOCLI {
          return payload.toString();
     }
 
-/**
-
- * Safe for log.
-
- * @param value the value
-
- * @return the string
-
- */
-
+    /**
+     * Sanitizes a value for safe log output by replacing any character that is
+     * not alphanumeric, dot, underscore, or hyphen with an underscore.
+     *
+     * @param value the raw value to sanitize; may be null
+     * @return the sanitized string, or an empty string when the input is null
+     */
     private static String safeForLog(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
+    /**
+     * Immutable record of a single PEO activity (legality check, citation, or
+     * parking event) used to populate the session's activity history view.
+     */
     private static class PEOActivityLogEntry {
         final String action;
         final String vin;
         final String result;
         final long timestamp;
 
+        /**
+         * Creates an activity log entry capturing one PEO action.
+         *
+         * @param action    the action that was performed
+         * @param vin       the vehicle identification number involved
+         * @param result    the outcome or result text for the action
+         * @param timestamp the time the action occurred, in epoch milliseconds
+         */
         PEOActivityLogEntry(String action, String vin, String result, long timestamp) {
             this.action = action;
             this.vin = vin;
@@ -373,6 +353,14 @@ public class PEOCLI {
         }
     }
 
+    /**
+     * Extracts an event timestamp from a transaction document in epoch
+     * milliseconds, handling numeric epoch seconds, ISO-8601 string timestamps,
+     * and a numeric {@code storedAt} fallback.
+     *
+     * @param doc the transaction document to read the timestamp from
+     * @return the timestamp in epoch milliseconds, or 0 if none could be parsed
+     */
     private static long getTimestampMs(Document doc) {
         Object ts = doc.get("timestamp");
         if (ts instanceof Number) {

@@ -189,26 +189,19 @@ public class CustomerCLI {
         System.out.println("\nExiting CLI.");
     }
 
-/**
-
- * Publish message.
-
- * @param manager the manager
-
- * @param config the config
-
- * @param signer the signer
-
- * @param vin the vin
-
- * @param spaceId the spaceId
-
- * @param type the type
-
- * @param repository the repository
-
- */
-
+    /**
+     * Builds, signs and publishes a parking transaction message (start or stop)
+     * to the transactions queue using publisher confirms. Failures are logged and
+     * reported to the console rather than propagated.
+     *
+     * @param manager the RabbitMQ connection manager used to publish with confirms
+     * @param config the application configuration providing the target queue name
+     * @param signer the HMAC-SHA256 signer used to sign the message envelope
+     * @param vin the vehicle identification number initiating the transaction
+     * @param spaceId the target parking space number
+     * @param type the transaction action, either {@code "start"} or {@code "stop"}
+     * @param repository the parking repository used to compute stop costs and zones
+     */
     private static void publishMessage(RabbitMqConnectionManager manager, AppConfig config, SecureMessageSigner signer, String vin, String spaceId, String type, ParkingRepository repository) {
         try {
             String payload = buildPayload(vin, spaceId, type, repository, config);
@@ -230,57 +223,48 @@ public class CustomerCLI {
         }
     }
 
+    /**
+     * Builds the success confirmation line shown after a transaction is accepted
+     * by RabbitMQ.
+     *
+     * @param type the transaction action that succeeded (for example {@code "start"} or {@code "stop"})
+     * @return the user-facing success message
+     */
     static String publishSuccessMessage(String type) {
         return "SUCCESS: Parking " + type + " request accepted by RabbitMQ.";
     }
 
-/**
-
- * Build payload.
-
- * @param vin the vin
-
- * @param spaceId the spaceId
-
- * @param type the type
-
- * @param config the config
-
- * @return the string
-
- */
-
+    /**
+     * Convenience overload that builds a transaction payload without a repository,
+     * delegating to {@link #buildPayload(String, String, String, ParkingRepository, AppConfig)}
+     * with a {@code null} repository (so the stop cost defaults to {@code 0.00}).
+     *
+     * @param vin the vehicle identification number
+     * @param spaceId the target parking space number
+     * @param type the transaction action, either {@code "start"} or {@code "stop"}
+     * @param config the application configuration used for payload validation
+     * @return the validated JSON payload as a string
+     */
     static String buildPayload(String vin, String spaceId, String type, AppConfig config) {
-        /**
-         * Build payload.
-         * @param vin the vin
-         * @param spaceId the spaceId
-         * @param type the type
-         * @param null the null
-         * @param config the config
-         * @return the return
-         */
+        // Delegate to the repository-aware overload with no repository available.
         return buildPayload(vin, spaceId, type, null, config);
     }
 
-/**
-
- * Build payload.
-
- * @param vin the vin
-
- * @param spaceId the spaceId
-
- * @param type the type
-
- * @param repository the repository
-
- * @param config the config
-
- * @return the string
-
- */
-
+    /**
+     * Builds and validates the JSON payload for a parking transaction. The VIN and
+     * space number are normalised and validated; for a stop action the elapsed
+     * parking cost is computed from the vehicle's last start event and the space
+     * rate (falling back to a default when the database is unreachable), and the
+     * zone/area name is looked up when a repository is supplied.
+     *
+     * @param vin the vehicle identification number
+     * @param spaceId the target parking space number
+     * @param type the transaction action, either {@code "start"} or {@code "stop"}
+     * @param repository the parking repository used to compute cost and zone, or {@code null} when unavailable
+     * @param config the application configuration providing the maximum allowed amount for validation
+     * @return the validated JSON payload as a string
+     * @throws IllegalArgumentException if the action is not {@code "start"} or {@code "stop"}, or if validation fails
+     */
     static String buildPayload(String vin, String spaceId, String type, ParkingRepository repository, AppConfig config) {
         String safeVin = ValidationUtils.requireValidVehicleId(vin == null ? "" : vin.trim().toUpperCase());
         String safeSpace = ValidationUtils.requireValidSpaceId(spaceId == null ? "" : spaceId.trim().toUpperCase());
@@ -353,6 +337,7 @@ public class CustomerCLI {
      * @param selectedIdx index of the node selected by the customer
      * @param config application TLS configuration
      * @param signer HMAC-SHA256 signer
+     * @param repository the parking repository used to enrich the recommendation display
      */
     static void queryRecommender(String spaceId, List<ClusterNode> recNodes, int selectedIdx, AppConfig config, SecureMessageSigner signer, ParkingRepository repository) {
         try {
@@ -729,6 +714,15 @@ public class CustomerCLI {
         }
     }
 
+    /**
+     * Renders a list of headers and rows as a fixed-width ASCII table using
+     * {@code +}, {@code -} and {@code |} border characters, sizing each column to
+     * its widest cell.
+     *
+     * @param headers the column header labels
+     * @param rows the table rows, each a list of cell values aligned to the headers
+     * @return the formatted multi-line table string
+     */
     private static String formatConsoleTable(List<String> headers, List<List<String>> rows) {
         int numCols = headers.size();
         int[] colWidths = new int[numCols];
@@ -802,6 +796,14 @@ public class CustomerCLI {
         return sb.toString();
     }
 
+    /**
+     * Builds a string consisting of a single character repeated a given number
+     * of times, used to draw table borders and padding.
+     *
+     * @param c the character to repeat
+     * @param count the number of repetitions
+     * @return the resulting string of {@code count} copies of {@code c}
+     */
     private static String repeatChar(char c, int count) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < count; i++) {
@@ -810,20 +812,27 @@ public class CustomerCLI {
         return sb.toString();
     }
 
-/**
-
- * Safe for log.
-
- * @param value the value
-
- * @return the string
-
- */
-
+    /**
+     * Sanitises a value for safe inclusion in log output by replacing any
+     * character outside {@code [A-Za-z0-9._-]} with an underscore, preventing
+     * log injection.
+     *
+     * @param value the raw value to sanitise, may be {@code null}
+     * @return the sanitised value, or an empty string when {@code value} is {@code null}
+     */
     private static String safeForLog(String value) {
         return value == null ? "" : value.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
+    /**
+     * Formats an epoch-second timestamp (supplied as a {@link Number} or a numeric
+     * string) into a human-readable {@code yyyy-MM-dd HH:mm:ss UTC} string for
+     * console display.
+     *
+     * @param ts the timestamp value in epoch seconds, may be {@code null}
+     * @return the formatted UTC date-time string, {@code "-"} when {@code ts} is {@code null},
+     *         or the value's {@code toString()} when it cannot be parsed
+     */
     private static String formatTimestamp(Object ts) {
         if (ts == null) return "-";
         try {

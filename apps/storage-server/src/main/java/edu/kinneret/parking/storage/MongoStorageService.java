@@ -81,6 +81,12 @@ public class MongoStorageService {
         }
     }
 
+    /**
+     * Determines the MongoDB collection an envelope should be stored in based on its message type.
+     *
+     * @param envelope the message envelope to classify
+     * @return {@code "transactions"} for transaction messages, otherwise {@code "citations"}
+     */
     static String collectionNameFor(MessageEnvelope envelope) {
         return envelope.getType().toLowerCase().contains("transaction") ? "transactions" : "citations";
     }

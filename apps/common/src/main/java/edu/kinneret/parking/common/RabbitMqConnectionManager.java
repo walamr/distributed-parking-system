@@ -33,6 +33,13 @@ public final class RabbitMqConnectionManager {
                 name));
     }
 
+    /**
+     * Creates a connection manager with a custom connection opener, primarily to allow tests
+     * to inject a stubbed opener.
+     *
+     * @param appConfig        the application configuration
+     * @param connectionOpener the strategy used to open the underlying RabbitMQ connection
+     */
     RabbitMqConnectionManager(AppConfig appConfig, ConnectionOpener connectionOpener) {
         this.appConfig = appConfig;
         this.clusterClientSelector = new ClusterClientSelector(appConfig.getRabbitMqNodes());
@@ -203,6 +210,9 @@ public final class RabbitMqConnectionManager {
      * Classifies the root cause of a failure into a coarse, secret-free category so the
      * surfaced error distinguishes connection, TLS, auth/vhost, queue, confirm-timeout and
      * consumer problems instead of a single vague message.
+     *
+     * @param throwable the failure whose root cause should be classified (may be {@code null})
+     * @return a coarse, secret-free category label describing the failure
      */
     private static String classifyFailure(Throwable throwable) {
         if (throwable == null) {
@@ -255,6 +265,14 @@ public final class RabbitMqConnectionManager {
         });
     }
 
+    /**
+     * Declares a durable quorum queue with a three-member initial group and a dead-letter
+     * exchange/routing key derived from the queue name.
+     *
+     * @param channel   the open channel on which to declare the queue
+     * @param queueName the name of the quorum queue to declare
+     * @throws IOException when the queue declaration fails
+     */
     private void declareQuorumQueue(Channel channel, String queueName) throws IOException {
         String deadLetterRoutingKey = queueName.replace(".queue", ".dead");
         channel.queueDeclare(queueName, true, false, false,
@@ -323,6 +341,12 @@ public final class RabbitMqConnectionManager {
         return factory;
     }
 
+    /**
+     * Builds a human-readable RabbitMQ connection name that embeds the active application
+     * profile, used to identify the client in the broker's management UI.
+     *
+     * @return the connection name in the form {@code parking-<profile>}
+     */
     private String connectionName() {
         AppConfig.ApplicationProfile profile = appConfig.getApplicationProfile();
         String profileName = profile == null ? "unknown" : profile.name().toLowerCase(java.util.Locale.ROOT);
@@ -367,8 +391,10 @@ public final class RabbitMqConnectionManager {
     }
 
     /**
-     * Checks if at least one RabbitMQ node is reachable.
-     * @return true if healthy
+     * Checks whether at least one RabbitMQ node is reachable by attempting to open and
+     * immediately close a connection.
+     *
+     * @return {@code true} when a connection succeeds, otherwise {@code false}
      */
     public boolean checkHealth() {
         try (ConnectionHandle ignored = connect()) {
@@ -378,6 +404,12 @@ public final class RabbitMqConnectionManager {
         }
     }
 
+    /**
+     * Produces a string summary of the enabled configured RabbitMQ node addresses for use in
+     * diagnostic error messages.
+     *
+     * @return the string representation of the enabled node addresses
+     */
     private String configuredNodesSummary() {
         return appConfig.getRabbitMqNodes().stream()
                 .filter(ClusterNode::isEnabled)
@@ -386,6 +418,13 @@ public final class RabbitMqConnectionManager {
                 .toString();
     }
 
+    /**
+     * Produces a secret-free, single-line summary of a failure's root cause for inclusion in
+     * surfaced error messages.
+     *
+     * @param throwable the failure to summarize (may be {@code null})
+     * @return the sanitized root-cause summary, or {@code "none"} when {@code throwable} is null
+     */
     private static String lastFailureSummary(Throwable throwable) {
         if (throwable == null) {
             return "none";
@@ -397,8 +436,23 @@ public final class RabbitMqConnectionManager {
         return root.getClass().getSimpleName() + ": " + SecurityLogger.sanitize(root.getMessage());
     }
 
+    /**
+     * Strategy for opening a RabbitMQ {@link Connection}, allowing the real network opener to
+     * be substituted with a test double.
+     */
     @FunctionalInterface
     interface ConnectionOpener {
+
+        /**
+         * Opens a RabbitMQ connection to the given cluster node using the supplied factory.
+         *
+         * @param factory        the pre-configured connection factory
+         * @param node           the target cluster node
+         * @param connectionName the client connection name reported to the broker
+         * @return the opened connection
+         * @throws IOException      when the connection cannot be established
+         * @throws TimeoutException when establishing the connection times out
+         */
         Connection open(ConnectionFactory factory, ClusterNode node, String connectionName)
                 throws IOException, TimeoutException;
     }

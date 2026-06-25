@@ -67,6 +67,16 @@ public class StorageServerApplication {
         runConsumersForever(config, storageService, validator, connectionManager);
     }
 
+    /**
+     * Runs the storage consumer loop indefinitely, reconnecting to RabbitMQ on any failure or
+     * connection loss until the thread is interrupted. Each connection cycle verifies the required
+     * topology, starts manual-ack consumers, and blocks until the connection closes.
+     *
+     * @param config the application configuration
+     * @param storageService the MongoDB persistence service
+     * @param validator the security validator applied to each delivery
+     * @param connectionManager the RabbitMQ connection manager
+     */
     private static void runConsumersForever(
             AppConfig config,
             MongoStorageService storageService,
@@ -115,6 +125,16 @@ public class StorageServerApplication {
         }
     }
 
+    /**
+     * Waits until both required RabbitMQ queues exist before the storage server starts consuming,
+     * since the topology is declared by the queue-server. Retries passively until the queues are
+     * available or the wait window is exhausted.
+     *
+     * @param connection the active RabbitMQ connection
+     * @param config the application configuration providing the queue names
+     * @throws InterruptedException if the waiting thread is interrupted
+     * @throws IllegalStateException if the required queues never become available
+     */
     private static void waitForRequiredQueues(com.rabbitmq.client.Connection connection, AppConfig config)
             throws InterruptedException {
         String transactionsQueue = config.getTransactionsQueueName();
@@ -141,6 +161,14 @@ public class StorageServerApplication {
         }
     }
 
+    /**
+     * Passively verifies that a queue exists without declaring or modifying it, logging its
+     * current message and consumer counts.
+     *
+     * @param channel the active RabbitMQ channel
+     * @param queueName the name of the queue to verify
+     * @throws IOException if the queue does not exist or cannot be inspected
+     */
     private static void passivelyVerifyQueue(Channel channel, String queueName) throws IOException {
         com.rabbitmq.client.AMQP.Queue.DeclareOk status = channel.queueDeclarePassive(queueName);
         logger.info("Verified RabbitMQ queue=" + queueName
@@ -155,6 +183,7 @@ public class StorageServerApplication {
      * @param queueName the name of the queue to consume
      * @param storageService the database storage service
      * @param validator the security validator
+     * @param config the application configuration used for payload validation and logging
      * @throws IOException when queue operations fail
      */
     private static void consumeQueue(Channel channel, String queueName, MongoStorageService storageService, QueueMessageSecurityValidator validator, AppConfig config) throws IOException {
@@ -240,6 +269,9 @@ public class StorageServerApplication {
      * Performs type checking, range checking, and format validation.
      * 
      * @param payload the JSON payload string
+     * @param messageType the message type used to select the applicable validation rules
+     * @param config the application configuration providing limits such as the maximum amount
+     * @throws IllegalArgumentException if the payload fails validation
      */
     private static void validatePayload(String payload, String messageType, AppConfig config) {
         try {

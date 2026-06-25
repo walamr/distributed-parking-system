@@ -118,6 +118,11 @@ public class PEOController {
         startParkingEventMonitor();
     }
 
+    /**
+     * Starts a daemon thread that polls the repository for new parking start and
+     * stop events, deduplicates them by message identifier, and prepends each new
+     * event to the activity log on the JavaFX Application Thread.
+     */
     private void startParkingEventMonitor() {
         Thread monitor = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted()) {

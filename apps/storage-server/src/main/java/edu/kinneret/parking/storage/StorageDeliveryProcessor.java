@@ -9,9 +9,23 @@ final class StorageDeliveryProcessor {
     private static final Logger logger = Logger.getLogger(StorageDeliveryProcessor.class.getName());
     private static final String SERVICE_NAME = "storage-server";
 
+    /** Utility class; instantiation is not permitted. */
     private StorageDeliveryProcessor() {
     }
 
+    /**
+     * Persists a single validated message and then makes the appropriate RabbitMQ acknowledgement
+     * decision. On success the delivery is acked. On a transient MongoDB failure (for example a
+     * replica-set failover) the delivery is requeued so it can be redelivered; on a permanent
+     * failure it is rejected and dead-lettered.
+     *
+     * @param queueName the queue the delivery came from (for logging)
+     * @param envelope the validated message envelope to persist
+     * @param sanitizedMongoTarget the sanitized MongoDB target description (for logging)
+     * @param store the persistence callback that stores the envelope
+     * @param acknowledger the callback used to ack, reject, or requeue the delivery
+     * @return {@code true} when the message was stored and acked, {@code false} otherwise
+     */
     static boolean persistThenAcknowledge(
             String queueName,
             MessageEnvelope envelope,
@@ -73,6 +87,9 @@ final class StorageDeliveryProcessor {
      * election in progress, a socket/connection/server-selection timeout, or a retryable
      * write). Such messages should be requeued rather than dead-lettered so no parking
      * event is lost during a MongoDB failover.
+     *
+     * @param ex the failure to inspect, including its cause chain
+     * @return {@code true} if the failure appears transient and should be retried
      */
     static boolean isTransientMongoError(Throwable ex) {
         for (Throwable t = ex; t != null; t = t.getCause()) {
@@ -94,20 +111,45 @@ final class StorageDeliveryProcessor {
         return false;
     }
 
+    /**
+     * Callback that persists a single message envelope, decoupling this processor from the
+     * concrete storage implementation.
+     */
     @FunctionalInterface
     interface MessageStore {
+        /**
+         * Persists the given message envelope.
+         *
+         * @param envelope the envelope to store
+         * @throws Exception if persistence fails
+         */
         void store(MessageEnvelope envelope) throws Exception;
     }
 
+    /**
+     * Callback abstraction over the three RabbitMQ delivery outcomes (ack, reject, requeue),
+     * decoupling this processor from the concrete channel.
+     */
     interface DeliveryAcknowledger {
+        /**
+         * Acknowledges the delivery as successfully processed and persisted.
+         *
+         * @throws Exception if acknowledging fails
+         */
         void ack() throws Exception;
 
-        /** Dead-letters the delivery (permanent failure: never redelivered to this queue). */
+        /**
+         * Dead-letters the delivery (permanent failure: never redelivered to this queue).
+         *
+         * @throws Exception if rejection fails
+         */
         void reject() throws Exception;
 
         /**
          * Returns the delivery to the queue for redelivery (transient failure). Defaults to
          * {@link #reject()} for implementations that do not distinguish the two outcomes.
+         *
+         * @throws Exception if requeuing fails
          */
         default void requeue() throws Exception {
             reject();

@@ -18,12 +18,10 @@ public final class RecommenderRequestSigner {
             "type", "spaceId", "correlationId", "timestamp", "nonce", "nodeId",
             "localResult", "status", "result", "reason", "vehicleId");
 
-/**
-
- * Constructs a new RecommenderRequestSigner.
-
- */
-
+    /**
+     * Prevents instantiation; this class only exposes static factory methods
+     * for building signed recommender requests.
+     */
     private RecommenderRequestSigner() {
     }
 
@@ -69,16 +67,15 @@ public final class RecommenderRequestSigner {
         return request;
     }
 
-/**
-
- * Canonical signing content.
-
- * @param message the message
-
- * @return the string
-
- */
-
+    /**
+     * Builds the canonical, deterministic string that is fed to the HMAC signer.
+     * Only the fields in {@link #SIGNED_FIELDS} that are present on the message
+     * are included, emitted in sorted {@code key=value} order so that both the
+     * sender and receiver compute an identical signing payload.
+     *
+     * @param message the request JSON whose signed fields should be serialised
+     * @return the canonical {@code key=value} representation used for signing
+     */
     private static String canonicalSigningContent(JsonObject message) {
         Map<String, String> fields = new LinkedHashMap<>();
         SIGNED_FIELDS.stream().sorted().forEach(field -> {
