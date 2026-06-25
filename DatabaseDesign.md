@@ -3,11 +3,11 @@
 ## Team Members
 | Name | Student ID | Task Performed | Hours Worked |
 | :--- | :--- | :--- | :--- |
-| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 20 Hours |
-| **Hanan Taha** | 212277438 | Task 2: Queue Server | 20 Hours |
-| **Aseel Shaheen** | 214228009 | Task 4: Documentation | 20 Hours |
-| **Hala Assadi** | 324830967 | Task 3: Database and Storage | 20 Hours |
-| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening | 20 Hours |
+| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 22 Hours |
+| **Hanan Taha** | 212277438 | Task 2: Recommender Server | 20 Hours |
+| **Aseel Shaheen** | 214228009 | Task 4: Documentation & DevOps | 21 Hours |
+| **Hala Assadi** | 324830967 | Task 3: Consensus Protocol | 19 Hours |
+| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening (Blue Teaming) | 18 Hours |
 
 ## 1. MongoDB Cluster Layout
 
@@ -22,6 +22,48 @@ Host-run Java applications default to:
 
 ```text
 mongodb://customer_db_user:db_pwd_rotated_cust@mongo1:27017,mongo2:27018,mongo3:27019/parking_db?replicaSet=rs0&authSource=admin
+```
+
+### Collections Diagram
+
+The `parking_db` database holds five collections. Reference data (`vehicles`, `zones`, `spaces`) is seeded at init; event data (`transactions`, `citations`) is written only by the storage server and linked to reference data through `spaceId` / `vehicleId`.
+
+```mermaid
+erDiagram
+    ZONES ||--o{ SPACES : "contains (zoneName)"
+    SPACES ||--o{ TRANSACTIONS : "spaceId"
+    SPACES ||--o{ CITATIONS : "spaceId"
+    VEHICLES ||--o{ TRANSACTIONS : "vehicleId"
+    VEHICLES ||--o{ CITATIONS : "vehicleId"
+
+    ZONES {
+        string zoneId
+        string zoneName
+        double hourlyRate
+    }
+    SPACES {
+        string spaceId
+        string zoneId
+        string zoneName
+        double hourlyRate
+    }
+    VEHICLES {
+        string vehicleId
+        string owner
+        string accountType
+    }
+    TRANSACTIONS {
+        string correlationId
+        string messageId
+        long timestamp
+        object payload
+    }
+    CITATIONS {
+        string correlationId
+        string messageId
+        long timestamp
+        object payload
+    }
 ```
 
 ## 2. MongoDB TLS for Host-Run Apps

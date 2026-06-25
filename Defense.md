@@ -35,36 +35,36 @@ During the Round 2 Red Teaming exercise, our system was audited by two red teams
 ## 5. Updated Security Architecture
 ```mermaid
 flowchart TD
-    subgraph UI Clients
-        C[Customer UI\n(Role: customer)]
-        P[PEO UI\n(Role: peo_service)]
-        M[MO UI\n(Role: mulligan_admin)]
+    subgraph UIClients["UI Clients"]
+        C["Customer UI<br/>(Role: customer)"]
+        P["PEO UI<br/>(Role: peo_service)"]
+        M["MO UI<br/>(Role: mulligan_admin)"]
     end
 
-    subgraph Message Broker
-        RMQ[(RabbitMQ Cluster\nQuorum Queues)]
+    subgraph Broker["Message Broker"]
+        RMQ[("RabbitMQ Cluster<br/>Quorum Queues")]
     end
 
-    subgraph Microservices
-        QS[Queue Server\n(Role: queue_service)]
-        SS[Storage Server\n(Role: storage_service)]
-        RS[Recommender Server Cluster]
+    subgraph Microservices["Microservices"]
+        QS["Queue Server<br/>(Role: queue_service)"]
+        SS["Storage Server<br/>(Role: storage_service)"]
+        RS["Recommender Server Cluster"]
     end
 
-    subgraph Data Tier
-        DB[(MongoDB Replica Set\nStrict mTLS)]
+    subgraph DataTier["Data Tier"]
+        DB[("MongoDB Replica Set<br/>Strict mTLS")]
     end
 
-    C -- "AMQP (TLS)\nWrite-Only" --> RMQ
-    P -- "AMQP (TLS)\nWrite-Only" --> RMQ
-    M -- "AMQP (TLS)\nAdmin" --> RMQ
+    C -- "AMQP TLS<br/>write-only" --> RMQ
+    P -- "AMQP TLS<br/>write-only" --> RMQ
+    M -- "AMQP TLS<br/>admin" --> RMQ
 
-    RMQ -- "AMQP (TLS)\nRead/Consume" --> QS
-    RMQ -- "AMQP (TLS)\nRead/Consume" --> SS
+    RMQ -- "AMQP TLS<br/>read/consume" --> QS
+    RMQ -- "AMQP TLS<br/>read/consume" --> SS
 
-    QS -- "MongoDB Wire Protocol (TLS)\nShared Nonce Store" --> DB
-    SS -- "MongoDB Wire Protocol (TLS)" --> DB
-    RS -- "MongoDB Wire Protocol (TLS)" --> DB
+    QS -- "MongoDB wire TLS<br/>shared nonce store" --> DB
+    SS -- "MongoDB wire TLS" --> DB
+    RS -- "MongoDB wire TLS<br/>read-only" --> DB
 ```
 
 ## 6. Testing Results

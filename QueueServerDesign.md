@@ -3,11 +3,11 @@
 ## Team Members
 | Name | Student ID | Task Performed | Hours Worked |
 | :--- | :--- | :--- | :--- |
-| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 20 Hours |
-| **Hanan Taha** | 212277438 | Task 2: Queue Server | 20 Hours |
-| **Aseel Shaheen** | 214228009 | Task 4: Documentation | 20 Hours |
-| **Hala Assadi** | 324830967 | Task 3: Database and Storage | 20 Hours |
-| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening | 20 Hours |
+| **Walaa Mruwat** | 325224194 | Task 1: User Interfaces | 22 Hours |
+| **Hanan Taha** | 212277438 | Task 2: Recommender Server | 20 Hours |
+| **Aseel Shaheen** | 214228009 | Task 4: Documentation & DevOps | 21 Hours |
+| **Hala Assadi** | 324830967 | Task 3: Consensus Protocol | 19 Hours |
+| **Taqwa Mrowat** | 212804017 | Task 5: Security Hardening (Blue Teaming) | 18 Hours |
 
 ## 1. Messaging Topology
 
@@ -21,26 +21,26 @@
 
 ```mermaid
 flowchart LR
-    subgraph Publishers
-        C[Customer UI/CLI\nuser: customer]
-        P[PEO UI/CLI\nuser: peo_service]
+    subgraph Publishers["Publishers"]
+        C["Customer UI/CLI<br/>user: customer"]
+        P["PEO UI/CLI<br/>user: peo_service"]
     end
-    subgraph Broker["RabbitMQ Quorum Cluster (TLS 5671/5673/5674)"]
-        TQ[(transactions.queue\nquorum, group size 3)]
-        CQ[(citations.queue\nquorum, group size 3)]
+    subgraph Broker["RabbitMQ Quorum Cluster - TLS 5671/5673/5674"]
+        TQ[("transactions.queue<br/>quorum, group size 3")]
+        CQ[("citations.queue<br/>quorum, group size 3")]
     end
-    subgraph Consumers
-        QS[Queue Server\nuser: mulligan_admin\ndeclares topology]
-        SS[Storage Server\nuser: peo_service\npersist-then-ack]
+    subgraph Consumers["Consumers"]
+        QS["Queue Server<br/>user: mulligan_admin<br/>declares topology"]
+        SS["Storage Server<br/>user: peo_service<br/>persist-then-ack"]
     end
-    R[Recommender Cluster] -. "health check only\n(TLS AMQP)" .-> Broker
+    R["Recommender Cluster"] -. "health check only<br/>TLS AMQP" .-> Broker
     C -- "publish (write-only)" --> TQ
     P -- "publish" --> TQ
     P -- "publish" --> CQ
     TQ --> SS
     CQ --> SS
     QS -- "declare/manage" --> Broker
-    SS -- "validated insert (TLS)" --> M[(MongoDB Replica Set)]
+    SS -- "validated insert (TLS)" --> M[("MongoDB Replica Set")]
 ```
 
 The repository now includes a reproducible setup script:

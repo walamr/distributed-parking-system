@@ -163,6 +163,36 @@ The cluster is 3 nodes, so the majority threshold is 2. The table below maps eve
 
 The key rule demonstrated by 4.1.4 and 4.1.5 is that the leader compares the **complete serialized list**, not just the first recommended space — so `3;1, 4;1` and `3;1` are different votes.
 
+### Per-Node Decision Flow (normal vs malicious — Assignment Figure 4)
+
+Each node decides what to vote before the leader tallies:
+
+```mermaid
+flowchart TD
+    A["Receive request for spaceId"] --> B{"Malicious mode?"}
+    B -- "Yes" --> M["Return configured fake list<br/>(e.g. 999;999)"]
+    B -- "No" --> C["Query DB: spaces in zone,<br/>latest tx per space, citation counts"]
+    C --> D["Keep only available spaces"]
+    D --> E{"Any available?"}
+    E -- "No" --> F["Vote = Empty List<br/>(ZONE_FULL)"]
+    E -- "Yes" --> G["Select minimum citation count"]
+    G --> H["Pick smallest distance<br/>to requested space"]
+    H --> I["Sort numerically, serialize list"]
+    M --> V["Send signed vote to leader"]
+    F --> V
+    I --> V
+```
+
+### Leader Majority-Vote Flow (Assignment Figure 3)
+
+```mermaid
+flowchart TD
+    S["Collect votes:<br/>own + forwarded + COLLECT_RESPONSEs"] --> T["Group identical full lists, count each"]
+    T --> U{"Top list count >= floor(N/2)+1 ?"}
+    U -- "Yes" --> W["Return that list as SUCCESS<br/>(or ZONE_FULL if Empty List)"]
+    U -- "No" --> X["Return FAILURE:<br/>No majority consensus reached"]
+```
+
 ## 4. Design Rationale: Custom TLS-Socket Protocol vs. Apache Ratis/Raft
 
 While Apache Ratis and the Raft consensus protocol are excellent for state-machine replication (ensuring consistent state updates across a replicated log), the requirements of the Recommender Cluster in this assignment led to the design of a custom, lightweight, TLS-socket-based majority voting consensus protocol.

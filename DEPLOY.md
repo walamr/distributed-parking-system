@@ -5,7 +5,8 @@
 - Course: Distributed Systems
 - Semester / Year: Semester 2, 5786
 - Assignment: Assignment 3 - Recommender and Consensus (with Blue-Team hardening)
-- Documentation owner: Aseel Shaheen (ID: 214228009)
+- Team and task breakdown: see the Team Members table in [README.md](README.md)
+- DevOps / documentation lead: Aseel Shaheen (ID: 214228009)
 
 This guide covers:
 
