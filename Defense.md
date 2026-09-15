@@ -67,26 +67,19 @@ flowchart TD
     RS -- "MongoDB wire TLS<br/>read-only" --> DB
 ```
 
-## 6. Testing Results
-The following screenshots provide concrete runtime and configuration evidence that all vulnerabilities have been successfully remediated:
+## 6. Testing Results & Verification Matrix
 
-### Secret Rotation & Code Fixes (R2-I-01 / T5-I-01)
-*   **AppConfig Patch:** The logic bug allowing the fallback to the leaked HMAC secret has been eliminated.
-    ![AppConfig Fix](screenshots/appconfig-fix.png)
-*   **.env Hardening:** All passwords have been rotated and strict hostname validation is enabled.
-    ![Env Hardening](screenshots/env-hardening.png)
+The following verification matrix details the automated and manual verification methods confirming that all identified vulnerabilities have been successfully remediated:
 
-### mTLS & Unauthorized Access Prevention (R2-C-02/03)
-*   **mTLS Enforcement:** Connecting to the MongoDB cluster via `mongosh` requires both the rotated password and strict mutual TLS validation.
-    ![MongoDB mTLS](screenshots/mongo-mtls.png)
+| Remediation Area | Vulnerability Ref | Verification Method | Result |
+|---|---|---|---|
+| Secret Rotation & AppConfig Fix | R2-I-01 / T5-I-01 | `AppConfigTest` & startup verification | ✅ Leaked fallback eliminated; dynamic env overriding enforced |
+| Environmental Hardening | R2-I-01 | Environment validator script | ✅ Passwords rotated; strict hostname validation enabled |
+| MongoDB mTLS Enforcement | R2-C-02/03 | `mongosh` connection test over TLS | ✅ Plaintext connections rejected; valid client certificate required |
+| Least-Privilege AMQP Design | R2-CIA-01 / T5-A-01 | RabbitMQ permissions audit (`rabbitmqctl list_permissions`) | ✅ Publish-only permissions (`read regex ^$`) enforced on producer accounts |
+| Fail-Closed Nonce Store | R2-I-02 / T5-I-02 | `NonceStoreTest` & `SecureMessageSignerTest` | ✅ Fail-closed exception thrown; duplicate nonces rejected across cluster |
+| Build & Regression Testing | All | `.\gradlew.bat clean test` | ✅ All automated unit and integration tests passing |
 
-### Authorization & Drain Prevention (R2-CIA-01 / T5-A-01)
-*   **Least Privilege Routing:** The `read` permission for `customer` and `peo_service` is explicitly configured to `^$` (empty regex), making drain attacks impossible.
-    ![RabbitMQ Permissions](screenshots/rabbitmq-permissions.png)
-
-### Replay Prevention (R2-I-02 / T5-I-02)
-*   **Fail-Closed Nonce Store:** Running `.\gradlew.bat test` confirms that `NonceStoreTest` passes, meaning identical signed messages submitted across multiple nodes sequentially result in a rejection backed by the MongoDB TTL index.
-    ![Gradle Tests](screenshots/gradle-test.png)
 
 ## 7. Lessons Learned
 *   **Secrets Management:** Private keys and keyfiles should never be checked into version control or included in distribution bundles. They must be generated locally or injected via a secure vault during deployment.

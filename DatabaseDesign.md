@@ -139,9 +139,10 @@ A reproducible health check script is available to verify the cluster state from
 .\scripts\verify-cluster-health.ps1
 ```
 
-## 8. Text Evidence
+## 8. Cluster Health Verification
 
-The database cluster can be verified without screenshots by running:
+The database cluster status can be verified by running the following commands:
+
 
 ```powershell
 docker compose up -d

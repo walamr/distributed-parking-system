@@ -4,13 +4,13 @@
 
 This document summarizes:
 
-- automated tests now present in the repository
-- manual verification steps for Task 1
-- manual failure/recovery checks for the MongoDB cluster
-- existing RabbitMQ evidence for Task 2
-- text-based evidence commands that replace manual screenshot requirements
+- automated unit and integration tests
+- manual application verification steps
+- cluster failure and recovery verification procedures
+- RabbitMQ & MongoDB cluster status verification commands
 
 ## 1. Automated Test Coverage
+
 
 The current Gradle test/build run covers:
 
@@ -83,9 +83,10 @@ Verify:
 - citation reports load from MongoDB
 - report tables tolerate both nested and legacy payload storage shapes
 
-## 3. Task 1 Text Evidence Checklist
+## 3. UI Application Verification Checklist
 
-Screenshots are not required for this submission package. The UI checks are verified by launching each role application and confirming the observable runtime behavior below.
+UI verification is completed by launching each role application and confirming the expected runtime behaviors detailed below:
+
 
 | UI | Command | Required text/runtime evidence |
 | :--- | :--- | :--- |
@@ -310,7 +311,8 @@ This test verifies the consensus behavior, malicious mode handling, and fault to
 
 ## 7. MongoDB Text Evidence
 
-Use these commands to collect database evidence without screenshots:
+Execute the following commands to inspect database status and collection records:
+
 
 ```powershell
 docker compose up -d
@@ -328,7 +330,8 @@ Expected evidence:
 
 ## 8. RabbitMQ Text Evidence
 
-Use these commands to collect queue evidence without screenshots:
+Execute the following commands to verify RabbitMQ cluster topology and queue status:
+
 
 ```powershell
 .\scripts\setup-rabbitmq-cluster.ps1

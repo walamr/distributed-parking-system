@@ -1,32 +1,47 @@
+# ── Build outputs ───────────────────────────────────────────────────────────
 .gradle/
 build/
 */build/
+**/build/
 bin/
 **/bin/
 *.class
+dist/
+
+# ── IDE / OS ─────────────────────────────────────────────────────────────────
 .project
 .classpath
 .settings/
 .vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+project.pdf
+project_text.txt
 
-# Generated / large files
-dist/
-red-team-delivery/
-gradle-bin/
-**/build/
-*.zip
+
+# ── Logs / generated ─────────────────────────────────────────────────────────
 *.log
 logs/
-.gradle/
+*.zip
+red-team-delivery/
+gradle-bin/
 
-# Security - do not distribute private keys (Commented out to allow Git sync across team PCs)
-# docker/rabbitmq/certs/*-key.pem
-# docker/rabbitmq/certs/*.jks
-# docker/rabbitmq/certs/*.p12
-# docker/mongodb/certs/mongo*.pem
-# docker/mongodb/certs/mongodb-keyfile
-
-# Ignore environment config containing actual secrets.
-# The Erlang cookie and other secrets live only in the untracked .env (use .env.example as a template).
+# ── SECRETS — NEVER COMMIT ───────────────────────────────────────────────────
+# Environment files with real credentials
 .env
+network-ips.env
+env-configs/*.env
 
+# TLS private keys & keystores (self-signed lab certs — regenerate for each env)
+docker/rabbitmq/certs/*-key.pem
+docker/rabbitmq/certs/*.jks
+docker/rabbitmq/certs/*.p12
+docker/rabbitmq/certs/*.srl
+
+# MongoDB private certs and keyfile
+docker/mongodb/certs/mongo*.pem
+docker/mongodb/certs/mongodb-keyfile

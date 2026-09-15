@@ -50,10 +50,7 @@ The infrastructure services (RabbitMQ, MongoDB) use official Docker Hub images. 
 
 The compose network `rabbitmq-internal` is a private `bridge` network. No service port is published on a public interface: every host-facing port is bound to loopback only (for example `127.0.0.1:5671`, `127.0.0.1:15671`, `127.0.0.1:27017`), so the cluster is not reachable from outside the host.
 
-Existing RabbitMQ evidence:
 
-- `docs/evidence/rabbitmq/01a-docker-compose-clean-reset-and-startup.png`
-- `docs/evidence/rabbitmq/01b-docker-compose-all-services-running-healthy.png`
 
 ## 3. Create the RabbitMQ Cluster Reproducibly
 
@@ -163,11 +160,7 @@ Expected result:
 - only TLS AMQP listeners are exposed externally on `5671`, `5673`, and `5674`
 - HTTPS management listeners are active on `15671`, `15673`, and `15674`
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/02a-rabbitmq-cluster-status-3-running-nodes.png`
-- `docs/evidence/rabbitmq/02b-rabbitmq-cluster-listeners-and-tls-ports.png`
-- `docs/evidence/rabbitmq/02c-rabbitmq-cluster-feature-flags-enabled.png`
 
 ## 7. Verify Quorum Queues
 
@@ -183,9 +176,7 @@ Expected result:
 - both queues include `x-quorum-initial-group-size=3`
 - both queues show members across the 3-node cluster
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/03-quorum-queues-replicated-3-members.png`
 
 ## 8. Verify RabbitMQ Users and Permissions
 
@@ -200,9 +191,7 @@ Expected result:
 - `peo_service` has `transactions.queue` and `citations.queue` access
 - `mulligan_admin` has admin permissions for queue-server topology setup
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/04-rabbitmq-users-and-permissions.png`
 
 ## 9. Run the Storage Server
 
@@ -234,9 +223,7 @@ Expected result:
 - the queue server declares `transactions.queue` and `citations.queue`
 - the queue server starts long-running consumers with automatic RabbitMQ recovery enabled
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/05-queue-server-running-consumers.png`
 
 ## 11. Run the UIs
 
@@ -311,10 +298,7 @@ $env:HMAC_SECRET='change-me-for-real-deployments'
 .\gradlew.bat :queue-server:runQueueSmokeTest
 ```
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/06-smoke-test-published-successfully.png`
-- `docs/evidence/rabbitmq/07-queues-after-smoke-test-consumers-attached.png`
 
 ## 14. Failure and Recovery Test
 
@@ -369,13 +353,7 @@ Expected result:
 - smoke test still succeeds
 - queue-server consumer connection is expected to recover automatically through the RabbitMQ client recovery mechanism
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/08a-rabbitmq1-stopped-cluster-running-on-rabbitmq2-rabbitmq3.png`
-- `docs/evidence/rabbitmq/08b-rabbitmq-failover-listeners-after-node-failure.png`
-- `docs/evidence/rabbitmq/08c-rabbitmq-feature-flags-after-node-failure.png`
-- `docs/evidence/rabbitmq/09-queues-after-rabbitmq1-failure.png`
-- `docs/evidence/rabbitmq/10-smoke-test-success-after-rabbitmq1-failure.png`
 
 ### Recover the stopped node
 
@@ -387,12 +365,7 @@ docker exec rabbitmq1 rabbitmqctl list_feature_flags
 docker exec rabbitmq1 rabbitmqctl list_queues name messages_ready consumers leader members
 ```
 
-Existing evidence:
 
-- `docs/evidence/rabbitmq/11a-rabbitmq1-recovered-3-nodes-running.png`
-- `docs/evidence/rabbitmq/11b-rabbitmq-recovery-listeners-and-no-partitions.png`
-- `docs/evidence/rabbitmq/11c-rabbitmq-feature-flags-after-recovery.png`
-- `docs/evidence/rabbitmq/12-queues-after-rabbitmq1-recovery.png`
 
 ## 15. Gradle Validation
 
@@ -401,14 +374,10 @@ Existing evidence:
 .\gradlew.bat :queue-server:test
 ```
 
-Existing evidence:
+## 16. Cluster Health & Status Verification
 
-- `docs/evidence/rabbitmq/13-gradle-clean-test-build-success.png`
-- `docs/evidence/rabbitmq/14-queue-server-tests-success.png`
+Run the following CLI commands to verify cluster status and service health:
 
-## 16. Evidence Without Screenshots
-
-The submission does not require manual screenshots to prove deployment. Use these commands as text evidence:
 
 ```powershell
 .\gradlew.bat clean test build
