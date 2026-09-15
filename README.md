@@ -635,6 +635,7 @@ NONINFRINGEMENT.
 | [QueueServerDesign.md](QueueServerDesign.md) | RabbitMQ topology, security model, client failover design |
 | [DatabaseDesign.md](DatabaseDesign.md) | MongoDB layout, collection schemas, Recommender query patterns |
 | [Defense.md](Defense.md) | Blue Team report: 8 vulnerabilities, root-cause analysis, fixes applied |
+| [SECURITY.md](SECURITY.md) | Security policy, vulnerability reporting, and secret management guidelines |
 | [Testing.md](Testing.md) | Automated and manual verification evidence |
 
 ---

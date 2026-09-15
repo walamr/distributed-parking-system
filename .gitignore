@@ -33,15 +33,22 @@ gradle-bin/
 # ── SECRETS — NEVER COMMIT ───────────────────────────────────────────────────
 # Environment files with real credentials
 .env
+.env.local
+.env.*.local
 network-ips.env
 env-configs/*.env
+!env-configs/.env.ui-template
 
-# TLS private keys & keystores (self-signed lab certs — regenerate for each env)
-docker/rabbitmq/certs/*-key.pem
-docker/rabbitmq/certs/*.jks
-docker/rabbitmq/certs/*.p12
-docker/rabbitmq/certs/*.srl
+# Sensitive data files
+registered_users.properties
 
-# MongoDB private certs and keyfile
-docker/mongodb/certs/mongo*.pem
-docker/mongodb/certs/mongodb-keyfile
+# TLS private keys & keystores
+*.jks
+*.p12
+*.pem
+*.key
+*.crt
+docker/rabbitmq/certs/*
+!docker/rabbitmq/certs/.gitkeep
+docker/mongodb/certs/*
+!docker/mongodb/certs/.gitkeep
